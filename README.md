@@ -10,7 +10,7 @@ That opens [play.html](play.html). Hit **Wake up** to start. **Continue** picks 
 
 GitHub’s file view only shows the source. The Play link above is what runs the game.
 
-WASD and the mouse on a computer. On a phone, the stick and a drag to look. Nothing to install.
+WASD and the mouse on a computer. On a phone, turn it sideways: the stick and a drag to look. Nothing to install.
 
 ## Files
 

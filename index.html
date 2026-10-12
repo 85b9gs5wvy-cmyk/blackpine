@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Blackpine</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="blackpine.css" />
+    <style>
+      :root {
+        --bone: #e7e1d2;
+        --rust: #c4552a;
+        --moss: #a3b36a;
+        --ink: #1a1814;
+        --panel: #23281c;
+        --muted: #b4ad9e;
+        --font: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #100e0c;
+        overflow: hidden;
+      }
+      .bp-shell {
+        position: fixed;
+        inset: 0;
+        background: #100e0c;
+        color: var(--bone);
+        font-family: var(--font);
+      }
+      .bp-title {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        align-items: flex-end;
+        justify-content: flex-start;
+        padding: calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 96px);
+        background: #14120e;
+        pointer-events: auto;
+      }
+      .bp-title.off {
+        display: none;
+      }
+      .bp-card {
+        width: min(560px, 100%);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .bp-kicker {
+        margin: 0;
+        color: var(--rust);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .bp-card h1 {
+        margin: 0;
+        font-size: clamp(56px, 12vw, 92px);
+        line-height: 0.86;
+        letter-spacing: 0.04em;
+        font-weight: 700;
+      }
+      .bp-card p {
+        margin: 0;
+        max-width: 46ch;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.45;
+      }
+      .bp-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .bp-actions button {
+        min-height: 52px;
+        border: 0;
+        padding: 0 22px;
+        font: 700 16px/1 var(--font);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+      .bp-actions .go {
+        background: var(--moss);
+        color: var(--ink);
+      }
+      .bp-actions .alt {
+        background: transparent;
+        color: var(--bone);
+        border: 1px solid rgba(231, 225, 210, 0.35);
+      }
+      .bp-actions button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .bp-load {
+        color: var(--moss);
+        font-size: 14px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .bp-err {
+        color: #e08070;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bp-shell">
+      <div id="blackpine"></div>
+      <section class="bp-title" id="title">
+        <div class="bp-card">
+          <p class="bp-kicker">Wilderness survival</p>
+          <h1>BLACKPINE</h1>
+          <p>
+            Gather, build a claim, and keep a rating the island does not forget. A tool cupboard
+            holds the ground around it. Weather turns. Every tenth night, they come for the cupboard.
+          </p>
+          <p id="status" class="bp-load" hidden>Charting the ridgeline…</p>
+          <p id="err" class="bp-err" hidden></p>
+          <div class="bp-actions">
+            <button class="go" id="play" type="button">Play</button>
+            <button class="alt" id="cont" type="button" disabled>Continue</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script type="module">
+      import * as THREE from "./three.module.js";
+      import { bootSurvival } from "./blackpine.js";
+
+      const title = document.getElementById("title");
+      const play = document.getElementById("play");
+      const cont = document.getElementById("cont");
+      const status = document.getElementById("status");
+      const err = document.getElementById("err");
+      const root = document.getElementById("blackpine");
+      const SAVE = "blackpine-save-v1";
+
+      try {
+        cont.disabled = localStorage.getItem(SAVE) == null;
+      } catch {
+        cont.disabled = true;
+      }
+
+      let running = false;
+      function start(keep) {
+        if (running) return;
+        running = true;
+        err.hidden = true;
+        status.hidden = false;
+        play.disabled = true;
+        cont.disabled = true;
+        try {
+          bootSurvival(THREE, root, { cont: keep });
+          title.classList.add("off");
+        } catch (e) {
+          running = false;
+          status.hidden = true;
+          play.disabled = false;
+          err.hidden = false;
+          err.textContent = e instanceof Error ? e.message : "The island failed to wake.";
+        }
+      }
+
+      play.addEventListener("click", () => start(false));
+      cont.addEventListener("click", () => start(true));
+    </script>
+  </body>
+</html>

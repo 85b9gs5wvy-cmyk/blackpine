@@ -4,15 +4,17 @@ Wilderness survival in the browser. Gather, build a claim, and hold the tool cup
 
 ## Play
 
-**On GitHub Pages:** Settings → Pages → Deploy from branch → `main` / root. Then open `https://<your-username>.github.io/<repo-name>/` (that serves `index.html`).
-
 **[Play Blackpine](https://htmlpreview.github.io/?https://github.com/85b9gs5wvy-cmyk/blackpine/blob/main/play.html)**
 
-That opens [play.html](play.html). Hit **Wake up** to start. The page also has **Save file**, **Load file**, and a **Menu** for look sensitivity, day speed, gather rate, and pause. **Continue** picks up a save already in this browser.
+That opens [play.html](play.html), the whole game in one file. Hit **Wake up** to start.
 
-GitHub’s file view only shows the source. The Play link above is what runs the game.
+**[Play the split build](https://htmlpreview.github.io/?https://github.com/85b9gs5wvy-cmyk/blackpine/blob/main/index.html)**
 
-WASD and the mouse on a computer. On a phone, turn it sideways: the stick and a drag to look. Nothing to install.
+That opens [index.html](index.html), the same game loaded from the separate files.
+
+Both links run in the browser. GitHub’s file view only shows source, and this account cannot turn on GitHub Pages, so don’t use a `github.io` address.
+
+The page also has **Save file**, **Load file**, and a **Menu** for look sensitivity, day speed, gather rate, and pause. **Continue** picks up a save already in this browser. On a phone, turn it sideways: the stick and a drag to look. Nothing to install.
 
 ## Files
 

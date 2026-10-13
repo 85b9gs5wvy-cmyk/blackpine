@@ -4142,7 +4142,7 @@ function nodeTick(dt){for(let i=RN.length-1;i>=0;i--){const n=RN[i],o=n.o;
  else if(n.st==='wait'){if((n.timer-=dt)<=0){n.st='grow';n.t=0;o.rotation.copy(n.r0);o.visible=true;if(n.stump)scene.remove(n.stump)}}
  else{n.t+=dt/1.4;const e=Math.min(1,n.t),q=1+2.7*Math.pow(e-1,3)+1.7*Math.pow(e-1,2);o.scale.copy(n.s0).multiplyScalar(Math.max(.001,q));
   if(e>=1){o.scale.copy(n.s0);o.userData.uses=o.userData.farm?(n.k==='tree'?2:3):(n.k==='tree'?3:2);things.push(o);RN.splice(i,1)}}}}
-function act(){if(dead)return;{const s=SL[sel];if(s&&(ITEMS[s.id].bd||ITEMS[s.id].dv))return buildAct(s)}const o=target()||closestUse();
+function act(){if(dead)return;{const s=SL[sel];if(s&&(ITEMS[s.id].bd||ITEMS[s.id].dv))return buildAct(s)}if(tool('hammer')&&hammerTarget())return hammerAct();const o=target()||closestUse();
  if(!o){const chip=toolPiece();if(chip&&(tool('hatchet')||tool('pickaxe')))return chopPiece(chip);if(canDrink()){S.thirst=Math.min(100,S.thirst+30);return say('You drink the water.')}return useSlot(sel)||say('Nothing in reach.')}
  if(o.userData.k==='recycler')return openRecycler(o.userData.rc);
  if(o.userData.k==='drop'){const id=o.userData.item||'meat',n=o.userData.n||1;if(!room(id,n))return say('Inventory full.');give(id,n);const i=things.indexOf(o);if(i>=0)things.splice(i,1);scene.remove(o);return say('Picked up '+ITEMS[id].n+'.')}
@@ -4288,7 +4288,7 @@ function render(keepTip){
  else if(tab==='craft'){
   const note=document.createElement('div');note.id='det';note.innerHTML='<b>Raid kit</b><p>Craft a pistol, rifle, spike trap or snap trap, and an auto turret. Turrets do nothing until a wind turbine and a battery are wired to them.</p>';c.appendChild(note);
   const pr=document.createElement('div');pr.className='pills';for(const k of CATS){const pb=btn(k,()=>{craftCat=k;render()});if(k===craftCat)pb.className='on';pr.appendChild(pb)}c.appendChild(pr);const wbn=nearWB(),wst=document.createElement('div');wst.className='wbs '+(wbn?'ok':'no');wst.textContent=wbn?'Workbench in reach':'No workbench in reach. Electrical, weapons and components need one.';c.appendChild(wst);
-  for(const r of REC.filter(x=>catOf(x.out)===craftCat)){const it=ITEMS[r.out],need=priced(r),ok=ch('free')||(Object.keys(need).every(k=>cnt(k)>=need[k])&&(!r.fire||nearFire())&&(!needWB(r)||nearWB())),e=document.createElement('div');e.className='rc';
+  for(const r of REC.filter(x=>catOf(x.out)===craftCat&&!(ITEMS[x.out].bd&&ITEMS[x.out].bd.t!=='wood'))){const it=ITEMS[r.out],need=priced(r),ok=ch('free')||(Object.keys(need).every(k=>cnt(k)>=need[k])&&(!r.fire||nearFire())&&(!needWB(r)||nearWB())),e=document.createElement('div');e.className='rc';
    e.innerHTML='<span class="ic">'+ico(r.out)+'</span><div><b>'+it.n+'</b><br><small>'+it.d+'</small><br>'+Object.keys(need).map(k=>'<span class="'+(cnt(k)>=need[k]?'ok':'no')+'">'+ITEMS[k].i+' '+cnt(k)+'/'+need[k]+'</span>').join(' ')+'</div>';
    const mx=ch('free')?99:Math.min(...Object.keys(need).map(k=>Math.floor(cnt(k)/need[k]))),cb=document.createElement('div');cb.className='cb';const b=btn(needWB(r)&&!nearWB()&&!ch('free')?'Needs bench':'Craft',()=>craft(r));b.disabled=!ok;cb.appendChild(b);if(it.max>1){const b5=btn('×5',()=>{for(let n=0;n<5;n++)craft(r);render()});b5.disabled=!ok||mx<5;cb.appendChild(b5)}e.appendChild(cb);c.appendChild(e)}}
  else{
@@ -4301,12 +4301,42 @@ root.querySelectorAll('#tabs button').forEach(b=>b.onpointerdown=()=>{tab=b.data
 // ===== BASE BUILDING + ELECTRICITY =====
 const C=3,FH=3.25,BCAP=600,STR=new Map(),key=(a,b,c)=>a+','+b+(c?','+c:''),FD=new Map(),WL=new Map(),RF=new Map(),ALLC=[],devs=[],wires=[];
 let tg=0,tu=0,tb=0,wf=null,gh=null,ghId=null;
-const TIER={wood:{n:'Wood',c:0x7a5a38,x:1},stone:{n:'Stone',c:0x8a8a86,x:1.6},metal:{n:'Metal',c:0x8f949c,x:2.2}};
+const TIER={wood:{n:'Wood',c:0x7a5a38,x:1},stone:{n:'Stone',c:0x8a8a86,x:1.6},metal:{n:'Metal',c:0x8f949c,x:2.2},hq:{n:'HQ Metal',c:0x3a4048,x:3.4}};
+// Build in wood, then upgrade each piece with the Hammer: Wood > Stone > Metal > HQ Metal.
+const TORD=['wood','stone','metal','hq'],HPT={wood:140,stone:260,metal:440,hq:900},PCS=[];
+function upCost(p,t){const b=PT[p][2];if(t==='hq')return{metal:Math.round(b*TIER.hq.x),gears:Math.max(2,Math.ceil(b/8))};return{[t]:Math.round(b*TIER[t].x)}}
+function tierDetail(b,bx){const t=b.t,p=b.p,S={wood:{seam:0x4a3622,trim:0x8f6e46,bolt:0x9a7a50},stone:{seam:0x5a5a56,trim:0xa8a8a0,bolt:0x9a9a94},metal:{seam:0x666b73,trim:0xb8bec6,bolt:0x4e5359},hq:{seam:0x14171b,trim:0xcdd4dc,bolt:0xe6bf55}}[t];
+ if(p==='wall'){
+  for(const y of[.75,1.5,2.25])bx(3.02,.05,.28,0,y,0,S.seam);
+  if(t==='wood')for(const x of[-1,0,1])bx(.03,3,.27,x,1.5,0,S.seam);
+  if(t==='stone'){const rc=[.375,1.125,1.875,2.625];rc.forEach((y,i)=>{const xs=i%2?[0]:[-.75,.75];for(const x of xs)bx(.05,.75,.28,x,y,0,S.seam)});bx(.14,3,.3,-1.46,1.5,0,S.trim);bx(.14,3,.3,1.46,1.5,0,S.trim)}
+  if(t==='metal'||t==='hq'){for(const x of[-1.32,1.32])for(const y of[.4,1.1,1.9,2.6])bx(.11,.11,.31,x,y,0,S.bolt);bx(.05,3,.29,0,1.5,0,S.seam)}
+  if(t==='hq'){bx(3.05,.14,.31,0,.07,0,S.trim);bx(3.05,.14,.31,0,2.93,0,S.trim);bx(.14,3,.31,-1.46,1.5,0,S.trim);bx(.14,3,.31,1.46,1.5,0,S.trim);bx(.9,.9,.31,0,1.5,0,S.seam);bx(.22,.22,.33,0,1.5,0,S.bolt)}
+ }else if(p==='doorway'||p==='window'){
+  bx(3.04,.1,.28,0,2.95,0,t==='wood'?S.seam:S.trim);
+  if(t!=='wood'){bx(.1,3,.28,-1.5,1.5,0,S.trim);bx(.1,3,.28,1.5,1.5,0,S.trim)}
+  if(t==='hq'){for(const x of[-1.05,1.05])for(const y of[.5,1.5,2.5])bx(.1,.1,.31,x,y,0,S.bolt)}
+ }else if(p==='foundation'){
+  bx(3.06,.12,3.06,0,-.06,0,t==='wood'?S.seam:S.trim);bx(3.03,.06,3.03,0,-.9,0,S.seam);bx(3.03,.06,3.03,0,-1.7,0,S.seam);
+  if(t==='hq')for(const sx of[-1,1])for(const sz of[-1,1])bx(.22,2.4,.22,sx*1.45,-1.2,sz*1.45,S.trim);
+ }else if(p==='roof'){
+  if(t==='wood')for(const x of[-1,0,1])bx(.08,.06,3.1,x,3.28,0,S.seam);else bx(3.14,.05,3.14,0,3.275,0,S.trim);
+  if(t==='hq')for(const x of[-1,0,1])bx(.1,.07,3.1,x,3.3,0,S.bolt);
+ }}
+function hammerTarget(){ray.setFromCamera({x:0,y:0},cam);const ms=[];for(let i=PCS.length-1;i>=0;i--){const r=PCS[i];if(!r.m.parent){PCS.splice(i,1);continue}if(r.owner==='you')ms.push(r.m)}if(!ms.length)return null;const h=ray.intersectObjects(ms,true);for(const x of h){let o=x.object;while(o&&ms.indexOf(o)<0)o=o.parent;if(o){const r=PCS.find(q=>q.m===o);if(r)return r}}return null}
+function hammerLabel(){const r=hammerTarget();if(!r)return'Hammer: aim at a wall, floor or roof you built';const nm=PT[r.p][0],nt=TORD[TORD.indexOf(r.t)+1];if(!nt)return TIER[r.t].n+' '+nm+' (fully upgraded)';const c=upCost(r.p,nt);return'Upgrade '+nm+' to '+TIER[nt].n+': '+Object.keys(c).map(k=>c[k]+' '+ITEMS[k].n+' ('+cnt(k)+')').join(', ')}
+function upgradePiece(r,nt,quiet){const it=ITEMS[nt+'_'+r.p];if(!it)return;const old=r.m,m=mk(it,null);m.position.copy(old.position);m.rotation.copy(old.rotation);scene.add(m);scene.remove(old);for(const c of ALLC)if(c.mesh===old){c.mesh=m;c.tier=nt;c.hp=c.maxHp=HPT[nt]}r.m=m;r.t=nt;
+ for(const e of BLOG)if(e.g&&e.g.k===r.k&&e.g.p===r.p)e.id=nt+'_'+r.p;
+ if(!quiet){swing=.3;RT.build+=.6;bumpHeat(.03);puffAt(old.position.x,old.position.y+(r.p==='foundation'?.4:r.p==='roof'?3:1.4),old.position.z);blip(nt==='hq'?520:nt==='metal'?340:200,.12,'square');blip(120,.08,'sawtooth');say(PT[r.p][0]+' upgraded to '+TIER[nt].n+'.')}}
+function hammerAct(){const r=hammerTarget();if(!r)return false;const nt=TORD[TORD.indexOf(r.t)+1];if(!nt){say('That '+PT[r.p][0].toLowerCase()+' is already HQ Metal. Nothing stronger.');return true}
+ const c=upCost(r.p,nt);if(!ch('free')){const lack=Object.keys(c).filter(k=>cnt(k)<c[k]);if(lack.length){say('Need '+lack.map(k=>(c[k]-cnt(k))+' more '+ITEMS[k].n.toLowerCase()).join(' and ')+' for '+TIER[nt].n+'.');return true}for(const k in c)take(k,c[k])}
+ upgradePiece(r,nt);return true}
 const PT={foundation:['Foundation','⬜',30,'A 3 m base. Build these first; the first can go anywhere flat and dry.'],wall:['Wall','🧱',20,'Snaps to a foundation edge.'],doorway:['Doorway','🚪',20,'A wall with a gap. Add a door.'],window:['Window Wall','🪟',20,'A wall with an opening.'],roof:['Roof','🔺',20,'Covers a foundation cell. Sheltered cells stay warmer.'],stairs:['Stairs','🪜',25,'Climbs one floor in the direction you face. Leave the roof above it open.']};
-for(const t in TIER)for(const p in PT){const id=t+'_'+p;ITEMS[id]={n:TIER[t].n+' '+PT[p][0],i:PT[p][1],max:10,bd:{t,p},d:PT[p][3]};REC.push({out:id,q:1,need:{[t]:Math.round(PT[p][2]*TIER[t].x)}})}
+for(const t in TIER)for(const p in PT){const id=t+'_'+p;ITEMS[id]={n:TIER[t].n+' '+PT[p][0],i:PT[p][1],max:10,bd:{t,p},d:PT[p][3]};REC.push({out:id,q:1,need:{[t==='hq'?'metal':t]:Math.round(PT[p][2]*TIER[t].x)}})}
 const DV={solar:['Solar Panel','☀',{metal:15,wood:5,circuit:2},'Up to 20 W in daylight, 0 at night.'],wind:['Wind Turbine','🌬',{metal:25,wood:10,circuit:3},'At least 18 W, day and night, enough for four turrets. Storms spin it harder.'],battery:['Battery','🔋',{metal:15,stone:5,circuit:1},'Stores 600 units. Charges from surplus, covers shortfalls.'],lamp:['Lamp','💡',{metal:3,wood:2},'Uses 3 W.'],heater:['Heater','♨',{metal:10,stone:5},'Uses 10 W. Warms within 6 m.'],switch:['Switch','🎚',{metal:3},'Use to toggle. Off breaks the circuit through it.'],door:['Wooden Door','🚪',{wood:15,metal:2},'Fits a doorway. Use to open or close.'],box:['Storage Box','📦',{wood:30},'12 slots. Use to open, then move items in and out.'],furnace:['Furnace','🏭',{stone:40,wood:15},'Smelts Metal Ore into Metal Fragments. Burns wood as fuel.'],turret:['Auto Turret','🎯',{metal:30,stone:10,gears:4},'Uses 4 W. Shoots hostiles within 24 m while powered. Your own turns on settlers who have drawn on you.'],tc:['Tool Cupboard','🔒',{wood:60,stone:20},'Building privilege for 26 m. Stock wood, stone and metal or covered pieces decay. Raiders come for this first. You cannot build inside someone else\'s cupboard.']};
 const NAMES={};for(const k in DV){NAMES[k]=DV[k][0];ITEMS[k]={n:DV[k][0],i:DV[k][1],max:k==='lamp'?10:5,dv:k,d:DV[k][3]};REC.push({out:k,q:1,need:DV[k][2]})}
 ITEMS.gears={n:'Gears',i:'⚙',max:100,d:'Salvaged from junk piles. Needed for turrets.'};ITEMS.circuit={n:'Circuit Board',i:'📟',max:100,d:'Salvaged from junk piles. Needed for solar panels, wind turbines and batteries.'};ITEMS.ore={n:'Metal Ore',i:'🔶',max:500,d:'Mined from rocks. Smelt it in a furnace.'};ITEMS.metal={n:'Metal Fragments',i:'🔩',max:500,d:'Smelted from Metal Ore in a furnace. Needed for electronics.'};
+ITEMS.hammer={n:'Builder Hammer',i:'🔨',max:1,tool:'hammer',d:'Equip it, aim at a wall, floor or roof you built and press Use to upgrade it: Wood, then Stone, Metal and HQ Metal. Stronger pieces cost more and hold out longer against raiders.'};REC.push({out:'hammer',q:1,need:{wood:8,stone:4}});BLD.push('hammer');
 ITEMS.wire={n:'Wire Tool',i:'🔌',max:1,tool:'wire',d:'Equip it, then Use on one device and another to connect. Repeat to remove.'};REC.push({out:'wire',q:1,need:{metal:5}});
 ITEMS.workbench={n:'Workbench',i:'🛠',max:3,dv:'workbench',d:'The camp table. Settlers keep one in every base. Craft guns and traps here in the crafting tab, then place them before raid night.'};REC.push({out:'workbench',q:1,need:{wood:40,stone:12,metal:6}});NAMES.workbench='Workbench';
 ITEMS.spike={n:'Spike Trap',i:'🪤',max:10,dv:'spike',d:'Place it in the yard. Raiders and wolves that step on it take a hit. No power.'};REC.push({out:'spike',q:1,need:{wood:22,stone:8}});NAMES.spike='Spike Trap';
@@ -4343,7 +4373,7 @@ function mk(it,mat){const g=new T.Group(),col=it.bd&&TIER[it.bd.t].c,u=g.userDat
   if(p==='foundation')bx(3,2.4,3,0,-1.2,0);else if(p==='wall')bx(3,3,.25,0,1.5,0);else if(p==='roof')bx(3.1,.25,3.1,0,3.125,0);
   else if(p==='stairs'){const n=8,rise=FH,run=3;for(let i=0;i<n;i++){const t1=(i+1)/n,z1=-1.5+run*t1,z0=-1.5+run*i/n,y1=rise*t1;bx(2.2,.14,(z1-z0)+.04,0,y1-.07,(z0+z1)/2);bx(2.2,rise/n,.07,0,y1-rise/(2*n),z1)}}
   else if(p==='doorway'){bx(.9,3,.25,-1.05,1.5,0);bx(.9,3,.25,1.05,1.5,0);bx(1.2,.7,.25,0,2.65,0)}
-  else{bx(3,1,.25,0,.5,0);bx(3,.7,.25,0,2.65,0);bx(.9,1.3,.25,-1.05,1.65,0);bx(.9,1.3,.25,1.05,1.65,0)}}
+  else{bx(3,1,.25,0,.5,0);bx(3,.7,.25,0,2.65,0);bx(.9,1.3,.25,-1.05,1.65,0);bx(.9,1.3,.25,1.05,1.65,0)}tierDetail(it.bd,bx)}
  else{const v=it.dv;
   if(v==='solar'){bx(.1,1,.1,0,.5,0,0x444444);bx(1.8,.07,1.1,0,1.1,0,0x1d3b66).rotation.x=-.5}
   else if(v==='wind'){bx(.15,6,.15,0,3,0,0xcccccc);const r=new T.Group();r.position.set(0,6.2,.2);for(let i=0;i<3;i++){const h=new T.Group();h.rotation.z=i*2.094;bx(.15,2.4,.05,0,1.2,0,0xeeeeee,h);r.add(h)}g.add(r);u.rotor=r}
@@ -4390,9 +4420,9 @@ function flushTerrain(){if(!terrDirty||!terrMesh)return;terrDirty=0;const g=terr
 function reseatFoundations(){for(const [k,f] of FD){const parts=String(k).split(',');if(parts.length!==2)continue;seatFoundation(+parts[0]*C,+parts[1]*C,f.y)}flushTerrain()}
 function onFound(x,z){const cx=Math.round(x/C),cz=Math.round(z/C);return FD.has(key(cx,cz))&&Math.hypot(x-cx*C,z-cz*C)<1.55}
 function onPlan(x,z,pad){const m=pad==null?1.8:pad;for(const n of NP){const p=n.plan;if(!p||p.cx==null)continue;if(x>=(p.cx-1)*C-m&&x<=(p.cx+p.w)*C+m&&z>=(p.cz-1)*C-m&&z<=(p.cz+p.d)*C+m)return true}return false}
-function construct(it,g,npc){const m=mk(it,null);m.position.set(g.x,g.y,g.z);m.rotation.y=g.rot||0;scene.add(m);noteBuild(it,g,npc);
+function construct(it,g,npc){const m=mk(it,null);m.position.set(g.x,g.y,g.z);m.rotation.y=g.rot||0;scene.add(m);noteBuild(it,g,npc);if(it.bd)PCS.push({m,p:it.bd.p,t:it.bd.t,k:g.k,owner:npc?'npc':'you'});
  if(it.bd){const p=g.p;if(p==='foundation'){FD.set(g.k,{y:g.y});seatFoundation(g.x,g.z,g.y);flushTerrain();clearNodes(g.x,g.z,2.3);ALLC.push({x0:g.x-1.5,x1:g.x+1.5,z0:g.z-1.5,z1:g.z+1.5,y:g.y-2.6,top:g.y,found:1})}else if(p==='roof')RF.set(g.k,1);else if(p==='stairs')STR.set(g.k,{dx:g.dx,dz:g.dz});
-  else{WL.set(g.k,{p});const rs=p==='doorway'?[rect(g.x,g.z,.9,g.rot,-1.05),rect(g.x,g.z,.9,g.rot,1.05)]:[rect(g.x,g.z,3,g.rot,0)];for(const r of rs){r.y=g.y;r.piece=1;r.mesh=m;r.wk=g.k;r.owner=npc?'npc':'you';r.tier=it.bd.t;r.born=age;r.hp=r.maxHp=({wood:140,stone:260,metal:440}[it.bd.t]||140);ALLC.push(r)}}return}
+  else{WL.set(g.k,{p});const rs=p==='doorway'?[rect(g.x,g.z,.9,g.rot,-1.05),rect(g.x,g.z,.9,g.rot,1.05)]:[rect(g.x,g.z,3,g.rot,0)];for(const r of rs){r.y=g.y;r.piece=1;r.mesh=m;r.wk=g.k;r.owner=npc?'npc':'you';r.tier=it.bd.t;r.born=age;r.hp=r.maxHp=(HPT[it.bd.t]||140);ALLC.push(r)}}return}
  const d={t:it.dv,x:g.x,y:g.y,z:g.z,i:devs.length,ch:0,pw:0,on:true,out:0,use:{lamp:3,heater:10,turret:4}[it.dv]||0,open:false,rot:g.rot,m,sl:Array(it.dv==='furnace'?6:12).fill(null),burn:0,prog:0,owner:npc?'npc':'you',hp:it.dv==='tc'?200:110,maxHp:it.dv==='tc'?200:110,born:age};
  Object.assign(m.userData,{k:'dev',d});things.push(m);devs.push(d);
  if(it.dv==='door'){const w=WL.get(g.k);w.door=1;w.doorDev=d;ALLC.push(Object.assign(rect(g.cx,g.cz,1.2,g.rot,0),{d,y:g.y}))}
@@ -4497,6 +4527,7 @@ const ITM={
  helmet:()=>armHelmet(AMC),vest:()=>armVest(AMC),
  legs:()=>{const b=new MB();for(const s of[-1,1]){b.box(.2,.22,.2,s*.14,.4,0,AMC);b.box(.19,.26,.19,s*.14,.05,.02,AMC);b.sph(.11,s*.14,.2,.1,shade(AMC,1.15),.7,5);b.box(.2,.03,.2,s*.14,.26,0,0x222222)}return b.build()},
  hatchet:()=>{const b=new MB();b.cyl(.03,.03,.6,6,0,0,0,0x5a3d28);b.box(.04,.15,.2,0,.25,.08,0x888888);return b.build()},
+ hammer:()=>{const b=new MB();b.cyl(.03,.03,.55,6,0,0,0,0x5a3d28);b.box(.16,.1,.1,0,.28,0,0x6c7078);return b.build()},
  pickaxe:()=>{const b=new MB();b.cyl(.03,.03,.7,6,0,0,0,0x5a3d28);b.box(.04,.04,.4,0,.3,0,0x888888);return b.build()}
 };
 for(const id of['hatchet','pickaxe']){const f=ITM[id];ITM[id]=()=>{const m=f();m.userData.grip=[0,.18,0];m.userData.gd=[.25,-1,.6];return m}}
@@ -4989,13 +5020,13 @@ function pokeBase(x,z){let b=null,bd=26;for(const n of NP){if(n._dead||n.hp<=0)c
 function killSettler(n){if(!n||n._dead)return;n._dead=1;n.hp=-1;dropFoe(n);const i=NP.indexOf(n);if(i>=0)NP.splice(i,1);if(Math.hypot(P.x-n.x,P.z-n.z)<48){give('wood',4+(Math.random()*6|0));if(Math.random()<.45)give('stone',3);if(Math.random()<.35)give('metal',2);say('Settler down.')}RT.blood+=1.1;bumpHeat(.25)}
 function gdtOf(dt){const fwd=ch('freeze')?0:(CH.on?CH.ts:1);return dt*fwd*(pace/REF_PACE)}
 function tcTake(d,id,n){let left=n;for(let i=0;i<d.sl.length&&left>0;i++){const s=d.sl[i];if(!s||s.id!==id)continue;const a=Math.min(s.n,left);s.n-=a;left-=a;if(s.n<=0)d.sl[i]=null}return n-left}
-function upkeepTick(dt){const g=gdtOf(dt);if(g<=0)return;const UP={wood:.05,stone:.035,metal:.02};
+function upkeepTick(dt){const g=gdtOf(dt);if(g<=0)return;const UP={wood:.05,stone:.035,metal:.02,hq:.03};
  for(const tc of devs){if(tc.t!=='tc'||tc._gone||tc.owner!=='you')continue;const cost={wood:0,stone:0,metal:0},covered=[];
-  for(const c of ALLC){if(!c.piece||c.owner!=='you'||!(c.hp>0)||!c.mesh)continue;const cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2;if(tcCovering(cx,cz)!==tc)continue;if(covered.some(q=>q.mesh===c.mesh))continue;covered.push(c);const tier=c.tier||'wood';cost[tier]+=UP[tier]||UP.wood}
+  for(const c of ALLC){if(!c.piece||c.owner!=='you'||!(c.hp>0)||!c.mesh)continue;const cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2;if(tcCovering(cx,cz)!==tc)continue;if(covered.some(q=>q.mesh===c.mesh))continue;covered.push(c);const tier0=c.tier||'wood',tier=tier0==='hq'?'metal':tier0;cost[tier]+=UP[tier0]||UP.wood}
   for(const dev of devs){if(dev._gone||dev===tc||dev.owner!=='you'||dev.t==='door')continue;if(tcCovering(dev.x,dev.z)!==tc)continue;cost.metal+=UP.metal*.5}
   tc.cost=cost;tc.paid=true;tc.short='';tc.due=tc.due||{};
   for(const k of ['wood','stone','metal']){const need=(cost[k]||0)*g;if(need<=0)continue;tc.due[k]=(tc.due[k]||0)+need;const whole=Math.floor(tc.due[k]);if(whole>0){const got=tcTake(tc,k,whole);tc.due[k]-=got;if(got<whole){tc.paid=false;tc.short=k}}}
-  if(!tc.paid){for(const c of covered){if(tc.short&&(c.tier||'wood')!==tc.short)continue;c.hp-=.5*g;for(const o of ALLC)if(o.mesh===c.mesh)o.hp=c.hp;if(c.hp<=0)smashPiece(c,true)}}}
+  if(!tc.paid){for(const c of covered){if(tc.short&&(c.tier==='hq'?'metal':(c.tier||'wood'))!==tc.short)continue;c.hp-=.5*g;for(const o of ALLC)if(o.mesh===c.mesh)o.hp=c.hp;if(c.hp<=0)smashPiece(c,true)}}}
  for(const c of ALLC.slice()){if(!c.piece||c.owner!=='you'||!(c.hp>0))continue;const cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2;if(devs.some(t=>t.t==='tc'&&t.owner==='you'&&!t._gone&&Math.hypot(t.x-cx,t.z-cz)<=TC_R))continue;if(age-(c.born||0)<90)continue;c.hp-=.22*g;if(c.mesh)for(const o of ALLC)if(o.mesh===c.mesh)o.hp=c.hp;if(c.hp<=0)smashPiece(c,true)}}
 function raidAnchor(){const tc=playerTC();if(tc)return{x:tc.x,z:tc.z,live:false,tc};if(CLAIM)return{x:CLAIM.x,z:CLAIM.z,live:false,tc:null};let sx=0,sz=0,n=0;for(const c of ALLC)if(c.piece&&c.owner==='you'){sx+=(c.x0+c.x1)/2;sz+=(c.z0+c.z1)/2;n++}for(const d of devs)if(d.owner==='you'){sx+=d.x;sz+=d.z;n++}if(n)return{x:sx/n,z:sz/n,live:false,tc:null};return{x:P.x,z:P.z,live:true,tc:null}}
 function raidGround(x,z){if(Math.abs(x)>=B-2||Math.abs(z)>=B-2)return false;const h=H(x,z);if(!(h>1.05&&h<8.2))return false;for(const d of devs)if(d.t==='tc'&&!d._gone&&d.owner!=='you'&&Math.hypot(d.x-x,d.z-z)<40)return false;return true}
@@ -5677,8 +5708,8 @@ function hud(){
  $('clock').innerHTML=`Day ${days+1}&nbsp;&nbsp;${String(hr).padStart(2,'0')}:${String(mn).padStart(2,'0')}&nbsp;&nbsp;${WXNAME[wx]||''}`+(CH.on?`&nbsp;&nbsp;(${P.x|0}, ${P.z|0})`:'')+`<span class="pace">${pace}× · ${dayLenLabel()}</span>`;$('cht').style.display=CH.on?'block':'none';paintRate();minimap();
  uiTick();
  
- const o=target()||closestUse(),p=$('prompt'),chip=!o&&(tool('hatchet')||tool('pickaxe'))?toolPiece():null,hold=SL[sel];
- p.innerHTML=o?`<span>E</span>${plab2(o)}`:chip?`<span>E</span>${tool('pickaxe')?'Mine the wall':'Chop the wall'}`:(hold&&ITEMS[hold.id].nade)?`<span>E</span>${ITEMS[hold.id].plant?'Set charge':'Throw'}`:(hold&&hold.id==='launcher')?'<span>E</span>Launch rocket':canDrink()?'<span>E</span>Drink water':'';
+ const o=target()||closestUse(),p=$('prompt'),chip=!o&&(tool('hatchet')||tool('pickaxe'))?toolPiece():null,hold=SL[sel],hmr=tool('hammer')?hammerLabel():'';
+ p.innerHTML=hmr?`<span>E</span>${hmr}`:o?`<span>E</span>${plab2(o)}`:chip?`<span>E</span>${tool('pickaxe')?'Mine the wall':'Chop the wall'}`:(hold&&ITEMS[hold.id].nade)?`<span>E</span>${ITEMS[hold.id].plant?'Set charge':'Throw'}`:(hold&&hold.id==='launcher')?'<span>E</span>Launch rocket':canDrink()?'<span>E</span>Drink water':'';
  {const gs=gunOf(),am=$('ammo');if(gs){am.style.display='block';am.textContent=(reloadT>0?'RELOAD  ':'')+(gs.mag||0)+' / '+cnt('ammo')}else if(hold&&hold.id==='launcher'){am.style.display='block';am.textContent=cnt('rocket')+' rockets'}else am.style.display='none'}
  $('hurt').style.opacity=Math.max(0,(45-S.health)/45);
 }

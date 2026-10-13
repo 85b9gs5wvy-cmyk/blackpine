@@ -1,177 +1,96 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Blackpine</title>
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="blackpine.css" />
-    <style>
-      :root {
-        --bone: #e7e1d2;
-        --rust: #c4552a;
-        --moss: #a3b36a;
-        --ink: #1a1814;
-        --panel: #23281c;
-        --muted: #b4ad9e;
-        --font: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
-      }
-      html,
-      body {
-        height: 100%;
-        margin: 0;
-        background: #100e0c;
-        overflow: hidden;
-      }
-      .bp-shell {
-        position: fixed;
-        inset: 0;
-        background: #100e0c;
-        color: var(--bone);
-        font-family: var(--font);
-      }
-      .bp-title {
-        position: absolute;
-        inset: 0;
-        z-index: 20;
-        display: flex;
-        align-items: flex-end;
-        justify-content: flex-start;
-        padding: calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 96px);
-        background: #14120e;
-        pointer-events: auto;
-      }
-      .bp-title.off {
-        display: none;
-      }
-      .bp-card {
-        width: min(560px, 100%);
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-      }
-      .bp-kicker {
-        margin: 0;
-        color: var(--rust);
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-      }
-      .bp-card h1 {
-        margin: 0;
-        font-size: clamp(56px, 12vw, 92px);
-        line-height: 0.86;
-        letter-spacing: 0.04em;
-        font-weight: 700;
-      }
-      .bp-card p {
-        margin: 0;
-        max-width: 46ch;
-        color: var(--muted);
-        font-size: 16px;
-        line-height: 1.45;
-      }
-      .bp-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 4px;
-      }
-      .bp-actions button {
-        min-height: 52px;
-        border: 0;
-        padding: 0 22px;
-        font: 700 16px/1 var(--font);
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        cursor: pointer;
-      }
-      .bp-actions .go {
-        background: var(--moss);
-        color: var(--ink);
-      }
-      .bp-actions .alt {
-        background: transparent;
-        color: var(--bone);
-        border: 1px solid rgba(231, 225, 210, 0.35);
-      }
-      .bp-actions button:disabled {
-        opacity: 0.4;
-        cursor: default;
-      }
-      .bp-load {
-        color: var(--moss);
-        font-size: 14px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .bp-err {
-        color: #e08070;
-        font-size: 14px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="bp-shell">
-      <div id="blackpine"></div>
-      <section class="bp-title" id="title">
-        <div class="bp-card">
-          <p class="bp-kicker">Wilderness survival</p>
-          <h1>BLACKPINE</h1>
-          <p>
-            Gather, build a claim, and keep a rating the island does not forget. A tool cupboard
-            holds the ground around it. Weather turns. Every tenth night, they come for the cupboard.
-          </p>
-          <p id="status" class="bp-load" hidden>Charting the ridgeline…</p>
-          <p id="err" class="bp-err" hidden></p>
-          <div class="bp-actions">
-            <button class="go" id="play" type="button">Play</button>
-            <button class="alt" id="cont" type="button" disabled>Continue</button>
-          </div>
-        </div>
-      </section>
-    </div>
-    <script type="module">
-      import * as THREE from "./three.module.js";
-      import { bootSurvival } from "./blackpine.js";
-
-      const title = document.getElementById("title");
-      const play = document.getElementById("play");
-      const cont = document.getElementById("cont");
-      const status = document.getElementById("status");
-      const err = document.getElementById("err");
-      const root = document.getElementById("blackpine");
-      const SAVE = "blackpine-save-v1";
-
-      try {
-        cont.disabled = localStorage.getItem(SAVE) == null;
-      } catch {
-        cont.disabled = true;
-      }
-
-      let running = false;
-      function start(keep) {
-        if (running) return;
-        running = true;
-        err.hidden = true;
-        status.hidden = false;
-        play.disabled = true;
-        cont.disabled = true;
-        try {
-          bootSurvival(THREE, root, { cont: keep });
-          title.classList.add("off");
-        } catch (e) {
-          running = false;
-          status.hidden = true;
-          play.disabled = false;
-          err.hidden = false;
-          err.textContent = e instanceof Error ? e.message : "The island failed to wake.";
-        }
-      }
-
-      play.addEventListener("click", () => start(false));
-      cont.addEventListener("click", () => start(true));
-    </script>
-  </body>
-</html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Blackpine</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="blackpine.css">
+</head>
+<body>
+<div class="bp-shell"><div id="blackpine"></div>
+<section class="bp-title" id="title"><div class="bp-card">
+<p class="bp-kicker">Wilderness survival</p><h1>BLACKPINE</h1>
+<p>Gather, build a claim, and keep a rating the island does not forget. A tool cupboard holds the ground around it. Weather turns. Craft the charges the tenth-night crew carries — they come for the cupboard.</p>
+<div class="bp-facts">
+<div><strong>Move</strong><span>WASD and mouse. On a phone, the stick and a drag to look.</span></div>
+<div><strong>Rating</strong><span>Scavenge, hunt, build, and blood. Heat sizes the raid.</span></div>
+<div><strong>Raid tools</strong><span>Craft guns, spike traps and snap traps. Settlers claim a cupboard, then build the camp themselves — a cupboard room, workshop, loot room and bedrooms, plus a furnace, windmill, battery, and a turret on a foundation outside each corner. Turrets stay dark without power.</span></div>
+</div>
+<p class="bp-load" id="load" style="display:none">Charting the ridgeline…</p>
+<p class="bp-err" id="err" style="display:none"></p>
+<div class="bp-actions"><button class="go" id="go" type="button">Wake up</button><button class="alt" id="cont" type="button" disabled>Continue</button></div>
+</div></section></div>
+<div id="bprot"><div class="ph"></div><h2>Turn your phone sideways</h2><p>Blackpine plays in landscape. Rotate your phone to continue.</p></div>
+<script type="module">
+import * as THREE from "./three.module.js";
+import { bootSurvival } from "./blackpine.js";
+(function(){
+const root=document.getElementById('blackpine'),title=document.getElementById('title'),load=document.getElementById('load'),err=document.getElementById('err'),go=document.getElementById('go'),cont=document.getElementById('cont');
+let api=null;
+const fine=matchMedia('(hover:hover) and (pointer:fine)').matches;
+const st=document.createElement('style');st.textContent=`#bpbar{position:absolute;z-index:6;display:none;gap:4px;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%)}
+#bpbar.on{display:flex}#bpbar button,#ldf{font:700 11px "Roboto Condensed","Arial Narrow",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#e6e6e0;background:rgba(18,20,22,.78);border:1px solid rgba(255,255,255,.18);padding:5px 9px;cursor:pointer}
+#bpbar button:hover{border-color:#c9d63a}#bpkeys{position:absolute;z-index:6;display:none;left:50%;top:calc(env(safe-area-inset-top,0px) + 44px);transform:translateX(-50%);background:rgba(18,20,22,.88);border-left:3px solid #c4552a;padding:8px 12px;color:#e6e6e0;font:12px/1.55 "Roboto Condensed","Arial Narrow",Arial,sans-serif}
+#bpkeys.on{display:block}#bpkeys b{color:#c9d63a;display:inline-block;min-width:62px}#bpflash{position:absolute;z-index:7;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);transform:translateX(-50%);background:#23281c;color:#e6e6e0;padding:6px 12px;font:12px "Roboto Condensed",Arial,sans-serif;display:none}
+@media (pointer:coarse){#bpbar{left:10px;top:calc(env(safe-area-inset-top,0px) + 252px);transform:none}}`;document.head.appendChild(st);
+const bar=document.createElement('div');bar.id='bpbar';const keys=document.createElement('div');keys.id='bpkeys';
+keys.innerHTML='<b>W A S D</b> move<br><b>Mouse</b> look (click the game to capture)<br><b>Click / E</b> use, fire, gather<br><b>Shift</b> sprint &nbsp; <b>R</b> reload<br><b>1 - 6</b> hotbar &nbsp; <b>I / Tab</b> bag<br><b>`</b> cheats &nbsp; <b>Esc</b> release mouse';
+const fl=document.createElement('div');fl.id='bpflash';root.parentNode.append(bar,keys,fl);let flT=0;
+function flash(t){fl.textContent=t;fl.style.display='block';clearTimeout(flT);flT=setTimeout(()=>fl.style.display='none',2600)}
+function mk(t,f){const b=document.createElement('button');b.type='button';b.textContent=t;b.onclick=f;return b}
+async function saveFile(){if(!api)return;let txt;try{txt=api.exportSave()}catch(e){return flash('Save failed')}
+ try{const dl=window.claude&&claude.use?await claude.use('downloads'):null;if(dl){await dl.save({filename:'blackpine-save.json',data:txt});return flash('Save file ready')}}catch(e){if(e&&e.code==='declined')return}
+ try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='blackpine-save.json';document.body.appendChild(a);a.click();a.remove();flash('Saved')}catch(e){flash('Save failed')}}
+function loadFile(){const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=()=>{const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const s=JSON.parse(r.result);if(!s||s.v!==1||!s.p)throw 0;try{localStorage.setItem('blackpine-save-v1',r.result)}catch(e){throw 0}cont.disabled=false;begin(true)}catch(e){flash('That is not a Blackpine save')}};r.readAsText(f)};i.click()}
+bar.append(mk('Save file',saveFile),mk('Load file',loadFile),mk('Controls',()=>keys.classList.toggle('on')));
+const ldf=mk('Load file',loadFile);ldf.id='ldf';ldf.className='alt';cont.parentNode.appendChild(ldf);
+const SET=(()=>{try{return JSON.parse(localStorage.getItem('blackpine-set')||'{}')}catch(e){return{}}})();window.__bpSens=SET.sens||1;window.__bpInv=!!SET.inv;if(SET.gather)window.__bpGather=SET.gather;window.__bpSaveGather=v=>{SET.gather=v;saveSet()};
+function saveSet(){try{localStorage.setItem('blackpine-set',JSON.stringify({sens:window.__bpSens,inv:window.__bpInv,mm:SET.mm!==false,gather:SET.gather}))}catch(e){}}
+const ms=document.createElement('style');ms.textContent=`#blackpine #chb{display:none!important}#bpflash{z-index:60!important}
+#bpmb{position:absolute;z-index:6;top:calc(env(safe-area-inset-top,0px) + 86px);right:10px;display:none;font:700 14px "Roboto Condensed",Arial,sans-serif;text-transform:uppercase;color:#e6e6e0;background:rgba(18,20,22,.72);border:1px solid rgba(255,255,255,.14);border-bottom:3px solid #c4552a;padding:8px 14px;min-height:40px;cursor:pointer}
+#bpmenu{position:absolute;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:rgba(10,9,7,.78);backdrop-filter:blur(3px);font-family:"Roboto Condensed","Arial Narrow",Arial,sans-serif;color:#e6e6e0;padding:16px;box-sizing:border-box}
+#bpmenu.on{display:flex}#bpmenu .card{width:min(340px,100%);max-height:100%;overflow:auto;background:#1a1814;border-left:4px solid #c4552a;padding:18px;display:flex;flex-direction:column;gap:8px}
+#bpmenu h2{margin:0 0 6px;font-size:26px;letter-spacing:.14em;text-transform:uppercase}#bpmenu button{font:700 15px "Roboto Condensed",Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e6e6e0;background:#2a2822;border:1px solid rgba(255,255,255,.12);padding:11px 14px;text-align:left;cursor:pointer}
+#bpmenu button:hover{border-color:#c9d63a}#bpmenu button.pri{background:#c4552a;border-color:#c4552a}#bpmenu button.warn{color:#f0a090}#bpmenu label{display:flex;flex-direction:column;gap:4px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#b4ad9e}
+#bpmenu input[type=range]{width:100%;accent-color:#c4552a}#bpmenu p{margin:0;font-size:13px;line-height:1.7;color:#d6d0c2}#bpmenu p b{color:#c9d63a;display:inline-block;min-width:78px}`;document.head.appendChild(ms);
+const mm=document.createElement('div');mm.id='bpmenu';const mb=document.createElement('button');mb.id='bpmb';mb.type='button';mb.textContent='Menu';root.parentNode.append(mm,mb);
+let mOpen=false,mView='main';
+function openMenu(){if(!api||mOpen)return;mOpen=true;window.__bpPause=1;try{if(document.pointerLockElement)document.exitPointerLock()}catch(e){}view('main');mm.classList.add('on')}
+function closeMenu(lock){mOpen=false;window.__bpPause=0;mm.classList.remove('on');if(lock!==false&&api&&api.lock)try{api.lock()}catch(e){}}
+async function exitGame(){flash('Saving...');try{await mirror()}catch(e){}if(api){try{api.exportSave()}catch(e){}api.destroy();api=null}mOpen=false;window.__bpPause=0;mm.classList.remove('on');mb.style.display='none';load.style.display='none';title.style.display='';go.disabled=false;cont.disabled=false}
+function view(name){mView=name;mm.innerHTML='';const c=document.createElement('div');c.className='card';mm.appendChild(c);const h=document.createElement('h2');c.appendChild(h);
+ const row=(t,f,cls)=>{const b=document.createElement('button');b.type='button';b.textContent=t;if(cls)b.className=cls;b.onclick=f;c.appendChild(b);return b};
+ if(name==='main'){h.textContent='Paused';row('Resume',()=>closeMenu(),'pri');row('Settings',()=>view('set'));row('Cheats',()=>{closeMenu(false);api.cheats()});row('Controls',()=>view('keys'));row('Save to file',saveFile);row('Load from file',loadFile);row('Save & exit',exitGame,'warn')}
+ else if(name==='set'){h.textContent='Settings';const l=document.createElement('label'),sp=document.createElement('span'),r=document.createElement('input');r.type='range';r.min=.3;r.max=2.5;r.step=.05;r.value=window.__bpSens;sp.textContent='Look sensitivity: '+(+r.value).toFixed(2)+'x';l.append(sp,r);r.oninput=()=>{window.__bpSens=+r.value;sp.textContent='Look sensitivity: '+(+r.value).toFixed(2)+'x';saveSet()};c.appendChild(l);
+  const iv=row('Invert Y: '+(window.__bpInv?'on':'off'),()=>{window.__bpInv=!window.__bpInv;iv.textContent='Invert Y: '+(window.__bpInv?'on':'off');saveSet()});
+  const dp=row('Day speed: '+api.getPace()+'x',()=>{const P=api.paces,n=P[(P.indexOf(api.getPace())+1)%P.length];api.setPace(n);dp.textContent='Day speed: '+api.getPace()+'x'});
+  const gp=row('Gather rate: '+api.getGather()+'x',()=>{const G=[.5,1,2,5,10],n=G[(G.indexOf(api.getGather())+1)%G.length];api.setGather(n);window.__bpGather=n;SET.gather=n;saveSet();gp.textContent='Gather rate: '+n+'x'});const mp=row('Minimap: '+(SET.mm!==false?'on':'off'),()=>{SET.mm=SET.mm===false;applySet();saveSet();mp.textContent='Minimap: '+(SET.mm!==false?'on':'off')});row('Back',()=>view('main'))}
+ else{h.textContent='Controls';const p=document.createElement('p');p.innerHTML='<b>W A S D</b> move<br><b>Mouse</b> look (click to capture)<br><b>Click / E</b> use, fire, gather<br><b>Shift</b> sprint<br><b>R</b> reload<br><b>1 - 6</b> hotbar<br><b>I / Tab</b> bag<br><b>Esc</b> pause menu<br><b>Touch</b> stick, Use / Fire, Sprint, Bag buttons';c.appendChild(p);row('Back',()=>view('main'))}}
+function applySet(){const m=root.querySelector('#mm');if(m)m.style.display=SET.mm===false?'none':''}
+mb.onclick=openMenu;
+window.addEventListener('keydown',e=>{if(!api)return;if(mOpen){if(e.code==='Escape'){e.preventDefault();e.stopPropagation();mView==='main'?closeMenu():view('main')}else e.stopPropagation();return}if(e.code==='Escape'&&!root.classList.contains('menu')&&!document.pointerLockElement)openMenu()},true);
+document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement||!api||mOpen)return;setTimeout(()=>{const o=root.querySelector('#over');if(api&&!mOpen&&!document.pointerLockElement&&!root.classList.contains('menu')&&!(o&&getComputedStyle(o).display!=='none'))openMenu()},150)});
+window.__bpShow=()=>{mOpen=false;window.__bpPause=0;mm.classList.remove('on');mb.style.display='block';applySet()};
+let cloud=null,lastSent='';
+(async()=>{try{if(!(window.claude&&claude.use))return;const db=await claude.use('db'),user=await claude.use('user');if(!db||!user)return;const id=await user.id();if(!id)return;
+ const ref=db.collection('data/users/'+id).doc('blackpine-save');cloud=ref;
+ const snap=await ref.get();if(snap.exists){const d=snap.data()||{};let lt=0;try{lt=+localStorage.getItem('blackpine-save-ts')||0}catch(e){}
+  if(d.json&&(d.ts||0)>lt&&!api){try{localStorage.setItem('blackpine-save-v1',d.json);localStorage.setItem('blackpine-save-ts',String(d.ts||0))}catch(e){}cont.disabled=false;lastSent=d.json}}}catch(e){}})();
+async function mirror(){if(!api||!cloud)return;try{const t=api.exportSave();if(t===lastSent)return;const ts=Date.now();await cloud.set({json:t,ts});lastSent=t;try{localStorage.setItem('blackpine-save-ts',String(ts))}catch(e){}}catch(e){}}
+setInterval(mirror,15000);document.addEventListener('visibilitychange',()=>{if(document.hidden)mirror()});window.addEventListener('pagehide',mirror);
+root.addEventListener('click',e=>{if(api&&api.lock&&e.target.closest&&!e.target.closest('button,#bpbar'))try{api.lock()}catch(_){}});
+document.addEventListener('pointerlockerror',()=>flash('Mouse capture was blocked. Click the game again, or open the link in its own tab.'));
+try{cont.disabled=localStorage.getItem('blackpine-save-v1')===null}catch(e){}
+const pq=matchMedia('(pointer:coarse) and (orientation:portrait) and (max-width:820px)');
+const pf=()=>{window.__bpPortrait=pq.matches};if(pq.addEventListener)pq.addEventListener('change',pf);else if(pq.addListener)pq.addListener(pf);pf();
+function landscapeLock(){try{if(!matchMedia('(pointer:coarse)').matches)return;const el=document.documentElement,rq=el.requestFullscreen||el.webkitRequestFullscreen;const done=()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(e){}};if(rq&&!document.fullscreenElement){const r=rq.call(el);if(r&&r.then)r.then(done).catch(()=>{});else done()}else done()}catch(e){}}
+function begin(next){
+  landscapeLock();
+  err.style.display='none';load.style.display='';go.disabled=cont.disabled=true;
+  setTimeout(()=>{
+    try{ if(api) api.destroy(); api=bootSurvival(THREE,root,{cont:next}); title.style.display='none';window.__bpShow(); try{if(matchMedia('(pointer:fine)').matches&&api.lock)api.lock()}catch(e){} }
+    catch(e){ err.textContent=(e&&e.message)||'The island failed to wake.'; err.style.display=''; load.style.display='none'; go.disabled=false; }
+  },40);
+}
+go.onclick=()=>begin(false);cont.onclick=()=>begin(true);
+})();
+</script></body></html>

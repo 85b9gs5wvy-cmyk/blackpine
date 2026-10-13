@@ -6,7 +6,7 @@ Wilderness survival in the browser. Gather, build a claim, and hold the tool cup
 
 **[Play Blackpine](https://htmlpreview.github.io/?https://github.com/85b9gs5wvy-cmyk/blackpine/blob/main/play.html)**
 
-**[Same game, other link](https://htmlpreview.github.io/?https://github.com/85b9gs5wvy-cmyk/blackpine/blob/main/index.html)**
+**[Same game, other link](https://htmlpreview.github.io/?https://raw.githubusercontent.com/85b9gs5wvy-cmyk/blackpine/777b711/index.html)**
 
 Both open the full game. Hit **Wake up** to start. **Continue** picks up a save already in this browser. **Save file** and **Load file** move a save on and off the computer. **Menu** covers pause, look sensitivity, day speed, and gather rate.
 

@@ -18,6 +18,8 @@ GitHub’s file list only shows source. The button above is what runs it. On a p
 
 ## What’s new
 
+- **Bigger island.** New monuments: satellite dish, oil depot, abandoned sawmill, power substation, and radar helipad, two of each, alongside the military outposts, warehouses, gas stations, and shacks. A road runs from where you wake toward the nearest settler and on to a monument. Trees now include spruce, aspen, birch, and scrub.
+- **Doors upgrade.** Hit a door with the hammer to step it up, all the way to armored HQ metal.
 - **3D items and drops.** Every item now has a 3D model in your hand and on the ground. Press **G** to toss the held stack (**Shift+G** for one). Dropped items arc, bounce, settle, hover and spin, merge with nearby stacks, and fly to you when picked up. The bag has Drop 1 / Drop Stack instead of Discard.
 
 - **Tools gate gathering.** Bare hands can no longer chop trees or mine rocks. You wake with a **Rock** in your hotbar: it chops trees for 2 wood and chips stone for 1, and never breaks. Use it to collect 4 wood and 4 stone, craft a **Stone Hatchet** (needed for wood) and a **Stone Pickaxe** (needed for stone, ore and sulfur). Berries and loot still work by hand. Settlers ignore this rule. If you lose the Rock and lack both tools, you get a new one when you wake or load.

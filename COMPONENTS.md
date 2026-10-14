@@ -46,3 +46,23 @@ Vitals are now a compact icon+bar strip at top-center; alerts (fog, rain, cold, 
 - Armor-Piercing: 20 standard, 8 metal, 2 powder, 1 gears. Ignores most armor, passes through to a second target.
 - Incendiary: 20 standard, 6 sulfur, 1 fuel. Lower impact damage, sets targets on fire (burn ignores armor).
 Found in tier 2-3 crates and occasionally dropped by raiders. Each gun remembers which ammo is loaded. Swapping types returns the old rounds to your bag.
+
+## Scrap and research (Rust-style)
+Scrap drops: junk piles (55%, 1-3), barrels (brown 22%, blue/oil 50%, red 65%, white 12%), supply crates (2-6), military crates (10-25), elite crates (25-60), raiders (70%, 1-4). Every crate that rolls scrap always includes it.
+Recycler: tech trash -> 10 scrap + circuit; spring -> 5 scrap + 6 metal; sheet -> 3 scrap + 8 metal; pipe -> 2 scrap + 6 metal; semi body -> 8 scrap + 15 metal; SMG body -> 12 scrap + 20 metal.
+
+**Research Table**: 60 wood, 20 metal, 40 scrap. Use it, pick a locked item, pay the scrap and hand over one copy. The copy is used up and the blueprint is kept for good (it is saved).
+
+| Blueprint | Scrap |
+|---|---|
+| Metal Pipe, Sheet Metal | 20 |
+| Snap Trap, Hollow Point ammo | 40 / 30 |
+| Revolver | 60 |
+| Spring, Semi-Auto Body, Armor-Piercing, Incendiary, Pistol, Shotgun | 75 |
+| Rocket, Auto Turret | 100 |
+| SMG Body, Pump Shotgun | 125 |
+| SMG, Thompson, C4 | 150 |
+| Semi-Auto Rifle, Rifle | 200 |
+| Assault Rifle, Rocket Launcher | 300 |
+
+Locked recipes show a lock in the crafting tab. Settlers do not need blueprints. Saves from before this update start with everything unlocked.

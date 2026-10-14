@@ -909,3 +909,28 @@ html,body{height:100%;margin:0;background:#100e0c;overflow:hidden}
 /* ammo types */
 #blackpine #ammo{pointer-events:auto;cursor:pointer;line-height:1.1;text-align:right}
 #blackpine #ammo small{display:inline-block;font-size:.5em;font-weight:800;letter-spacing:.08em;padding:2px 6px;margin-right:6px;border:1px solid currentColor;border-radius:4px;vertical-align:middle;background:rgba(0,0,0,.35)}
+
+/* wall health bar */
+#blackpine #wbar{top:calc(50% - 74px);left:50%;transform:translateX(-50%);width:158px;padding:4px 9px 6px;border-radius:7px;background:rgba(14,16,18,.66);text-align:center;opacity:0;transition:opacity .15s;pointer-events:none;font-size:11px;line-height:1.25;--c:#7fb04a;z-index:3}
+#blackpine #wbar.on{opacity:1}
+#blackpine #wbar[data-s="1"]{--c:#d6c34a}
+#blackpine #wbar[data-s="2"]{--c:#e0883d}
+#blackpine #wbar[data-s="3"]{--c:#c4453c}
+#blackpine #wbar b{display:block;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#e7e1d2}
+#blackpine #wbar span{display:block;font-size:11px;font-variant-numeric:tabular-nums;color:#cfc8b6}
+#blackpine #wbar .tr{height:6px;margin-top:3px;border-radius:3px;background:rgba(255,255,255,.16);overflow:hidden}
+#blackpine #wbar .tr i{display:block;height:100%;background:var(--c);border-radius:3px;transition:width .18s,background .18s}
+
+/* full map */
+#blackpine #mm{pointer-events:auto;cursor:pointer}
+#blackpine #fmap{inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,8,15,.86);pointer-events:auto;z-index:40}
+#blackpine #fmbox{display:flex;flex-direction:column;gap:8px;align-items:center;max-width:100%}
+#blackpine #fmh{display:flex;gap:14px;align-items:center;color:#f0e2b0;font:600 15px sans-serif}
+#blackpine #fmh span{opacity:.6;font-weight:400;font-size:12px}
+#blackpine #fmh button{margin-left:6px;padding:5px 12px;border:1px solid var(--edge);border-radius:6px;background:#1a1d22;color:#fff;cursor:pointer}
+#blackpine #fmc{border:2px solid var(--edge);border-radius:6px;background:#0b3b57;image-rendering:auto}
+#blackpine #fmk{color:#ddd;font:12px sans-serif;display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center}
+#blackpine #fmk i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;border:1px solid #000}
+/* touch controls setting */
+#blackpine.notouch #js,#blackpine.notouch #act,#blackpine.notouch #spr{display:none!important}
+#blackpine.touchon #js,#blackpine.touchon #act,#blackpine.touchon #spr{display:block!important}

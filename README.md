@@ -18,6 +18,9 @@ GitHub’s file list only shows source. The button above is what runs it. On a p
 
 ## What’s new
 
+- **Smarter fights.** Raiders strafe, flank, duck behind trees and rocks while they reload, and bandage when they are badly hurt. A shot calls nearby raiders in. Settlers do the same: they hold a gun line, heal, and repair broken walls, doors, and machines. They upgrade the camp door to sheet metal once they have the metal and a gear.
+- **Deer and wolves.** Deer bolt as a herd when you get close, when a wolf is near, or when a gun goes off. Wolves hunt deer and call the pack. Both drop meat and leather.
+- **Hands on the gun.** The viewmodel now has gloved hands. Two-handed tools and rifles use both.
 - **Bigger island.** New monuments: satellite dish, oil depot, abandoned sawmill, power substation, and radar helipad, two of each, alongside the military outposts, warehouses, gas stations, and shacks. A road runs from where you wake toward the nearest settler and on to a monument. Trees now include spruce, aspen, birch, and scrub.
 - **Doors upgrade.** Hit a door with the hammer to step it up, all the way to armored HQ metal.
 - **3D items and drops.** Every item now has a 3D model in your hand and on the ground. Press **G** to toss the held stack (**Shift+G** for one). Dropped items arc, bounce, settle, hover and spin, merge with nearby stacks, and fly to you when picked up. The bag has Drop 1 / Drop Stack instead of Discard.

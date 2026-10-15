@@ -225,7 +225,18 @@ let pace=5;try{const sp=+localStorage.getItem('blackpine-pace');if(PACES.include
 function dayLenLabel(){const mins=Math.round(1440/pace);return mins>=90?(Math.round(mins/6)/10)+'h day':mins+'m day'}
 function setPace(v){if(!PACES.includes(v))return;pace=v;try{localStorage.setItem('blackpine-pace',String(pace))}catch(e){}say('Day speed '+pace+'× real time. One day lasts about '+dayLenLabel().replace(' day','')+'.')}
 $('clock').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();setPace(PACES[(PACES.indexOf(pace)+1)%PACES.length])});
-let yaw=faceYaw,pitch=-.08,t=.32,age=0,days=0,dead=false,msgT=0,fires=[],chOpen=false,lastMv=0,saveAcc=0,demise='',demiseT=-99;let raidPhase='calm',raidWarned=-1,raidSpawned=-1,raidSawDark=false,raidTryAt=0,CLAIM=null,claimMesh=null,siegeAnchor={x:0,z:0,live:true};const RT={scavenge:0,hunt:0,build:0,blood:0,heat:0,quiet:0};const RANKS=['Unmarked','Drifter','Scavenger','Marked','Raider','Warlord'];const SAVEK='blackpine-save-v1';let REPLAY=0;const BLOG=[];let rateKey='';let actx=null;let raidChat=0;
+let yaw=faceYaw,pitch=-.08,t=.32,age=0,days=0,dead=false,msgT=0,fires=[],chOpen=false,lastMv=0,saveAcc=0,demise='',demiseT=-99;let raidPhase='calm',raidWarned=-1,raidSpawned=-1,raidSawDark=false,raidTryAt=0,CLAIM=null,claimMesh=null,siegeAnchor={x:0,z:0,live:true};const RT={scavenge:0,hunt:0,build:0,blood:0,heat:0,quiet:0};const RANKS=['Unmarked','Drifter','Scavenger','Marked','Raider','Warlord'];const SAVEK='blackpine-save-v1';
+const DIFFS={
+ easy:   {n:'Easy',   raidMul:.6, cap:24,hp:.6, arm:.5, grow:.03,dmg:.7, acc:.82,tier:-1,heavy:.6, sTgt:2,night:100,nightMax:1,camp:.7, campResp:240,sight:.85,sortie:480,party:2,wTier:1, sHp:1.3},
+ medium: {n:'Medium', raidMul:1,  cap:60,hp:.8, arm:.65,grow:.05,dmg:1,  acc:1,  tier:0, heavy:1,  sTgt:3,night:55, nightMax:2,camp:1,  campResp:180,sight:1,  sortie:300,party:2,wTier:0, sHp:1},
+ hard:   {n:'Hard',   raidMul:1.4,cap:64,hp:1,  arm:.8, grow:.07,dmg:1.25,acc:1.12,tier:1, heavy:1.3, sTgt:4,night:38, nightMax:3,camp:1.25,campResp:120,sight:1.2, sortie:200,party:3,wTier:0, sHp:.9},
+ extreme:{n:'Extreme',raidMul:2,  cap:72,hp:1.2,arm:1,  grow:.09,dmg:1.6, acc:1.25,tier:2, heavy:1.7, sTgt:5,night:22, nightMax:4,camp:1.5, campResp:75, sight:1.4, sortie:120,party:4,wTier:-1,sHp:.75}
+};
+let DIFFK=(()=>{let k=opts&&opts.difficulty;if(!k&&opts&&(opts.saveData||opts.cont)){try{const raw=opts.saveData?(typeof opts.saveData==='string'?JSON.parse(opts.saveData):opts.saveData):((window.__bpSaveStore&&typeof window.__bpSaveStore.latestRaw==='function'&&window.__bpSaveStore.latestRaw())||JSON.parse(localStorage.getItem(SAVEK)||'null'));k=raw&&raw.diff}catch(e){}}return DIFFS[k]?k:'medium'})();
+let DF=DIFFS[DIFFK];
+// Share of a hit that gets through a raider's heavy build (hv) and armor (ak). DF.arm eases both on lower modes; the .4 floor stops anyone becoming a sponge.
+function foeMit(hv,ak){return Math.max(.4,1-(1-hv*ak)*DF.arm)}
+let REPLAY=0;const BLOG=[];let rateKey='';let actx=null;let raidChat=0;
 const WXNAME={clear:'Clear',overcast:'Overcast',rain:'Rain',storm:'Storm',fog:'Fog',snow:'Snow'};
 const WXSAY={clear:'The sky clears.',overcast:'Clouds cover the pines.',rain:'Rain moves in. Stand in it to drink. A roof keeps the fire alive.',storm:'Storm. Turbines howl. Lightning hunts the open ground.',fog:'Fog settles. The trees close in.',snow:'Snow. You slow down, and the cold bites harder.'};
 let wx='clear',wxT=42,wxBolt=8,boltT=0,shake=0,hurtFx=0,throwCd=0,blastN=0;
@@ -427,7 +438,7 @@ function vit(k){const v=Math.round(S[k]),col=defs[k][1],low=v<(k==='warmth'?35:2
 function sortBag(){const all=[];for(let i=6;i<30;i++)if(SL[i]){all.push(SL[i]);SL[i]=null}all.sort((a,b)=>ITEMS[a.id].n.localeCompare(ITEMS[b.id].n)||b.n-a.n);const out=[];for(const q of all){const m=ITEMS[q.id].max,t=m>1&&out.find(o=>o.id===q.id&&o.n<m);if(t){const a=Math.min(m-t.n,q.n);t.n+=a;q.n-=a}if(q.n>0)out.push(q)}out.forEach((q,i)=>SL[6+i]=q)}
 const CATS=['Components','Building','Electrical','Survival','Weapons'];let craftCat='Survival';
 const isDoor=t=>t==='door'||t==='metal_door'||t==='hq_door',isWin=t=>t==='window_bars'||t==='embrasure',isInd=t=>t==='furnace'||t==='refinery'||t==='pump_jack'||t==='quarry';
-const COMP=['gears','circuit','charcoal','powder','explosives','leather','crude','targeting_computer','cctv'],ELEC=['solar','wind','battery','lamp','heater','switch','turret','wire'],BLD=['door','metal_door','hq_door','window_bars','embrasure','water_collector','bed','box','tc','furnace','refinery','pump_jack','quarry','workbench','spike','snap'],SURV=['medkit','hatchet','pickaxe','spear','club','campfire','bandage','bedroll','bed','water_collector','cooked'];
+const COMP=['gears','circuit','charcoal','powder','explosives','leather','crude','targeting_computer','cctv'],ELEC=['solar','wind','battery','lamp','heater','switch','turret','wire'],BLD=['door','metal_door','hq_door','window_bars','embrasure','water_collector','bed','box','tc','furnace','refinery','pump_jack','quarry','workbench','spike','snap','barricade'],SURV=['medkit','hatchet','pickaxe','spear','club','campfire','bandage','bedroll','bed','water_collector','cooked'];
 function catOf(id){const it=ITEMS[id];if(COMP.includes(id))return 'Components';if(ELEC.includes(id))return 'Electrical';if(it.bd||BLD.includes(id))return 'Building';if(SURV.includes(id))return 'Survival';return 'Weapons'}
 const needWB=r=>{const c=catOf(r.out);return c==='Electrical'||c==='Weapons'||['blade','sheet','propane','sewing_kit','tarp','fuse','pipe','spring','road_sign','semi_body','smg_body','explosives','targeting_computer','cctv','hq_door','gears','circuit','turret'].includes(r.out)};
 const nearWB=()=>devs.some(d=>d.t==='workbench'&&!d._gone&&Math.hypot(P.x-d.x,P.z-d.z)<8);
@@ -541,7 +552,7 @@ function tierDetail(b,bx){const t=b.t,p=b.p,S={wood:{seam:0x4a3622,trim:0x8f6e46
   if(t==='wood')for(const x of[-1,0,1])bx(.1,.09,3.12,x,3.3,0,S.seam);else bx(3.16,.08,3.16,0,3.3,0,S.trim);
   if(t==='hq')for(const x of[-1,0,1])bx(.1,.07,3.1,x,3.3,0,S.bolt);
  }}
-const DORD=['door','metal_door','hq_door'],DHP={door:200,metal_door:450,hq_door:800};
+const DORD=['door','metal_door','hq_door'],DHP={door:200,metal_door:450,hq_door:800,barricade:260};
 function hammerTarget(){ray.setFromCamera({x:0,y:0},cam);const ms=[];for(let i=PCS.length-1;i>=0;i--){const r=PCS[i];if(!r.m.parent){PCS.splice(i,1);continue}if(r.owner==='you')ms.push(r.m)}for(const d of devs)if(!d._gone&&d.owner==='you'&&isDoor(d.t)&&d.m&&d.m.parent)ms.push(d.m);if(!ms.length)return null;const h=ray.intersectObjects(ms,true);for(const x of h){let o=x.object;while(o&&ms.indexOf(o)<0)o=o.parent;if(o){const r=PCS.find(q=>q.m===o);if(r)return r;const d=devs.find(q=>q.m===o&&isDoor(q.t));if(d)return{_door:1,d}}}return null}
 function hammerLabel(){const r=hammerTarget();if(!r)return'Hammer: aim at a wall, floor, roof or door you built';if(r._door){const d=r.d,nt=DORD[DORD.indexOf(d.t)+1];if(!nt)return NAMES[d.t]+' (fully upgraded)';const c=DV[nt][2];return'Upgrade to '+NAMES[nt]+': '+Object.keys(c).map(k=>c[k]+' '+ITEMS[k].n+' ('+cnt(k)+')').join(', ')}const nm=PT[r.p][0],nt=TORD[TORD.indexOf(r.t)+1];if(!nt)return TIER[r.t].n+' '+nm+' (fully upgraded)';const c=upCost(r.p,nt);return'Upgrade '+nm+' to '+TIER[nt].n+': '+Object.keys(c).map(k=>c[k]+' '+ITEMS[k].n+' ('+cnt(k)+')').join(', ')}
 function upgradeDoor(d,nt,quiet){const it=ITEMS[nt];if(!it)return;const old=d.m,m=mk(it,null);m.position.copy(old.position);m.rotation.copy(old.rotation);Object.assign(m.userData,{k:'dev',d});scene.add(m);scene.remove(old);const ti=things.indexOf(old);if(ti>=0)things[ti]=m;else things.push(m);d.m=m;d.t=nt;d.hp=d.maxHp=DHP[nt]||450;if(!quiet){startSwing('hammer',true,.34);RT.build+=.6;bumpHeat(.03);puffAt(old.position.x,old.position.y+1.1,old.position.z);blip(nt==='hq_door'?520:360,.12,'square');say('Door upgraded to '+NAMES[nt]+'.')}}
@@ -612,6 +623,7 @@ function researchUI(c){const near=nearRT(),h=document.createElement('div');h.id=
 
 ITEMS.spike={n:'Spike Trap',i:'🪤',max:10,dv:'spike',d:'Place it in the yard. Raiders and wolves that step on it take a hit. No power.'};REC.push({out:'spike',q:1,need:{wood:18,blade:2,rope:1}});NAMES.spike='Spike Trap';
 ITEMS.snap={n:'Snap Trap',i:'⚙',max:8,dv:'snap',d:'A metal jaw. Hits harder than spikes, then needs a moment to reset. No power.'};REC.push({out:'snap',q:1,need:{metal:10,blade:1,spring:1,gears:1}});NAMES.snap='Snap Trap';
+ITEMS.barricade={n:'Wood Barricade',i:'🪵',max:6,dv:'barricade',d:'A 2.6 m plank wall you set down on open ground (260 HP). It blocks bullets and movement. Raiders and settlers that get shot at with no cover will set one down and hide behind it.'};REC.push({out:'barricade',q:1,need:{wood:30}});NAMES.barricade='Wood Barricade';
 ITEMS.meat={n:'Raw Meat',i:'🥩',max:20,use:'Eat',d:'Restores 18 food. Cook it for more. Eating lets stamina come back.',fx:()=>{S.hunger=Math.min(100,S.hunger+18);S.energy=Math.min(100,S.energy+10)}};
 ITEMS.cooked={n:'Cooked Meat',i:'🍖',max:20,use:'Eat',d:'Restores 40 food and a chunk of stamina. Cook near a fire.',fx:()=>{S.hunger=Math.min(100,S.hunger+40);S.energy=Math.min(100,S.energy+28)}};
 REC.push({out:'cooked',q:1,need:{meat:1},fire:1});
@@ -730,6 +742,11 @@ function mk(it,mat){const g=new T.Group(),col=it.bd&&TIER[it.bd.t].c,u=g.userDat
    const dr=new T.Group();dr.position.set(0,1.15,0);g.add(dr);u.drill=dr;
    const shaft=new T.Mesh(new T.CylinderGeometry(.11,.11,1.9,10),mat||cmat(0x7a828c));shaft.position.set(0,.35,0);dr.add(shaft);
    const bit=new T.Mesh(new T.ConeGeometry(.28,.55,10),mat||cmat(0x2a2e34));bit.rotation.x=Math.PI;bit.position.set(0,-.72,0);dr.add(bit);
+  }else if(v==='barricade'){
+   // Wood Barricade: five stacked planks on three posts with ground braces
+   for(let i=0;i<5;i++)bx(2.5,.3,.12,0,.17+i*.31,0,i%2?0x6b4a2a:0x7a5a38);
+   for(const x of[-1.15,0,1.15])bx(.16,1.62,.3,x,.81,0,0x4a321a);
+   for(const x of[-1.15,1.15]){bx(.14,.14,.7,x,.07,.36,0x4a321a);bx(.14,.14,.7,x,.07,-.36,0x4a321a)}
   }else if(v==='window_bars'){
    // Reinforced Window: frame + 5 vertical steel bars + cross-bar + ballistic glass
    bx(1.26,.09,.18,0,1.04,0,0x4a3622);bx(1.26,.09,.18,0,2.26,0,0x4a3622);
@@ -793,7 +810,7 @@ const DEV_BOX={
  tc:[.48,.32,1.22],box:[.52,.38,.78],workbench:[.74,.38,.84],research:[.80,.46,.90],
  furnace:[.56,.56,1.38],refinery:[.64,.58,2.15],water_collector:[.64,.64,1.52],
  battery:[.36,.28,.95],heater:[.32,.28,1.02],turret:[.34,.34,1.36],
- solar:[.55,.45,1.25],wind:[.24,.24,6.0],pump_jack:[1.18,.66,1.95],quarry:[1.22,1.12,2.42]
+ solar:[.55,.45,1.25],wind:[.24,.24,6.0],pump_jack:[1.18,.66,1.95],quarry:[1.22,1.12,2.42],barricade:[1.3,.18,1.62]
 };
 function seatFoundation(x,z,top){
   const map=terrLookup();if(!map||!terrMesh)return;
@@ -1549,12 +1566,13 @@ function col(o,ownerN){const rad=.36;for(let pass=0;pass<2;pass++)for(let i=0;i<
 function touchPosts(o,rad){const posts=POSTS;if(!posts||!posts.length)return;for(let i=0;i<posts.length;i++){const p=posts[i];if(p.skip)continue;const dx=o.x-p.x,dz=o.z-p.z,d=Math.hypot(dx,dz),need=(rad||.4)+(p.r||.3);if(d<need&&d>1e-4){o.x=p.x+dx/d*need;o.z=p.z+dz/d*need}}}
 function openNearDoor(n,rad){if(!n||!n.bp)return;for(const e of devs){if(!isDoor(e.t)||e._gone||e.npc!==n)continue;const d=Math.hypot(e.x-n.x,e.z-n.z);if(d<rad){e.open=true;e.ac=age+6}else if(e.open&&d>3.2&&EN.some(r=>r.hp>0&&Math.hypot(r.x-e.x,r.z-e.z)<18)){e.open=false;e.ac=0}}}
 function clearRing(n,tx,tz){for(const rad of[2.4,4.4,7]){let best=null,bd=1e9;for(let k=0;k<12;k++){const a=k*.524+(n.seed||0),x=tx+Math.cos(a)*rad,z=tz+Math.sin(a)*rad;if(Math.abs(x)>B-4||Math.abs(z)>B-4||H(x,z)<.65||blkAt(n,x,z))continue;const d=Math.hypot(x-tx,z-tz);if(d<bd){bd=d;best=[x,z]}}if(best)return best}return null}
-function stepTo(n,tx,tz,sp,dt){const px=n.x,pz=n.z,dx=tx-n.x,dz=tz-n.z,d=Math.hypot(dx,dz);let moved=d<=.15;
+function stepTo(n,tx,tz,sp,dt){const px=n.x,pz=n.z,dx=tx-n.x,dz=tz-n.z,d=Math.hypot(dx,dz);let moved=d<=.15,campBlk=0;
  if(d>.15){const base=Math.atan2(dx,dz),s=Math.min(d,sp*dt),sd=n.side||1,opts=[0,.5*sd,1.05*sd,1.65*sd,2.35*sd,-.5*sd,-1.05*sd,-1.65*sd,-2.35*sd];openNearDoor(n,2.7);
-  for(const a of opts){const q={x:n.x+Math.sin(base+a)*s,z:n.z+Math.cos(base+a)*s,y:n.y};if(H(q.x,q.z)<-.6)continue;col(q);
+  for(const a of opts){const q={x:n.x+Math.sin(base+a)*s,z:n.z+Math.cos(base+a)*s,y:n.y};if(H(q.x,q.z)<-.6)continue;if(n.k==='settler'){const cd=campDanger(n,q.x,q.z);if(cd&&Math.hypot(q.x-cd.x,q.z-cd.z)<Math.hypot(n.x-cd.x,n.z-cd.z)){campBlk=1;continue}}col(q);
    if(Math.hypot(q.x-n.x,q.z-n.z)>s*.30){n.x=q.x;n.z=q.z;n.m.rotation.y=base+a;if(a!==0){n.side=Math.sign(a)||1;n.detT=1.5}moved=true;break}}}
+ if(!moved&&campBlk){const bt=(n.job&&n.job.o)||n.lt;if(bt)(n.bad=n.bad||new Set()).add(bt);n.job=null;n.pT=null;n.pth=[];n.lt=null;n.stuck=0}
  if(!moved){n.stuck=(n.stuck||0)+dt;if(n.stuck>1.25&&!n._replan){n._replan=1;n.pth=[];n.pR=0;n.side=-(n.side||1)}
-  if(n.stuck>2.4){const spot=clearRing(n,tx,tz)||clearRing(n,n.x,n.z);if(spot){n.x=spot[0];n.z=spot[1];n.y=Math.max(H(n.x,n.z),0)}n.stuck=0;n._replan=0;n.pth=[];n.pT=null}}
+  if(n.stuck>2.4){const spot=clearRing(n,tx,tz)||clearRing(n,n.x,n.z);if(spot&&!campDanger(n,spot[0],spot[1])){n.x=spot[0];n.z=spot[1];n.y=Math.max(H(n.x,n.z),0)}n.stuck=0;n._replan=0;n.pth=[];n.pT=null}}
  else{n.stuck=Math.max(0,(n.stuck||0)-dt*2.4);n._replan=0}
  if(n.detT>0&&(n.detT-=dt)<=0)n.side=1;
  n.y+=(G(n.x,n.z,n.y)-n.y)*Math.min(1,dt*10);n._mv=Math.hypot(n.x-px,n.z-pz);n.m.position.set(n.x,n.y,n.z);return d}
@@ -1603,7 +1621,7 @@ function plan(n,tx,tz){
 function go(n,tx,tz,sp,dt){if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
  while(n.pth.length&&Math.hypot(n.pth[0][0]-n.x,n.pth[0][1]-n.z)<.85)n.pth.shift();
  const w=n.pth.length?n.pth[0]:[tx,tz];return stepTo(n,w[0],w[1],sp,dt)}
-function gatherNode(n,kinds,flt){let farm=null,fd=1e9,b=null,bd=1e9;const list=resList();for(let i=0;i<list.length;i++){const o=list[i],k=o.userData.k;if(!kinds.includes(k)||(n.bad&&n.bad.has(o))||(flt&&!flt(o)))continue;const d=Math.hypot(o.position.x-n.x,o.position.z-n.z);if(o.userData.farm===n){if(d<fd){fd=d;farm=o}}else if(!o.userData.farm&&d<230&&d<bd){bd=d;b=o}}return farm||b}
+function gatherNode(n,kinds,flt){let farm=null,fd=1e9,b=null,bd=1e9;const list=resList();for(let i=0;i<list.length;i++){const o=list[i],k=o.userData.k;if(!kinds.includes(k)||(n.bad&&n.bad.has(o))||(flt&&!flt(o)))continue;const d=Math.hypot(o.position.x-n.x,o.position.z-n.z);if(o.userData.farm===n){if(d<fd){fd=d;farm=o}}else if(!o.userData.farm&&d<230&&d<bd&&!campDanger(n,o.position.x,o.position.z)){bd=d;b=o}}return farm||b}
 function takeNode(n,o){const y=o.userData.yield;if(y){for(const k in y)n.inv[k]=(n.inv[k]||0)+Math.max(1,Math.round(y[k]*.4))}else if(o.userData.k==='tree')n.inv.wood=(n.inv.wood||0)+8;else if(o.userData.k==='junk'||o.userData.k==='barrel'){const L=o.userData.k==='barrel'?barrelLoot(o.userData.kind):loot();if(o.userData.k==='barrel'&&o.userData.kind==='red'&&!L.fuel)L.fuel=1+(Math.random()*2|0);for(const k in L)if(L[k])n.inv[k]=(n.inv[k]||0)+L[k]}else if(o.userData.k==='ore'){n.inv.ore=(n.inv.ore||0)+6;n.inv.stone=(n.inv.stone||0)+2}else if(o.userData.k==='sulfur')n.inv.sulfur=(n.inv.sulfur||0)+4;else{n.inv.stone=(n.inv.stone||0)+4;n.inv.ore=(n.inv.ore||0)+3}o.userData.uses=0;remove(o);const rn=RN[RN.length-1];if(rn&&rn.o===o)rn.timer*=2.2}
 function slotSum(sl,a,b,id){let n=0;for(let i=a;i<b;i++)if(sl[i]&&sl[i].id===id)n+=sl[i].n;return n}
 function furnacePut(f,id,n){const idx=id==='wood'||id==='fuel'?[2]:[0,1];let left=n;for(const i of idx){if(left<=0)break;const s=f.sl[i];if(s&&s.id===id){const a=Math.min(ITEMS[id].max-s.n,left);s.n+=a;left-=a}else if(!s){const a=Math.min(ITEMS[id].max,left);f.sl[i]={id,n:a};left-=a}}return n-left}
@@ -1883,7 +1901,7 @@ let SETSEED=100;
 function mkSettler(sx,sz,c,opt){
   opt=opt||{};
   while(H(sx,sz)<1&&Math.hypot(sx,sz)>2){sx*=.9;sz*=.9}
-  const n={x:sx,z:sz,y:H(sx,sz),hp:90,maxHp:90,aggro:0,healCd:0,inv:{wood:12,stone:10,ore:2,metal:4,gears:0,circuit:0,sulfur:0,fuel:6},devs:{},i:0,cd:0,fail:0,m:spawnMan(c,false),bp:[],hx:sx,hz:sz,k:'settler'};
+  const n={x:sx,z:sz,y:H(sx,sz),hp:Math.round(90*DF.sHp),maxHp:Math.round(90*DF.sHp),aggro:0,healCd:0,inv:{wood:12,stone:10,ore:2,metal:4,gears:0,circuit:0,sulfur:0,fuel:6},devs:{},i:0,cd:0,fail:0,m:spawnMan(c,false),bp:[],hx:sx,hz:sz,k:'settler'};
   n.m.position.set(sx,n.y,sz);n.m.userData.k='settler';n.m.userData.a=n;things.push(n.m);
   const tryPlan=p=>{
     for(let r=0;r<16&&!n.bp.length;r++)for(let k=0;k<8&&!n.bp.length;k++){
@@ -1927,15 +1945,17 @@ function pickJob(n){
     return {k:'mon',m,x:m.x+Math.cos(ang)*rad,z:m.z+Math.sin(ang)*rad,t:age+70};
   }
   const list=resList();let best=null,score=1e9;
-  if(list.length){const start=((n.seed+n.trips*13)%list.length+list.length)%list.length;for(let i=0;i<36&&i<list.length;i++){const o=list[(start+i*11)%list.length];if(!o||!o.userData||!(o.userData.uses>0))continue;if(o.userData.farm&&o.userData.farm!==n)continue;if(n.bad&&n.bad.has(o))continue;const d=Math.hypot(o.position.x-home.x,o.position.z-home.z);if(d<22||d>680)continue;const s=Math.abs(d-170);if(s<score){score=s;best=o}}}
+  if(list.length){const start=((n.seed+n.trips*13)%list.length+list.length)%list.length;for(let i=0;i<36&&i<list.length;i++){const o=list[(start+i*11)%list.length];if(!o||!o.userData||!(o.userData.uses>0))continue;if(o.userData.farm&&o.userData.farm!==n)continue;if(n.bad&&n.bad.has(o))continue;if(campDanger(n,o.position.x,o.position.z))continue;const d=Math.hypot(o.position.x-home.x,o.position.z-home.z);if(d<22||d>680)continue;const s=Math.abs(d-170);if(s<score){score=s;best=o}}}
   if(best)return {k:'node',o:best,t:age+48};
   const a=hash(n.trips,n.seed)*6.283, r=80+hash(n.z,n.trips)*170;
-  return {k:'wander',x:Math.max(-B+50,Math.min(B-50,home.x+Math.cos(a)*r)),z:Math.max(-B+50,Math.min(B-50,home.z+Math.sin(a)*r)),t:age+26};
+  let wx=Math.max(-B+50,Math.min(B-50,home.x+Math.cos(a)*r)),wz=Math.max(-B+50,Math.min(B-50,home.z+Math.sin(a)*r));
+  if(campDanger(n,wx,wz)){wx=home.x+Math.cos(a)*30;wz=home.z+Math.sin(a)*30}
+  return {k:'wander',x:wx,z:wz,t:age+26};
 }
 function senseMon(n){
   if(n.job&&n.job.k==='mon')return;
   let best=null,bd=62;
-  for(const m of MONS){const d=Math.hypot(m.x-n.x,m.z-n.z);if(d<bd&&d>7){bd=d;best=m}}
+  for(const m of MONS){if(m.raiderCamp)continue;const d=Math.hypot(m.x-n.x,m.z-n.z);if(d<bd&&d>7){bd=d;best=m}}
   if(!best||hash(n.x+age,n.seed)<.62)return;
   const ang=hash(best.x,n.seed)*6.28, rad=Math.max(5,(best.r||12)*.6);
   n.job={k:'mon',m:best,x:best.x+Math.cos(ang)*rad,z:best.z+Math.sin(ang)*rad,t:age+55};
@@ -2010,7 +2030,12 @@ const SWP=[null,
  [{id:'pistol',need:{metal:15,gears:2},rng:24,dmg:12,cd:.55},{id:'revolver',need:{metal:18,gears:3,wood:4},rng:28,dmg:20,cd:.75}],
  [{id:'shotgun',need:{metal:25,gears:4,wood:8},rng:16,dmg:30,cd:1},{id:'smg',need:{metal:30,gears:5,circuit:1},rng:26,dmg:5,cd:.13}],
  [{id:'rifle',need:{metal:35,gears:6,circuit:2,wood:8},rng:42,dmg:30,cd:.8},{id:'ak',need:{metal:45,gears:8,circuit:3},rng:36,dmg:8,cd:.14}]];
-function wantTier(){return Math.min(5-daysToRaid(),Math.min(5,raidNo()+2))}
+function wantTier(){return Math.max(1,Math.min(5-daysToRaid(),Math.min(5,raidNo()+2+DF.wTier)))}
+// Settlers stay away from live raider camps until they carry a gun (tier 3 = pistol/revolver or better)
+function campGunTier(){return 3}
+function settlerArmed(n){return !!n&&(n.wt||0)>=campGunTier()}
+function campPad(){return Math.ceil(58*DF.sight)+10}
+function campDanger(n,x,z){try{if(!n||n.k!=='settler'||(n.wt||0)>=campGunTier())return null;const hm=n.home||n.lot||{x:n.hx,z:n.hz};if(Math.hypot(n.x-hm.x,n.z-hm.z)<26&&Math.hypot(x-hm.x,z-hm.z)<30)return null;const pad=campPad();for(const c of RCAMPS){if(!c.raiders||!c.raiders.some(r=>r&&r.hp>0))continue;if(Math.hypot(x-c.x,z-c.z)<c.r+pad)return c}}catch(e){}return null}
 function setSettlerWeapon(n,w){n.wp=w;n.wt=w.t;const tw=n.m&&n.m.userData&&n.m.userData.tw;if(!tw)return;while(tw.children.length)tw.remove(tw.children[0]);let m;if(w.rng&&ITM[w.id]){m=itemModel(w.id);m.rotation.set(0,0,Math.PI/2);m.position.set(0,.28,0);tw.scale.setScalar(.52)}else if(w.rng){const L=(RGUN[w.id]||RGUN.pistol).len,b=new MB();b.cyl(.022,.028,L,6,0,.3+L/2,0,0x2a2d31);b.box(.08,.24,.1,0,.2,0,0x3a3d42);m=b.build();tw.scale.setScalar(.8)}else{m=itemModel(w.id);tw.scale.setScalar(.5)}tw.add(m)}
 function weaponWork(n,dt){
  if(n.hp<=0)return false;
@@ -2059,13 +2084,13 @@ function rate100(){return Math.max(0,Math.min(100,Math.round(rateScore()*2.6)))}
 function daysToRaid(){const d=days+1;return d%5===0?0:5-(d%5)}
 const RAIDSZ={};
 function raidSize(N){if(RAIDSZ[N]!=null)return RAIDSZ[N];let v;if(N<=1)v=3+(Math.random()*4|0);else v=raidSize(N-1)+(N<=5?1+(Math.random()*5|0):10);RAIDSZ[N]=v;return v}
-function raidCount(){return raidSize(raidNo())}
+function raidCount(){return Math.max(2,Math.min(DF.cap,Math.round(raidSize(raidNo())*DF.raidMul)))}
 function itId(it){for(const k in ITEMS)if(ITEMS[k]===it)return k;return ''}
 function noteBuild(it,g,npc){if(REPLAY||npc)return;const id=itId(it);if(!id)return;BLOG.push({id,g:{x:+g.x,y:+g.y,z:+g.z,rot:g.rot||0,k:g.k,p:g.p,dx:g.dx||0,dz:g.dz||0,cx:g.cx,cz:g.cz}});if(BLOG.length>360)BLOG.shift();RT.build+=1;bumpHeat(.05)}
 function replayBuilds(list){REPLAY=1;for(const rec of list||[]){const it=ITEMS[rec.id];if(!it)continue;try{construct(it,rec.g,0)}catch(err){}}REPLAY=0}
 function blip(freq,dur,type){try{actx=actx||new AudioContext();if(actx.state==='suspended')actx.resume();const o=actx.createOscillator(),g=actx.createGain();o.type=type||'sawtooth';o.frequency.value=freq;g.gain.setValueAtTime(.05,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+dur);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+dur)}catch(e){}}
-function ratingUI(c){const d=document.createElement('div');d.id='det';const rows=[['Scavenge',RT.scavenge],['Hunt',RT.hunt],['Build',RT.build],['Blood',RT.blood]];d.innerHTML='<b>Island rating</b><p>Loot, kills and building are remembered, the way a wipe remembers you. Heat cools if the days stay quiet, and it decides how mean the tenth-night crew is.</p>'+rows.map(r=>'<div class="srow"><span>'+r[0]+'</span><b>'+r[1].toFixed(1)+'</b></div>').join('')+'<div class="srow"><span>Rating</span><b>'+rate100()+' · '+RANKS[rateStars()]+'</b></div><div class="srow"><span>Heat</span><b>'+heatStars()+' / 5</b></div><div class="srow"><span>Next raid</span><b>'+(daysToRaid()?('in '+daysToRaid()+' days'):'tonight')+'</b></div>';c.appendChild(d)}
-function paintRate(){const st=rateStars(),hs=heatStars(),dr=daysToRaid(),live=EN.filter(e=>e.siege&&e.hp>0).length;const key=st+'|'+hs+'|'+dr+'|'+raidPhase+'|'+live+'|'+(age>16?1:0);if(key===rateKey)return;rateKey=key;const el=$('rate');if(el)el.innerHTML='<b>'+RANKS[st]+'</b><span class="pips">'+( '●'.repeat(st)+'○'.repeat(5-st))+'</span><small>Rating '+rate100()+' · Heat '+hs+' · '+(dr?('raid in '+dr+'d'):'raid tonight')+'</small>';const b=$('raid');if(!b)return;if(raidPhase==='warning'){b.style.display='block';b.className='warn';b.textContent='Raid tonight — they move at dark'}else if(raidPhase==='active'||raidPhase==='retreat'){b.style.display='block';b.className=raidPhase==='active'?'hot':'warn';b.textContent=raidPhase==='active'?('Raid in progress · '+live+' still out'):('Falling back · '+live+' left')}else b.style.display='none';const h=$('hint');if(h&&age>16)h.style.display='none'}
+function ratingUI(c){const d=document.createElement('div');d.id='det';const rows=[['Scavenge',RT.scavenge],['Hunt',RT.hunt],['Build',RT.build],['Blood',RT.blood]];d.innerHTML='<b>Island rating</b><p>Loot, kills and building are remembered, the way a wipe remembers you. Heat cools if the days stay quiet, and it decides how mean the tenth-night crew is.</p>'+rows.map(r=>'<div class="srow"><span>'+r[0]+'</span><b>'+r[1].toFixed(1)+'</b></div>').join('')+'<div class="srow"><span>Rating</span><b>'+rate100()+' · '+RANKS[rateStars()]+'</b></div><div class="srow"><span>Heat</span><b>'+heatStars()+' / 5</b></div><div class="srow"><span>Difficulty</span><b>'+DF.n+'</b></div><div class="srow"><span>Next raid</span><b>'+(daysToRaid()?('in '+daysToRaid()+' days'):'tonight')+'</b></div>';c.appendChild(d)}
+function paintRate(){const st=rateStars(),hs=heatStars(),dr=daysToRaid(),live=EN.filter(e=>e.siege&&e.hp>0).length;const key=st+'|'+hs+'|'+dr+'|'+raidPhase+'|'+live+'|'+(age>16?1:0)+'|'+DIFFK;if(key===rateKey)return;rateKey=key;const el=$('rate');if(el)el.innerHTML='<b>'+RANKS[st]+'</b><span class="pips">'+( '●'.repeat(st)+'○'.repeat(5-st))+'</span><small>Rating '+rate100()+' · Heat '+hs+' · '+(dr?('raid in '+dr+'d'):'raid tonight')+' · '+DF.n+'</small>';const b=$('raid');if(!b)return;if(raidPhase==='warning'){b.style.display='block';b.className='warn';b.textContent='Raid tonight — they move at dark'}else if(raidPhase==='active'||raidPhase==='retreat'){b.style.display='block';b.className=raidPhase==='active'?'hot':'warn';b.textContent=raidPhase==='active'?('Raid in progress · '+live+' still out'):('Falling back · '+live+' left')}else b.style.display='none';const h=$('hint');if(h&&age>16)h.style.display='none'}
 const TC_R=26,TUR_R=30;
 function tcCovering(x,z){let best=null,bd=TC_R;for(const d of devs){if(d.t!=='tc'||d._gone)continue;const q=Math.hypot(d.x-x,d.z-z);if(q<bd){bd=q;best=d}}return best}
 function privWhy(x,z,npc){const tc=tcCovering(x,z);if(!tc)return '';if(npc)return tc.npc===npc?'':'Building blocked.';if(tc.owner==='you')return '';return 'Building blocked. Their tool cupboard holds this ground.'}
@@ -2215,7 +2240,7 @@ function driveSiege(e,dt){if(e.flee){const dx=e.x-siegeAnchor.x,dz=e.z-siegeAnch
  const live=siegeAnchor.live;const ax=(live?P.x:siegeAnchor.x)+(e.idx%2?1.3:-1.3),az=(live?P.z:siegeAnchor.z)+((e.idx%3)-1)*1.3;const dp=Math.hypot(P.x-e.x,P.z-e.z);const speed=2.35+Math.min(1.1,RT.heat*.16)+(e.heavy?-.15:0);
  e.ordCd=Math.max(0,(e.ordCd||0)-dt);e.back=Math.max(0,(e.back||0)-dt);
  // Tactical field bandage when critically wounded
- if(e.hp<(e.maxHp||80)*.38&&(e.meds||0)>0&&e.back<=0){e.meds--;e.hp=Math.min(e.maxHp||80,e.hp+28);e.back=1.4;e.crouchT=1.2}
+ if(e.hp<(e.maxHp||80)*.38&&(e.meds||0)>0&&e.back<=0){e.meds--;e.hp=Math.min(e.maxHp||80,e.hp+Math.round(28*DF.hp));e.back=1.4;e.crouchT=1.2}
  if(e.back>0){const dx=e.x-ax,dz=e.z-az,d=Math.hypot(dx,dz)||1;const cov=findCoverSpot(e,ax,az);if(cov)stepTo(e,cov[0],cov[1],3.3,dt);else stepTo(e,e.x+dx/d*10,e.z+dz/d*10,3.3,dt);animMan(e,dt);return}
  const breach=nearestBreach(e.x,e.z);const axd=Math.hypot(ax-e.x,az-e.z);const home={x:ax,z:az,y:H(ax,az)+1.2,d:axd};const tt=(age<(e.tIgn||0))?null:raidTurret(e);const brk=tt?{x:tt.x,y:tt.y+.8,z:tt.z,d:Math.hypot(tt.x-e.x,tt.z-e.z)}:breach;const tgt=brk||home;
  const bashIfStuck=()=>{if((e._mv||0)<.012){e.stuck=(e.stuck||0)+dt;if(e.stuck>.4)bash(e,(e.heavy?22:15)*dt)}else e.stuck=0};
@@ -2227,20 +2252,49 @@ function driveSiege(e,dt){if(e.flee){const dx=e.x-siegeAnchor.x,dz=e.z-siegeAnch
  if(tt){e.tt=(e.tt||0)+dt;if(e.tt>16){e.tIgn=age+25;e.tt=0}else if(raidTurretAct(e,dt,speed,tt)){bashIfStuck();animMan(e,dt);return}}else e.tt=0;
  {const ft=raidFoe(e,dp);if(ft){e.tgtSettler=ft;if(raidSettler(e,dt,speed,ft)){animMan(e,dt);return}}else e.tgtSettler=null}
  if(e.gun&&gunSiege(e,dt,speed)){animMan(e,dt);return}
- if(dp<1.65){hurtP((e.heavy?11:8)*dt,'The raid');if(!(e.sw>0))e.sw=.45;animMan(e,dt);return}
+ if(dp<1.65&&turretSees(e,{x:P.x,y:P.y-1.7,z:P.z})){hurtP((e.heavy?11:8)*dt,'The raid');if(!(e.sw>0))e.sw=.45;animMan(e,dt);return}
  if(dp<80){
   // Flankers curve around the player's left/right flank when closing distance
   if(e.role==='flanker'&&dp>8&&dp<36){const dx=P.x-e.x,dz=P.z-e.z,fl=(e.idx%2?1:-1)*7.5;go(e,P.x-dz/dp*fl,P.z+dx/dp*fl,speed*1.15,dt)}
   else go(e,P.x,P.z,speed*1.12,dt);
  }else if(axd>2.3)go(e,ax,az,speed,dt);
  bashIfStuck();animMan(e,dt)}
-function bash(e,dmg){const tc=siegeAnchor.tc;if(tc&&!tc._gone&&Math.hypot(e.x-tc.x,e.z-tc.z)<2.6){tc.hp-=dmg*1.2;wbPoke(tc);if(!(e.sw>0))e.sw=.4;if(tc.hp<=0){killDev(tc);say('They destroyed the tool cupboard. Privilege is gone.')}return true}let best=null,bd=2.7,door=null,dd=2.35;for(const c of ALLC){if(c.d&&c.d.open)continue;const cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2,q=Math.hypot(e.x-cx,e.z-cz);if(c.d&&isDoor(c.d.t)&&c.d.owner==='you'&&q<dd){dd=q;door=c}else if(c.piece&&c.owner==='you'&&c.hp>0&&q<bd){bd=q;best=c}}const hit=door||best;if(!hit)return false;if(hit.d&&isDoor(hit.d.t)){hit.d.hp-=dmg;wbPoke(hit.d);if(hit.d.hp<=0){killDev(hit.d);say('They smashed the door.')}return true}hit.hp-=dmg;for(const o of ALLC)if(o.mesh&&o.mesh===hit.mesh)o.hp=hit.hp;wallDmg(hit,1);wbPoke(hit);if(hit.hp<=0)smashPiece(hit);return true}
+function bash(e,dmg){const tc=siegeAnchor.tc;if(tc&&!tc._gone&&Math.hypot(e.x-tc.x,e.z-tc.z)<2.6){tc.hp-=dmg*1.2;wbPoke(tc);if(!(e.sw>0))e.sw=.4;if(tc.hp<=0){killDev(tc);say('They destroyed the tool cupboard. Privilege is gone.')}return true}let best=null,bd=2.7,door=null,dd=2.35;for(const c of ALLC){if(c.d&&c.d.open)continue;const cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2,q=Math.hypot(e.x-cx,e.z-cz);if(c.d&&(isDoor(c.d.t)||c.d.t==='barricade')&&c.d.owner==='you'&&q<dd){dd=q;door=c}else if(c.piece&&c.owner==='you'&&c.hp>0&&q<bd){bd=q;best=c}}const hit=door||best;if(!hit)return false;if(hit.d&&(isDoor(hit.d.t)||hit.d.t==='barricade')){hit.d.hp-=dmg;wbPoke(hit.d);if(hit.d.hp<=0){killDev(hit.d);say(hit.d.t==='barricade'?'They smashed a barricade.':'They smashed the door.')}return true}hit.hp-=dmg;for(const o of ALLC)if(o.mesh&&o.mesh===hit.mesh)o.hp=hit.hp;wallDmg(hit,1);wbPoke(hit);if(hit.hp<=0)smashPiece(hit);return true}
 const RGUN={pistol:{dmg:6,rate:.85,range:30,mag:12,acc:.42,len:.3},revolver:{dmg:10,rate:1.25,range:34,mag:6,acc:.48,len:.38},shotgun:{dmg:15,rate:1.5,range:17,mag:6,acc:.62,len:.7},pump:{dmg:17,rate:1.2,range:20,mag:6,acc:.64,len:.74},smg:{dmg:4,rate:.14,range:26,mag:25,acc:.3,len:.45},thompson:{dmg:5.5,rate:.15,range:32,mag:20,acc:.34,len:.52},sar:{dmg:9,rate:.36,range:48,mag:16,acc:.42,len:.76},rifle:{dmg:12,rate:.8,range:62,mag:10,acc:.45,len:.85},ak:{dmg:6.5,rate:.16,range:48,mag:30,acc:.36,len:.8}};
 let RGT=0;
 function raidNo(){return Math.max(1,Math.floor((days+1)/5))}
 function raidTier(N){return{guns:N<2?['pistol','revolver','pistol']:N<3?['pistol','revolver','shotgun','smg','smg']:N<4?['revolver','shotgun','smg','rifle','rifle']:['smg','rifle','ak','ak','shotgun'],h:Math.min(.95,.05+.25*N),v:Math.min(.9,.25*(N-1)),l:Math.max(0,Math.min(.85,.3*(N-2)))}}
+// ===== AI COVER: wood barricades =====
+// A raider or settler that gets shot with nothing between it and the shooter hides behind a nearby barricade, or sets one down (raiders carry 1-2, settlers spend 20 wood).
+function underFire(e,sx,sz,sy){if(!e)return;e.fireT=age+4;e.fx=sx;e.fz=sz;e.fy=sy==null?H(sx,sz):sy}
+function coverSpot(e,x,z){return!turretSees({x:e.fx,y:e.fy,z:e.fz},{x,y:H(x,z),z})}
+function aiCover(e,dt,speed){
+ if(!(e.fireT>age)&&!(e.cvHold>age))return false;
+ if(e.k==='raider'&&e.walls===undefined)e.walls=e.heavy?2:1;
+ if(e.cvHold>age){
+  if(coverSpot(e,e.x,e.z)){e.crouchT=Math.max(e.crouchT||0,.3);const G=e.k==='raider'&&RGUN[e.gun];if(G&&e.rl<=0&&e.mag<G.mag*.6&&e.ammo>0)e.rl=2.2;return true}
+  e.cvHold=0;return false}
+ const fd=Math.hypot(e.fx-e.x,e.fz-e.z);
+ if(fd<5||age<(e.cvCd||0)||coverSpot(e,e.x,e.z))return false;
+ let best=null,bd=14;
+ for(const d of devs){if(d.t!=='barricade'||d._gone)continue;const dx=d.x-e.fx,dz=d.z-e.fz,l=Math.hypot(dx,dz)||1,sx=d.x+dx/l*1.25,sz=d.z+dz/l*1.25,q=Math.hypot(sx-e.x,sz-e.z);if(q<bd&&Math.hypot(sx-e.fx,sz-e.fz)>5&&coverSpot(e,sx,sz)){bd=q;best={x:sx,z:sz}}}
+ if(best){if(bd<.8){e.cvHold=age+3.5+Math.random()*2.5;e.cvCd=age+9;return true}stepTo(e,best.x,best.z,speed*1.2,dt);return true}
+ const can=e.k==='settler'?(e.inv&&e.inv.wood>=20):e.walls>0;
+ if(!can||!ITEMS.barricade){e.cvCd=age+3;return false}
+ let ai=0;for(const d of devs)if(d.t==='barricade'&&d.owner!=='you'&&!d._gone)ai++;
+ const ux=(e.fx-e.x)/fd,uz=(e.fz-e.z)/fd,x=e.x+ux*1.5,z=e.z+uz*1.5,y=H(x,z);
+ let bad=ai>=14||y<.5||Math.abs(y-e.y)>1.2;
+ if(!bad)for(const c of ALLC){if(c.ramp||(c.d&&(c.d.open||c.d._gone)))continue;if(x>c.x0-.9&&x<c.x1+.9&&z>c.z0-.9&&z<c.z1+.9&&(c.found||c.y===undefined||(y>c.y-1&&y<c.y+(c.h||3.05)))){bad=true;break}}
+ if(bad){e.cvCd=age+2.5;return false}
+ construct(ITEMS.barricade,{x,y,z,rot:Math.atan2(ux,uz)},true);
+ const d=devs[devs.length-1];if(!d||d.t!=='barricade'){e.cvCd=age+3;return false}
+ d.owner=e.k==='settler'?'npc':'raid';d.ttl=e.k==='settler'?480:240;d.born=age;
+ if(e.k==='settler')e.inv.wood-=20;else e.walls--;
+ e.cvHold=age+3.5+Math.random()*2.5;e.cvCd=age+9;puffAt(x,y+.7,z);if(Math.hypot(P.x-x,P.z-z)<60)blip(150,.09,'square');
+ return true}
 function gunSiege(e,dt,speed){const G=RGUN[e.gun];if(!G)return false;e.gcd=Math.max(0,(e.gcd||0)-dt);
  if(e.rl>0){e.rl-=dt;if(e.rl<=0){const k=Math.min(G.mag,e.ammo);e.mag=k;e.ammo-=k}}else if(e.mag<=0){if(e.ammo>0)e.rl=2.2;else return false}
+ if(aiCover(e,dt,speed))return true;
  const dx=P.x-e.x,dz=P.z-e.z,dp=Math.hypot(dx,dz);
  if(dp>G.range||dp<2.2||!turretSees({x:e.x,y:e.y,z:e.z},{x:P.x,y:P.y-1.7,z:P.z}))return false;
  const pref=G.range*(e.role==='marksman'?.62:.45);e._mv=0;e.aimT=.35;
@@ -2265,16 +2319,16 @@ function raidTurretAct(e,dt,speed,d){const G=RGUN[e.gun],dx=d.x-e.x,dz=d.z-e.z,q
 function raidFoe(e,dp){let b=null,bd=dp>45?75:Math.min(75,dp);for(const n of NP){if(n._dead||n.hp<=0)continue;const q=Math.hypot(n.x-e.x,n.z-e.z);if(q<bd){bd=q;b=n}}return b}
 function raidSettler(e,dt,speed,n){const G=RGUN[e.gun],dx=n.x-e.x,dz=n.z-e.z,d=Math.hypot(dx,dz)||1;e.gcd=Math.max(0,(e.gcd||0)-dt);
  if(G){if(e.rl>0){e.rl-=dt;if(e.rl<=0){const k=Math.min(G.mag,e.ammo);e.mag=k;e.ammo-=k}}else if(e.mag<=0&&e.ammo>0)e.rl=2.2}
- const dmgS=dm=>{n.hp-=dm;if(n.hp<=0){killSettler(n);say('Raiders killed a settler.')}else if(age>(n._rs||0)){n._rs=age+8;say('Raiders are attacking a settler!')}};
+ const dmgS=dm=>{n.hp-=dm;underFire(n,e.x,e.z,e.y);if(n.hp<=0){killSettler(n);say('Raiders killed a settler.')}else if(age>(n._rs||0)){n._rs=age+8;say('Raiders are attacking a settler!')}};
  if(G&&d<G.range&&d>2.4&&(e.mag>0||e.rl>0)&&turretSees(e,n)){e._mv=0;e.aimT=.35;const pref=G.range*.45;tacticalMove(e,n.x,n.z,d,pref,speed,dt);e.m.rotation.y=Math.atan2(dx,dz);
   if(e.rl<=0&&e.mag>0&&e.gcd<=0){e.gcd=G.rate*(.9+Math.random()*.4);e.mag--;e.armUp=.22;const oy=e.y+1.4,ty=n.y+1.1,L=Math.hypot(d,ty-oy)||1;tracer(e.x,oy,e.z,dx/L,(ty-oy)/L,dz/L,L,e.m.rotation.y);if(Math.random()<Math.max(.15,G.acc*(1-d/(G.range*1.2)))*(e.accK||1)+.15)dmgS(G.dmg*(e.dmgK||1)*1.4);if(age>RGT){RGT=age+.08;if(Math.hypot(P.x-e.x,P.z-e.z)<60)blip(150,.05,'square')}}
   return true}
  if(d<1.7){dmgS((e.heavy?11:8)*dt*1.3);if(!(e.sw>0))e.sw=.45;return true}
  go(e,n.x,n.z,speed*1.1,dt);return true}
-function spawnSiege(idx){const sT=NP.filter(n=>n.hp>0&&!n._dead&&Math.hypot(n.x-P.x,n.z-P.z)<170),g3=idx%3,sn=g3===2&&sT.length?sT[((idx/3)|0)%sT.length]:null,anch=sn?{x:sn.x,z:sn.z}:g3===0?{x:P.x,z:P.z}:(siegeAnchor.live?{x:P.x,z:P.z}:siegeAnchor);const q=ringSpawn(anch.x,anch.z,sn?42:36,sn?64:58);if(!q)return null;const N=raidNo(),T=raidTier(N),heavy=Math.random()<Math.min(.7,.15+.06*N)+RT.heat*.05;const kit=kitFor(idx,true,heavy);
- const gun=T.guns[(Math.random()*T.guns.length)|0],G=RGUN[gun],ar={h:heavy||Math.random()<T.h,v:heavy||Math.random()<T.v,l:heavy||Math.random()<T.l},hpK=1+.12*(N-1),maxHp=((heavy?108:68)+RT.heat*8)*hpK;
+function spawnSiege(idx){const sT=NP.filter(n=>n.hp>0&&!n._dead&&Math.hypot(n.x-P.x,n.z-P.z)<170),g3=idx%3,sn=sT.length&&((idx*7)%10)<DF.sTgt?sT[idx%sT.length]:null,anch=sn?{x:sn.x,z:sn.z}:g3===0?{x:P.x,z:P.z}:(siegeAnchor.live?{x:P.x,z:P.z}:siegeAnchor);const q=ringSpawn(anch.x,anch.z,sn?42:36,sn?64:58);if(!q)return null;const N=raidNo(),NT=Math.max(1,N+DF.tier),T=raidTier(NT),heavy=Math.random()<Math.min(.85,(.15+.06*NT)*DF.heavy)+RT.heat*.05;const kit=kitFor(idx,true,heavy);
+ const gun=T.guns[(Math.random()*T.guns.length)|0],G=RGUN[gun],ar={h:heavy||Math.random()<T.h,v:heavy||Math.random()<T.v,l:heavy||Math.random()<T.l},hpK=Math.min(1.8,1+DF.grow*(N-1)),maxHp=Math.round(((heavy?84:56)+RT.heat*5)*hpK*DF.hp);
  const role=kit.kit!=='melee'&&kit.nades>0?'breacher':gun==='rifle'?'marksman':idx%2===1?'flanker':'assault';
- const e={k:'raider',role,x:q[0],z:q[1],y:H(q[0],q[1]),hp:maxHp,maxHp,meds:heavy?2:1,heavy,cheat:true,siege:true,idx,pth:[],side:1,strafeDir:idx%2?1:-1,kit:kit.kit,nades:kit.nades,ordCd:.6+Math.random()*1.4,back:0,gun,mag:G.mag,ammo:G.mag*(2+N),gcd:.5+Math.random(),rl:0,accK:Math.min(1.5,.8+.08*N),dmgK:1+.07*(N-1),armr:ar,armorK:(ar.h?.88:1)*(ar.v?.72:1)*(ar.l?.9:1),m:spawnMan(0x6e2218,true,{heavy,kit:kit.kit,gun,arm:ar})};e.m.userData.k='raider';e.m.userData.a=e;e.m.position.set(e.x,e.y,e.z);things.push(e.m);EN.push(e);return e}
+ const e={k:'raider',role,x:q[0],z:q[1],y:H(q[0],q[1]),hp:maxHp,maxHp,meds:heavy?2:1,heavy,cheat:true,siege:true,idx,pth:[],side:1,strafeDir:idx%2?1:-1,kit:kit.kit,nades:kit.nades,ordCd:.6+Math.random()*1.4,back:0,gun,mag:G.mag,ammo:G.mag*(2+N),gcd:.5+Math.random(),rl:0,accK:Math.min(1.7,(.8+.08*NT)*DF.acc),dmgK:(1+.07*(NT-1))*DF.dmg,armr:ar,armorK:(ar.h?.88:1)*(ar.v?.72:1)*(ar.l?.9:1),m:spawnMan(0x6e2218,true,{heavy,kit:kit.kit,gun,arm:ar})};e.m.userData.k='raider';e.m.userData.a=e;e.m.position.set(e.x,e.y,e.z);things.push(e.m);EN.push(e);return e}
 function launchRaid(){if(ch('peace'))return say('Peace is on.');raidSawDark=false;raidWarned=days;siegeAnchor=raidAnchor();const n=raidCount();let made=0;for(let i=0;i<n;i++)if(spawnSiege(i))made++;if(!made){say('Nowhere dry to land a raid.');return}raidPhase='active';raidSpawned=days;say('Raid crew incoming. '+made+' on the ridge.');blip(68,.5,'square')}
 function skipToRaid(){const dayNum=days+1;if(dayNum%5!==0)days+=5-dayNum%5;else days+=5;t=.84;raidPhase='calm';raidSawDark=false;raidWarned=-1;raidSpawned=-1;say('Evening before a raid night. Day '+(days+1)+'. Tap the clock to speed the day, or start the crew now.')}
 let claimName=(opts&&opts.claimName)||'Blackpine Ridge',slotId=(opts&&opts.slotId)||('slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
@@ -2291,11 +2345,11 @@ function snapshot(customName){
   hp:Math.round(S.health),hunger:Math.round(S.hunger),thirst:Math.round(S.thirst),energy:Math.round(S.energy),warmth:Math.round(S.warmth),
   builds:BLOG.length,devs:yours.length,bpCount:BPK.size,scrap:cnt('scrap'),
   held:SL[sel]&&ITEMS[SL[sel].id]?ITEMS[SL[sel].id].n:'Unarmed',
-  coords:`(${P.x|0}, ${P.z|0})`,pace,gather:GATHER,
+  coords:`(${P.x|0}, ${P.z|0})`,pace,gather:GATHER,diff:DIFFK,
   hasTC:yours.some(d=>d.t==='tc'),hasBed:!!(CLAIM&&CLAIM.kind==='bed')
  };
  return{
-  v:1,slotId,name:claimName,ts:nowTs,meta,gather:GATHER,
+  v:1,slotId,name:claimName,ts:nowTs,meta,gather:GATHER,diff:DIFFK,
   bp:[...BPK],as:ammoSel,S:{...S},t,days,pace,yaw,pitch,p:{x:P.x,y:P.y,z:P.z},
   slots,eq:{head:EQ.head,chest:EQ.chest,legs:EQ.legs},rt:{...RT},
   claim:CLAIM?{x:CLAIM.x,z:CLAIM.z,kind:CLAIM.kind}:null,blog:BLOG,
@@ -2310,7 +2364,7 @@ function devAt(rec){return devs.find(q=>q.owner==='you'&&q.t===rec.t&&Math.hypot
 function applySave(s){if(!s||s.v!==1||!s.p)return false;
  if(s.name||(s.meta&&s.meta.name))claimName=s.name||(s.meta&&s.meta.name)||claimName;
  if(s.slotId||(s.meta&&s.meta.slotId))slotId=s.slotId||(s.meta&&s.meta.slotId)||slotId;
- if(s.gather&&+s.gather>0)GATHER=+s.gather;
+ if(s.gather&&+s.gather>0)GATHER=+s.gather;if(s.diff&&DIFFS[s.diff]){DIFFK=s.diff;DF=DIFFS[s.diff];CAMP_RESPAWN=DF.campResp}
  Object.assign(S,s.S||{});if(AMMO[s.as])ammoSel=s.as;
  BPK.clear();if(Array.isArray(s.bp))for(const k of s.bp)BPK.add(k);else for(const k in RCOST)BPK.add(k);
  t=s.t??t;days=s.days||0;if(PACES.includes(s.pace))setPace(s.pace);
@@ -2341,28 +2395,27 @@ function placeBed(){const x=P.x-Math.sin(yaw)*1.8,z=P.z-Math.cos(yaw)*1.8;if(H(x
 function wake(){if(!dead)return;dead=false;demise='';$('over').style.display='none';hurtFx=0;const isBed=CLAIM&&CLAIM.kind==='bed';S.health=isBed?85:48;S.hunger=isBed?68:42;S.thirst=isBed?68:48;S.energy=isBed?85:56;S.warmth=isBed?80:62;const x=CLAIM?CLAIM.x+1.2:SP.x,z=CLAIM?CLAIM.z+1.2:SP.z;P.x=LP.x=x;P.z=LP.z=z;P.y=Math.max(G(x,z),H(x,z),-2)+1.7;RT.heat=Math.max(0,RT.heat-.8);say(isBed?'You wake well-rested in your Respawn Bed.':CLAIM?'You wake at the bedroll.':'You wake where you first stood.');ensureStarter();persist()}
 
 function spawnRaider(cheat){let q=null;for(let i=0;i<24&&!q;i++){const t=cheat?landNear(18,30):landNear(50,100);if(t&&(cheat||raidGround(t[0],t[1])))q=t}if(!q)return;
- const heavy=Math.random()<.3,kit=kitFor(0,false,heavy),hasGun=Math.random()<(.38+Math.min(.42,RT.heat*.1)),gun=hasGun?(heavy?'shotgun':Math.random()<.5?'pistol':'revolver'):null,G=gun?RGUN[gun]:null,maxHp=heavy?90:65;
- const e={k:'raider',role:hasGun?'flanker':'assault',x:q[0],z:q[1],y:H(q[0],q[1]),hp:maxHp,maxHp,meds:1,heavy,cheat:!!cheat,siege:false,idx:EN.length,pth:[],side:1,strafeDir:Math.random()<.5?1:-1,kit:kit.kit,nades:kit.nades,ordCd:1,back:0,gun,mag:G?G.mag:0,ammo:G?G.mag*2:0,gcd:.6,rl:0,accK:.88,dmgK:1,m:spawnMan(0x8a2222,true,{heavy,kit:kit.kit,gun})};
+ const heavy=Math.random()<.3,kit=kitFor(0,false,heavy),hasGun=Math.random()<(.38+Math.min(.42,RT.heat*.1)+DF.tier*.06),gun=hasGun?(heavy?'shotgun':Math.random()<.5?'pistol':'revolver'):null,G=gun?RGUN[gun]:null,maxHp=Math.round((heavy?75:55)*DF.hp);
+ const e={k:'raider',role:hasGun?'flanker':'assault',x:q[0],z:q[1],y:H(q[0],q[1]),hp:maxHp,maxHp,meds:1,heavy,cheat:!!cheat,siege:false,idx:EN.length,pth:[],side:1,strafeDir:Math.random()<.5?1:-1,kit:kit.kit,nades:kit.nades,ordCd:1,back:0,gun,mag:G?G.mag:0,ammo:G?G.mag*2:0,gcd:.6,rl:0,accK:.88*DF.acc,dmgK:DF.dmg,m:spawnMan(0x8a2222,true,{heavy,kit:kit.kit,gun})};
  e.m.userData.k='raider';e.m.userData.a=e;e.m.position.set(e.x,e.y,e.z);things.push(e.m);EN.push(e)}
 function raidTick(dt){const pc=ch('peace');const raidDay=(days+1)%5===0;
  if(!pc&&raidDay&&raidWarned!==days&&t>.7&&t<.95&&dl()>.22){raidWarned=days;raidPhase='warning';const floor=Math.min(4,RT.build*.045+RT.scavenge*.03+RT.blood*.02);if(RT.heat<floor)RT.heat=floor;const tc=playerTC();say('Raid wave '+raidNo()+'. Heat '+heatStars()+'. About '+raidCount()+' are coming for '+(tc?'the tool cupboard.':CLAIM?'the bedroll.':'you.')+'.');blip(92,.35,'sawtooth');setTimeout(()=>blip(64,.45,'square'),260)}
  if(!pc&&raidDay&&raidSpawned!==days&&dl()<.2&&age>=raidTryAt){siegeAnchor=raidAnchor();const n=raidCount();let made=0;for(let i=0;i<n;i++)if(spawnSiege(i))made++;if(made){raidSpawned=days;raidPhase='active';raidSawDark=false;say('They are coming through the trees. '+made+' of them.');blip(58,.55,'square')}else{raidTryAt=age+12;if(raidPhase!=='active')raidPhase='warning';say('The crew is circling. No dry ground close enough yet.')}}
  if(raidPhase==='active'&&dl()<.3)raidSawDark=true;if(raidPhase==='active'&&raidSawDark&&dl()>.45){raidPhase='retreat';raidSawDark=false;say('Dawn. The crew falls back.');for(const q of EN)if(q.siege&&q.hp>0)q.flee=1}
  if((raidPhase==='active'||raidPhase==='retreat')&&raidSpawned===days&&!EN.some(e=>e.siege&&e.hp>0)){const broke=raidPhase==='active';raidPhase='calm';if(broke){RT.blood+=.4;say('The raid is broken.')}}
- if(!pc&&!raidDay&&dl()<.3&&EN.filter(e=>!e.siege).length<2&&(rt-=dt)<=0){rt=55;spawnRaider(false)}
+ if(!pc&&!raidDay&&dl()<.3&&EN.filter(e=>!e.siege&&!e.camp).length<DF.nightMax&&(rt-=dt)<=0){rt=DF.night;spawnRaider(false)}
  campTick(dt,pc);
  for(let i=EN.length-1;i>=0;i--){const e=EN[i];if(pc&&e.hp>0)e.hp=-99;else if(!e.siege&&!e.camp&&dl()>.55&&!e.cheat&&e.hp>0)e.hp=-99;if(e.hp<=0){dropFoe(e);EN.splice(i,1);if(e.hp>-50){const rem=e.camp?e.camp.raiders.filter(q=>q&&q!==e&&q.hp>0).length:0;say(e.warlord?'Raider Warlord eliminated!':e.camp?('Camp raider eliminated ('+rem+' left at '+e.camp.n+').'):e.siege?'Siege raider down.':'Raider eliminated.');lootRaider(e);RT.blood+=e.warlord?2.5:e.camp?1.4:1;bumpHeat(e.warlord?.25:.1)}continue}
   if(e.camp){driveCampRaider(e,dt);continue}
   if(e.siege){if(!e.flee&&Math.hypot(e.x-(siegeAnchor.live?P.x:siegeAnchor.x),e.z-(siegeAnchor.live?P.z:siegeAnchor.z))>420){e.hp=-99;continue}driveSiege(e,dt);continue}
   const d=Math.hypot(P.x-e.x,P.z-e.z);e._mv=0;if(d>160){e.hp=-99;continue}e.ordCd=Math.max(0,(e.ordCd||0)-dt);
-  if(e.hp<(e.maxHp||65)*.35&&(e.meds||0)>0){e.meds--;e.hp=Math.min(e.maxHp||65,e.hp+22);e.crouchT=.9}
+  if(e.hp<(e.maxHp||65)*.35&&(e.meds||0)>0){e.meds--;e.hp=Math.min(e.maxHp||65,e.hp+Math.round(22*DF.hp));e.crouchT=.9}
   if(e.nades>0&&e.kit==='beancan'&&d>6&&d<16&&e.ordCd<=0){tossFrom(e,{x:P.x,y:P.y-.2,z:P.z},'beancan');e.nades--;e.ordCd=4.2;animMan(e,dt);continue}
+  {const ft=raidFoe(e,d);if(ft&&raidSettler(e,dt,2.65,ft)){animMan(e,dt);continue}}
   if(e.gun&&gunSiege(e,dt,2.6)){animMan(e,dt);continue}
-  if(d>1.4)go(e,P.x,P.z,2.65,dt);if(d<1.65){hurtP(8*dt,'Raiders');if(!(e.sw>0))e.sw=.45}animMan(e,dt)}}
-function turretSees(d,e){const x0=d.x,y0=d.y+1.2,z0=d.z,x1=e.x,y1=(e.y||0)+1.15,z1=e.z,dx=x1-x0,dy=y1-y0,dz=z1-z0,dist=Math.hypot(dx,dz);if(dist<1.3)return true;const steps=Math.max(2,Math.min(14,Math.ceil(dist/1.5)));
- for(let s=1;s<steps;s++){const u=s/steps,x=x0+dx*u,y=y0+dy*u,z=z0+dz*u;if(y<H(x,z)+.15)return false;
-  for(const c of ALLC){if(c.d&&c.d.open)continue;if(c.y!==undefined&&(y<c.y-.05||y>c.y+2.9))continue;const mx=(c.x0+c.x1)/2,mz=(c.z0+c.z1)/2;if(Math.abs(x-mx)>2.4||Math.abs(z-mz)>2.4)continue;if(x>c.x0-.05&&x<c.x1+.05&&z>c.z0-.05&&z<c.z1+.05)return false}}
- return true}
+  if(d>1.4)go(e,P.x,P.z,2.65,dt);if(d<1.65&&turretSees(e,{x:P.x,y:P.y-1.7,z:P.z})){hurtP(8*dt,'Raiders');if(!(e.sw>0))e.sw=.45}animMan(e,dt)}}
+function turretSees(d,e){const x0=d.x,y0=d.y+1.2,z0=d.z,dx=e.x-x0,dy=(e.y||0)+1.15-y0,dz=e.z-z0,L=Math.hypot(dx,dy,dz);if(L<1.3)return true;
+ const m=L-.35;return blockDist(x0,y0,z0,dx/L,dy/L,dz/L,m)>=m}
 function turrets(dt){for(const d of devs){if(d.t!=='turret'||d._gone)continue;d.cd=(d.cd||0)-dt;const g=d.m&&d.m.userData.gun;if(!g)continue;let b=null;
  if(d.pw>.45){if((d.seeT=(d.seeT||0)-dt)<=0){d.seeT=.26;d.foe=null;const foes=[];for(const e of EN)if(e.hp>0){if(d.owner==='you')foes.push(e);else{const tc=d.npc&&d.npc.tc;if(tc&&!tc._gone?Math.hypot(e.x-tc.x,e.z-tc.z)<TC_R+8:Math.hypot(e.x-d.x,e.z-d.z)<TUR_R)foes.push(e)}}for(const w of WV)if(w.hp>0)foes.push(w);
   if(d.owner==='you'){for(const n of NP)if(n.hp>0&&n.aggro>0)foes.push(n)}
@@ -2370,7 +2423,7 @@ function turrets(dt){for(const d of devs){if(d.t!=='turret'||d._gone)continue;d.
   const fk=q=>Math.hypot(q.x-d.x,q.z-d.z)-(q.k==='raider'?(q.role==='breacher'?16:10):0);foes.sort((a,c)=>fk(a)-fk(c));
   for(let i=0;i<foes.length&&i<8;i++){if(Math.hypot(foes[i].x-d.x,foes[i].z-d.z)>TUR_R)break;if(turretSees(d,foes[i])){d.foe=foes[i];break}}}
   const f=d.foe;if(f&&(f._ply||f.hp>0)&&Math.hypot(f.x-d.x,f.z-d.z)<TUR_R)b=f}
- if(b){const targetYaw=Math.atan2(b.x-d.x,b.z-d.z)-(d.m.rotation.y||0);g.rotation.y=targetYaw;if(d.cd<=0){d.cd=.68;if(b._ply)hurtP(9,'A turret');else if(b.k==='settler'){b.hp-=b.heavy?12:20;if(b.hp<=0)killSettler(b)}else if(b.k==='wolf'){b.hp-=2;if(b.hp<=0)killAnimal(b,false)}else b.hp-=b.heavy?14:22;poolTracer(d.x,d.y+1.25,d.z,b.x,(b.y||0)+1.15,b.z,0xffd24a,90)}}
+ if(b){const targetYaw=Math.atan2(b.x-d.x,b.z-d.z)-(d.m.rotation.y||0);g.rotation.y=targetYaw;if(d.cd<=0){d.cd=.68;if(b._ply)hurtP(9,'A turret');else if(b.k==='settler'){b.hp-=b.heavy?12:20;if(b.hp<=0)killSettler(b)}else if(b.k==='wolf'){b.hp-=2;if(b.hp<=0)killAnimal(b,false)}else b.hp-=22*foeMit(b.heavy?.64:1,1);poolTracer(d.x,d.y+1.25,d.z,b.x,(b.y||0)+1.15,b.z,0xffd24a,90)}}
  else if(d.pw>.45){g.rotation.y=Math.sin(age*.85+d.x)*.65}}}
 function loot(){
  const r=Math.random,L={scrap:2+(r()*4|0)};
@@ -2449,6 +2502,7 @@ function settlerCombat(n,foe,isPlayer,step,fd){
  n.healCd=Math.max(0,(n.healCd||0)-step);
  if(n.hp<n.maxHp*.38&&n.healCd<=0){n.hp=Math.min(n.maxHp,n.hp+28);n.healCd=14;n.crouchT=.9;if(n.tc&&!n.tc._gone&&d<16){go(n,n.tc.x,n.tc.z,3.8,step);return}}
  if(W&&W.rng){
+  if(aiCover(n,step,3.7))return;
   const pref=W.rng*.58,los=turretSees({x:n.x,y:n.y,z:n.z},{x:tx,y:ty-1,z:tz});
   if(d>W.rng*.92||!los){go(n,tx,tz,3.7,step);return}
   // Tactical lateral strafe & standoff management
@@ -2464,7 +2518,7 @@ function settlerCombat(n,foe,isPlayer,step,fd){
    n.fcd=W.cd*(.92+Math.random()*.2);n.armUp=.22;
    if(isPlayer){if(Math.random()<.58)hurtP(W.dmg*.65,'A settler')}
    else if(foe.k==='wolf'){foe.hp-=Math.max(1.5,W.dmg*.18);if(foe.hp<=0)killAnimal(foe,fd<45)}
-   else{foe.hp-=W.dmg*(foe.heavy?.75:1)*(foe.armorK||1)}
+   else{foe.hp-=W.dmg*foeMit(foe.heavy?.75:1,foe.armorK||1);underFire(foe,n.x,n.z,n.y)}
    if(fd<130){poolTracer(n.x,n.y+1.35,n.z,tx,ty,tz,0xffd24a,70);if(fd<65&&age>RGT){RGT=age+.08;blip(W.id==='shotgun'?98:W.id==='rifle'||W.id==='ak'?145:195,.045,'square')}}
   }
   return}
@@ -2475,7 +2529,7 @@ function settlerCombat(n,foe,isPlayer,step,fd){
   const melDmg=W&&W.mel?W.mel:11;
   if(isPlayer)hurtP(melDmg*.65*step,'A settler');
   else if(foe.k==='wolf'){foe.hp-=melDmg*.22*step;if(foe.hp<=0)killAnimal(foe,fd<45)}
-  else foe.hp-=melDmg*step*(foe.heavy?.6:1)*(foe.armorK||1);
+  else foe.hp-=melDmg*step*foeMit(foe.heavy?.6:1,foe.armorK||1);
   if(!(n.sw>0))n.sw=.45}}
 function npcTick(dt){for(const d of devs)if(d.ac&&age>d.ac&&!NP.some(n=>Math.hypot(n.x-d.x,n.z-d.z)<2.5)&&Math.hypot(P.x-d.x,P.z-d.z)>2.5){d.open=false;d.ac=0}
  for(let i=NP.length-1;i>=0;i--){const n=NP[i];if(n.hp<=0){killSettler(n);continue}
@@ -2483,8 +2537,15 @@ function npcTick(dt){for(const d of devs)if(d.ac&&age>d.ac&&!NP.some(n=>Math.hyp
   if(n.hp<n.maxHp&&!(n.aggro>0))n.hp=Math.min(n.maxHp,n.hp+dt*.45);
   const fd=Math.hypot(n.x-P.x,n.z-P.z);if(!n.told&&fd<36){n.told=1;say(n.home?'That settler roams for ore and monuments. The turrets only shoot while the windmill keeps the battery up.':'A settler is still raising the camp.')}n.cd-=dt;n._mv=0;n._acc=(n._acc||0)+dt;let step=dt;const far=fd>190&&!(n.aggro>0);if(far){n.m.visible=false;if(n._acc<0.22)continue;step=n._acc;n._acc=0}else{n.m.visible=fd<240;n._acc=0}
   if(!ch('peace')&&n.aggro>0){n.aggro-=dt;if(fd>52)n.aggro=0;else{settlerCombat(n,P,true,step,fd);animMan(n,step);continue}}
+  if(!settlerArmed(n)){
+   // Unarmed settlers run home from camp raiders and back out of any live camp's range
+   const hm=n.home||n.lot||{x:n.hx,z:n.hz};let th=null,td=36;
+   for(const r of EN){if(r.hp<=0||!r.camp)continue;const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<td){td=q;th=r}}
+   const cd=th?null:campDanger(n,n.x,n.z);
+   if(th&&Math.hypot(n.x-hm.x,n.z-hm.z)>6){n.job=null;go(n,hm.x+2.4,hm.z+3.2,4.3,step);animMan(n,step);continue}
+   if(cd){n.job=null;n.pT=null;const dx=n.x-cd.x,dz=n.z-cd.z,l=Math.hypot(dx,dz)||1;stepTo(n,n.x+dx/l*14,n.z+dz/l*14,4,step);animMan(n,step);continue}}
   {const W=n.wp;let rr=null,rd=Math.max(18,W&&W.rng?W.rng:0);
-   for(const r of EN){if(r.k!=='raider'||r.hp<=0)continue;const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<rd){rd=q;rr=r}}
+   for(const r of EN){if(r.k!=='raider'||r.hp<=0||(r.camp&&!settlerArmed(n)&&Math.hypot(r.x-n.x,r.z-n.z)>8))continue;const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<rd){rd=q;rr=r}}
    if(!rr){for(const w of WV){if(w.hp<=0)continue;const q=Math.hypot(w.x-n.x,w.z-n.z);if(q<Math.min(rd,20)){rd=q;rr=w}}}
    if(rr){settlerCombat(n,rr,false,step,fd);animMan(n,step);continue}}
   npcAI(n,step);animMan(n,step)}}
@@ -2510,7 +2571,7 @@ function animBeast(a,dt){const moving=(a._mv||0)>.002;a.ph=(a.ph||0)+(moving?9:1
  if(a.headG)a.headG.rotation.y=Math.sin(a.ph*.35+a.x)*.1}
 function killAnimal(a,drop){dropFoe(a);const arr=a.k==='wolf'?WV:DE,i=arr.indexOf(a);if(i>=0)arr.splice(i,1);if(drop){const n=a.k==='deer'?3:2,nl=a.k==='deer'?3:2;dropFood(a.x,a.z,'meat',n);dropFood(a.x+.35,a.z+.25,'leather',nl);RT.hunt+=a.k==='wolf'?1.2:.55;bumpHeat(a.k==='wolf'?.2:.05);say(a.k==='deer'?'The deer dropped meat and leather. Pick them up.':'The wolf dropped meat and leather. Pick them up.')}}
 function hit(o,M){const a=o.userData.a;if(!a||a.hp<=0)return;S.energy=Math.max(0,S.energy-2);const h=M||tool('hatchet');if(h)wear();
- if(a.k==='raider'||a.k==='settler'){a.hp-=(M?M.dmg:h?20:8)*(a.heavy?.6:1)*(a.armorK||1);if(a.k==='settler'){const was=a.aggro>0;aggroSettler(a,32);if(a.hp<=0){killSettler(a);return}if(!was)say('You hit the settler. They come for you.');return}if(a.hp>0)say('You hit the raider.');return}
+ if(a.k==='raider'||a.k==='settler'){a.hp-=(M?M.dmg:h?20:8)*(a.k==='raider'?foeMit(a.heavy?.6:1,a.armorK||1):(a.heavy?.6:1)*(a.armorK||1));if(a.k==='settler'){const was=a.aggro>0;aggroSettler(a,32);if(a.hp<=0){killSettler(a);return}if(!was)say('You hit the settler. They come for you.');return}if(a.hp>0)say('You hit the raider.');return}
  a.hp-=M?M.dmg/10:h?2:1;if(a.hp<=0)return killAnimal(a,true);if(a.k==='deer'){a.flee=6;say('The deer bolts!')}else{a.aggro=12;say('The wolf snarls!')}}
 function stepBeast(a,tx,tz,sp,dt){const px=a.x,pz=a.z,dx=tx-a.x,dz=tz-a.z,d=Math.hypot(dx,dz);if(d>.15){const s=Math.min(d,sp*dt);a.x+=dx/d*s;a.z+=dz/d*s;a.m.rotation.y=Math.atan2(dx,dz)}
  if(H(a.x,a.z)<.3||Math.abs(a.x)>B||Math.abs(a.z)>B){a.x=px;a.z=pz;a.tx=a.x;a.tz=a.z;a.wt=0}col(a);a.y+=(G(a.x,a.z,a.y)-a.y)*Math.min(1,dt*8);a._mv=(a._mv||0)+Math.hypot(a.x-px,a.z-pz);a.m.position.set(a.x,a.y,a.z);return d}
@@ -3418,15 +3479,20 @@ spawnSettlers();warmSettlers();__mark('settlers');layRoads();__mark('roads');
 function spawnCampGarrison(camp){
  if(!camp||!camp.spawns)return 0;
  camp.raiders=(camp.raiders||[]).filter(r=>r&&r.hp>0);
- const want=Math.max(4,Math.min(10,camp.targetCount||6));
+ if(camp.baseCount==null)camp.baseCount=camp.targetCount||6;
+ const want=Math.max(3,Math.min(14,Math.round(camp.baseCount*DF.camp)));
+ const must=camp.spawns.filter(s=>s.warlord||s.tower),rest=camp.spawns.filter(s=>!s.warlord&&!s.tower);
+ const list=[...must,...rest].slice(0,Math.max(want,must.length));
+ for(let k=0;list.length<want&&rest.length;k++){const b=rest[k%rest.length];list.push(Object.assign({},b,{x:b.x+((k*37)%7-3)*.9,z:b.z+((k*53)%7-3)*.9}))}
+ camp.targetCount=list.length;
  let made=0;
- for(let i=0;i<want&&i<camp.spawns.length;i++){
-  const sp=camp.spawns[i],wx=camp.x+sp.x,wz=camp.z+sp.z;
+ for(let i=0;i<list.length;i++){
+  const sp=list[i],wx=camp.x+sp.x,wz=camp.z+sp.z;
   const wy=sp.tower?(camp.y+(sp.postY||3.0)):Math.max(G(wx,wz,camp.y+1.2),camp.y);
   const warlord=!!sp.warlord,heavy=warlord||!!sp.heavy;
   const gun=sp.gun||'ak',GS=RGUN[gun]||RGUN.ak;
   const ar={h:true,v:heavy||Math.random()<.85,l:heavy||Math.random()<.75};
-  const maxHp=warlord?185:heavy?125:95;
+  const maxHp=Math.round((warlord?150:heavy?100:75)*DF.hp);
   const col=warlord?0x4a0e0e:heavy?0x6e1d18:0x8a2222;
   const m=spawnMan(col,true,{heavy,warlord,kit:sp.kit||'melee',gun,arm:ar});
   const pts=(sp.pts||[[sp.x,sp.z]]).map(p=>[camp.x+p[0],camp.z+p[1]]);
@@ -3437,7 +3503,7 @@ function spawnCampGarrison(camp){
    idx:EN.length,pth:[],side:1,strafeDir:i%2?1:-1,
    kit:sp.kit||'melee',nades:sp.nades||0,ordCd:.8+Math.random(),back:0,
    gun,mag:GS.mag,ammo:GS.mag*(warlord?8:5),gcd:.4+Math.random()*.5,rl:0,
-   accK:warlord?1.28:sp.tower?1.22:1.08,dmgK:warlord?1.25:1.08,
+   accK:(warlord?1.28:sp.tower?1.22:1.08)*DF.acc,dmgK:(warlord?1.25:1.08)*DF.dmg,
    armr:ar,armorK:(ar.h?.86:1)*(ar.v?.72:1)*(ar.l?.88:1),
    patrolPts:pts,patrolIdx:0,patrolWait:i*.6,baseYaw:Math.atan2(-sp.x,-sp.z),
    m
@@ -3451,7 +3517,7 @@ function spawnCampGarrison(camp){
    const u=o.userData;u.op=0;u.loot=null;u.cd=0;u.rated=0;
   }
  }
- camp.hadRaiders=made>0;camp.cleared=false;camp.respawnT=0;camp.reinforceT=180;
+ camp.hadRaiders=made>0;camp.cleared=false;camp.respawnT=0;camp.reinforceT=CAMP_RESPAWN;
  return made;
 }
 function initRaiderCamps(){for(const c of RCAMPS)spawnCampGarrison(c)}
@@ -3461,7 +3527,7 @@ function campTowerShoot(e,dt){
  if(e.rl>0){e.rl-=dt;e.crouchT=.35;if(e.rl<=0){const k=Math.min(G.mag,e.ammo);e.mag=k;e.ammo-=k}return true}
  if(e.mag<=0){if(e.ammo>0){e.rl=2.0;return true}return false}
  const dx=P.x-e.x,dz=P.z-e.z,dp=Math.hypot(dx,dz);
- if(dp>G.range+12||dp<1.8)return false;
+ if(dp>G.range+12||dp<1.8||!turretSees(e,{x:P.x,y:P.y-1.7,z:P.z}))return false;
  e.m.rotation.y=Math.atan2(dx,dz);e.aimT=.4;
  if(e.gcd>0)return true;
  e.gcd=G.rate*(.85+Math.random()*.35);e.mag--;e.armUp=.24;
@@ -3471,16 +3537,37 @@ function campTowerShoot(e,dt){
  if(age>RGT){RGT=age+.08;if(dp<70)blip(145,.05,'square')}
  return true;
 }
+function raidDmgSettler(n,dm){if(!n||n._dead||n.hp<=0)return;n.hp-=dm;{let b=null,bd=75;for(const r of EN)if(r.hp>0){const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<bd){bd=q;b=r}}if(b)underFire(n,b.x,b.z,b.y)}if(n.hp<=0){killSettler(n);say('Raiders killed a settler.')}else if(age>(n._rs||0)){n._rs=age+8;say('Raiders are attacking a settler!')}}
+// Camp raiders spot settlers near the camp, call the garrison in on them, and towers snipe them
+function campSettlerFoe(e){const c=e.camp;if(!c)return null;let b=null,bd=(e.tower?58:44)*DF.sight;for(const n of NP){if(n._dead||n.hp<=0)continue;const q=Math.hypot(n.x-e.x,n.z-e.z);if(q<bd&&turretSees(e,n)){bd=q;b=n}}
+ if(b){c.sFoe=b;c.sT=9}else if(!e.tower&&c.sT>0&&c.sFoe&&!c.sFoe._dead&&c.sFoe.hp>0&&Math.hypot(c.sFoe.x-c.x,c.sFoe.z-c.z)<c.r+60)b=c.sFoe;
+ return b}
+function campTowerShootAt(e,dt,n){const G=RGUN[e.gun];if(!G)return false;e.gcd=Math.max(0,(e.gcd||0)-dt);
+ if(e.rl>0){e.rl-=dt;e.crouchT=.35;if(e.rl<=0){const k=Math.min(G.mag,e.ammo);e.mag=k;e.ammo-=k}return true}
+ if(e.mag<=0){if(e.ammo>0){e.rl=2.0;return true}return false}
+ const dx=n.x-e.x,dz=n.z-e.z,dp=Math.hypot(dx,dz);if(dp>G.range+12||dp<1.8||!turretSees(e,n))return false;
+ e.m.rotation.y=Math.atan2(dx,dz);e.aimT=.4;if(e.gcd>0)return true;
+ e.gcd=G.rate*(.85+Math.random()*.35);e.mag--;e.armUp=.24;
+ const oy=e.y+1.42,ty=n.y+1.1,L=Math.hypot(dp,ty-oy)||1,acc=Math.max(.14,G.acc*(1-dp/((G.range+14)*1.2)))*(e.accK||1)+.12;
+ tracer(e.x,oy,e.z,dx/L,(ty-oy)/L,dz/L,L,e.m.rotation.y);
+ if(Math.random()<acc)raidDmgSettler(n,G.dmg*(e.dmgK||1)*1.4);
+ if(age>RGT){RGT=age+.08;if(Math.hypot(P.x-e.x,P.z-e.z)<70)blip(145,.05,'square')}
+ return true}
+// A few ground raiders leave the camp on a timer and march on the nearest settler
+function campSortie(c){const live=c.raiders.filter(r=>r&&r.hp>0&&!r.tower&&!r.warlord&&!r.hunt&&r.hp>(r.maxHp||95)*.5);if(live.length<4||(c.alertT||0)>0)return;
+ let tgt=null,bd=340;for(const n of NP){if(n._dead||n.hp<=0)continue;const q=Math.hypot(n.x-c.x,n.z-c.z);if(q<bd){bd=q;tgt=n}}if(!tgt)return;
+ const k=Math.min(DF.party,live.length-2);for(let i=0;i<k;i++){const r=live[i];r.hunt=tgt;r.huntT=95}
+ if(Math.hypot(P.x-c.x,P.z-c.z)<320)say('Raiders from '+c.n+' are marching on a settler outpost.')}
 function driveCampRaider(e,dt){
  const camp=e.camp;if(!camp)return;
  const dp=Math.hypot(P.x-e.x,P.z-e.z),dc=Math.hypot(e.x-camp.x,e.z-camp.z);
  if(e.m)e.m.visible=dp<185;
- if(dp>185)return;
+ if(dp>185&&!e.hunt)return;
  e._mv=0;e.ordCd=Math.max(0,(e.ordCd||0)-dt);e.alertT=Math.max(0,(e.alertT||0)-dt);
- if(e.hp<(e.maxHp||95)*.42&&(e.meds||0)>0){e.meds--;e.hp=Math.min(e.maxHp||95,e.hp+(e.warlord?45:28));e.crouchT=1.0}
+ if(e.hp<(e.maxHp||95)*.42&&(e.meds||0)>0){e.meds--;e.hp=Math.min(e.maxHp||95,e.hp+Math.round((e.warlord?45:28)*DF.hp));e.crouchT=1.0}
  // Detect player approaching camp
  if(!ch('peace')&&!dead){
-  const sight=e.tower?58:44;
+  const sight=(e.tower?58:44)*DF.sight;
   if(dp<26||(dp<sight&&turretSees({x:e.x,y:e.y,z:e.z},{x:P.x,y:P.y-1.7,z:P.z}))){
    if((camp.alertT||0)<=0&&age>(camp.warnAt||0)){
     camp.warnAt=age+18;
@@ -3494,19 +3581,26 @@ function driveCampRaider(e,dt){
  // Tower marksman stays on watchtower deck
  if(e.tower){
   e.x=e.homeX;e.z=e.homeZ;e.y=e.postY;e.m.position.set(e.x,e.y,e.z);
+  const sfT=campSettlerFoe(e);
   if(e.alertT>0&&!ch('peace')&&!dead&&dp<70){
    campTowerShoot(e,dt);
+  }else if(sfT){
+   campTowerShootAt(e,dt,sfT);
   }else{
    e.m.rotation.y=(e.baseYaw||0)+Math.sin(age*.55+e.idx)*.95;
   }
   animMan(e,dt);return;
  }
  // Ground Raider Tether: return to camp if pulled too far outside perimeter
- if(dc>camp.r+38){
-  stepTo(e,e.homeX,e.homeZ,3.15,dt);
+ if(!e.hunt&&dc>camp.r+38){
+  if(dc>camp.r+110)go(e,e.homeX,e.homeZ,3.4,dt);else stepTo(e,e.homeX,e.homeZ,3.15,dt);
   if(e.hp<e.maxHp)e.hp=Math.min(e.maxHp,e.hp+4*dt);
   animMan(e,dt);return;
  }
+ // Settlers: a hunting party's target, or any settler the camp can see
+ if(e.hunt&&(e.hunt._dead||e.hunt.hp<=0||((e.huntT=(e.huntT||0)-dt)<=0)))e.hunt=null;
+ {const sf=e.hunt||campSettlerFoe(e);
+  if(sf&&!(e.alertT>0&&dp<40)){const sp2=e.warlord?2.82:e.heavy?2.48:2.72;if(raidSettler(e,dt,sp2,sf)){animMan(e,dt);return}}}
  // Active combat state
  if(e.alertT>0&&!ch('peace')&&!dead&&dp<75){
   const speed=e.warlord?2.82:e.heavy?2.48:2.72;
@@ -3519,7 +3613,7 @@ function driveCampRaider(e,dt){
    if(e.role==='flanker'&&dp>8&&dp<32){const dx=P.x-e.x,dz=P.z-e.z,fl=(e.idx%2?1:-1)*6.5;stepTo(e,P.x-dz/dp*fl,P.z+dx/dp*fl,speed*1.1,dt)}
    else stepTo(e,P.x,P.z,speed,dt);
   }else{
-   hurtP((e.warlord?15:e.heavy?11:8)*dt,e.warlord?'The Raider Warlord':'Camp Raiders');
+   if(turretSees(e,{x:P.x,y:P.y-1.7,z:P.z}))hurtP((e.warlord?15:e.heavy?11:8)*dt,e.warlord?'The Raider Warlord':'Camp Raiders');
    if(!(e.sw>0))e.sw=.45;
   }
   animMan(e,dt);return;
@@ -3541,12 +3635,13 @@ function driveCampRaider(e,dt){
  }
  animMan(e,dt);
 }
-const CAMP_RESPAWN=180; // 3 minutes (scales with fast-forward)
+let CAMP_RESPAWN=DF.campResp; // seconds, set by difficulty (scales with fast-forward)
 function campTick(dt,pc){
  const effDt=dt*(CH.on?(CH.ts||1):1);
  for(const c of RCAMPS){
-  c.alertT=Math.max(0,(c.alertT||0)-dt);
+  c.alertT=Math.max(0,(c.alertT||0)-dt);c.sT=Math.max(0,(c.sT||0)-dt);
   c.raiders=(c.raiders||[]).filter(r=>r&&r.hp>0);
+  if(!pc&&!c.cleared&&NP.length){c.sortT=(c.sortT==null?DF.sortie*(.4+Math.random()*.6):c.sortT)-effDt;if(c.sortT<=0){c.sortT=DF.sortie*(.8+Math.random()*.5);campSortie(c)}}
   if(c.hadRaiders&&c.raiders.length===0&&!c.cleared){
    c.cleared=true;c.respawnT=CAMP_RESPAWN;
    if(!pc){RT.blood+=3;RT.scavenge+=2;bumpHeat(.4);say('Raider Camp cleared: '+c.n+'! War-Chests unlocked (Camp respawns in 3m).');blip(520,.18,'triangle')}
@@ -3582,12 +3677,13 @@ function cullTick(dt){if((nearT-=dt)<=0){nearT=.1;NEAR.length=0;for(const o of t
  for(const m of MONS)m.g.visible=Math.hypot(m.x-P.x,m.z-P.z)<m.r+185}
 
 function trapTick(dt){
+  for(let i=devs.length-1;i>=0;i--){const d=devs[i];if(d.ttl&&age-d.born>d.ttl)killDev(d)}
   for(const d of devs){
     if(d._gone||(d.t!=='spike'&&d.t!=='snap'))continue;
     d.cd=(d.cd||0)-dt;if(d.cd>0)continue;
     const rad=d.t==='spike'?1.28:1.05, dmg=d.t==='spike'?18:36;
     let hit=false;
-    for(const e of EN)if(e.hp>0&&Math.hypot(e.x-d.x,e.z-d.z)<rad){e.hp-=e.heavy?dmg*.7:dmg;hit=true;e.back=Math.max(e.back||0,.35)}
+    for(const e of EN)if(e.hp>0&&Math.hypot(e.x-d.x,e.z-d.z)<rad){e.hp-=dmg*foeMit(e.heavy?.7:1,1);hit=true;e.back=Math.max(e.back||0,.35)}
     for(let i=WV.length-1;i>=0;i--){const w=WV[i];if(w.hp>0&&Math.hypot(w.x-d.x,w.z-d.z)<rad){w.hp-=dmg>20?3:2;hit=true;if(w.hp<=0)killAnimal(w,Math.hypot(P.x-w.x,P.z-w.z)<28)}}
     if(hit)d.cd=d.t==='spike'?.65:2.1;
   }
@@ -5633,8 +5729,18 @@ function bobVM(dt,mv){if(!vmM||!vmP)return;const it=ITEMS[vmId],b=Math.sin(age*9
     }
    }
   }}}
-function blockDist(ox,oy,oz,dx,dy,dz,max){for(let u=.6;u<max;u+=.6){const x=ox+dx*u,y=oy+dy*u,z=oz+dz*u;if(y<H(x,z)-.05)return u;
- for(let i=0;i<ALLC.length;i++){const c=ALLC[i];if(c.ramp||(c.d&&(c.d.open||c.d._gone)))continue;if(c.found){if(y>c.top-.04||y<c.top-2.45)continue}else{const ch=c.h||3.05;if(c.y!==undefined&&(y<c.y-.08||y>c.y+ch))continue;if(c.winWall&&y>c.y+1.02&&y<c.y+2.22&&Math.hypot(x-c.wx,z-c.wz)<.52)continue}if(x>c.x0-.12&&x<c.x1+.12&&z>c.z0-.12&&z<c.z1+.12)return u}}return max}
+function blockDist(ox,oy,oz,dx,dy,dz,max){let best=max;
+ // terrain: sampled along the ray
+ for(let u=.6;u<best;u+=.6){const x=ox+dx*u,y=oy+dy*u,z=oz+dz*u;if(y<H(x,z)-.05){best=u;break}}
+ // walls: exact ray vs box (no gaps, so thin walls can't be skipped between samples)
+ const BIG=1e9,sl=(o,d,lo,hi)=>{if(Math.abs(d)<1e-9)return o>lo&&o<hi?[-BIG,BIG]:null;const a=(lo-o)/d,b=(hi-o)/d;return a<b?[a,b]:[b,a]};
+ for(let i=0;i<ALLC.length;i++){const c=ALLC[i];if(c.ramp||(c.d&&(c.d.open||c.d._gone)))continue;
+  let ylo=-BIG,yhi=BIG;if(c.found){ylo=c.top-2.45;yhi=c.top-.04}else if(c.y!==undefined){ylo=c.y-.08;yhi=c.y+(c.h||3.05)}
+  const sx=sl(ox,dx,c.x0-.12,c.x1+.12);if(!sx)continue;const sz=sl(oz,dz,c.z0-.12,c.z1+.12);if(!sz)continue;const sy=sl(oy,dy,ylo,yhi);if(!sy)continue;
+  const t0=Math.max(.6,sx[0],sz[0],sy[0]),t1=Math.min(best,sx[1],sz[1],sy[1]);if(t0>=t1)continue;
+  if(c.winWall){for(let u=t0;u<=t1;u+=.1){const x=ox+dx*u,y=oy+dy*u,z=oz+dz*u;if(y>c.y+1.02&&y<c.y+2.22&&Math.hypot(x-c.wx,z-c.wz)<.52)continue;best=u;break}}
+  else best=t0}
+ return best}
 function tracer(ox,oy,oz,dx,dy,dz,len,yw,col){if(!col)fxAdd(0,0xffe2a0,ox+dx*.7,oy+dy*.7,oz+dz*.7,0,0,0,.07,.2,.2,.2,0);const rx=Math.cos(yw)*(1-adsLerp*.85),rz=-Math.sin(yw)*(1-adsLerp*.85),_tr=poolTracer(ox+dx*.55+rx*.2,oy+dy*.55-.14*(1-adsLerp*.55),oz+dz*.55+rz*.2,ox+dx*len,oy+dy*len,oz+dz*len,col,65)}
 let hmTo=0;
 function hitMark(crit,kill){const c=$('cross');c.classList.add('hit');c.style.borderColor=kill?'#ff3838':crit?'#ffd24a':'';clearTimeout(hmTo);hmTo=setTimeout(()=>{c.classList.remove('hit');c.style.borderColor=''},kill?180:120)}
@@ -5818,9 +5924,9 @@ function gunPose(dt,mv,b,bx){const id=vmId,A=ANIM[id]||ANIM.pistol,v=VMS[id],s=S
  if(barrelHeat>0){barrelHeat=Math.max(0,barrelHeat-dt);if((smokeAcc+=dt)>.09){smokeAcc=0;const{f,r,u}=vb(),mx=P.x+f[0]*.68+r[0]*(.15*(1-adsLerp*.88))-u[0]*.09,my=P.y+f[1]*.68-u[1]*.09,mz=P.z+f[2]*.68+r[2]*(.15*(1-adsLerp*.88))-u[2]*.09;fxAdd(0,0xb0b6c0,mx,my,mz,(Math.random()-.5)*.12,.32+Math.random()*.18,(Math.random()-.5)*.12,.42,.024*Math.min(1,barrelHeat),.024*Math.min(1,barrelHeat),.024*Math.min(1,barrelHeat),-.35)}}
  const fl=U.fl;if(fl){const on=flashT>0;fl.visible=on;if(on){U.fm.color.setHex(flashCol);const brk=mods&&mods.barrel==='muzzle_brake',bst=mods&&mods.barrel==='muzzle_boost';const q=Math.min(1,flashT/A.fl*1.35)*flashK*A.fs*.48/v[0];fl.scale.set(q*(bst?1.65:brk?.95:1.25),q*(brk?1.15:1),q*(brk?1.68:1));fl.rotation.x=flashR;fl.position.set(A.mz[0]+(bst?.08:brk?.05:0),A.mz[1],0);if(fl.userData.ring)fl.userData.ring.scale.setScalar(.8+(1-flashT/A.fl)*.9)}}}
 function shoot(a,dmg,ty){if(!a||a.hp<=0)return;
- if(a.k==='raider'||a.k==='settler'){let ak=a.armorK||1,hv=a.heavy?.6:1;
+ if(a.k==='raider'||a.k==='settler'){underFire(a,P.x,P.z,P.y-1.7);let ak=a.armorK||1,hv=a.heavy?.6:1;
   if(ty==='ammo_hp'){ak=Math.max(.35,1-(1-ak)*1.7);hv=a.heavy?.5:1}else if(ty==='ammo_ap'){ak=1-(1-ak)*.15;hv=a.heavy?.9:1}else if(ty==='burn'){ak=1;hv=1}
-  a.hp-=dmg*hv*ak;if(ty==='ammo_inc')ignite(a);if(a.k==='raider')alertRaiders(a,P.x,P.z);
+  a.hp-=dmg*(a.k==='raider'?foeMit(hv,ak):hv*ak);if(ty==='ammo_inc')ignite(a);if(a.k==='raider')alertRaiders(a,P.x,P.z);
   if(a.k==='settler'){const was=a.aggro>0;aggroSettler(a,35);if(a.hp<=0)killSettler(a);else if(!was&&ty!=='burn')say('The settler comes for you.')}return}
  a.hp-=ty==='burn'?dmg/2:dmg/8;if(ty==='ammo_inc')ignite(a);if(a.hp<=0)return killAnimal(a,true);if(a.k==='deer'){a.flee=6;a.fleeX=P.x;a.fleeZ=P.z}else{a.aggro=12;alertWolfPack(a)}}
 function ensureAmmo(){if(cnt(ammoSel)>0)return true;for(const k of AMMO_IDS)if(cnt(k)>0){ammoSel=k;say('Switched to '+AMMO[k].n+' rounds.');return true}return false}
@@ -6075,7 +6181,7 @@ ensureStarter();render();persist(opts&&opts.saveData?'load':'auto');
 const wakeBtn=$('wake');if(wakeBtn)wakeBtn.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();wake();if(ev.pointerType==='mouse')lookLock(true)});
 root.addEventListener('pointerdown',()=>{try{if(actx&&actx.state==='suspended')actx.resume()}catch(e){}},{passive:true});
 window.__controlsTest={getYaw:()=>yaw,getSpeed:()=>lastMv,getPos:()=>({x:P.x,z:P.z,yaw}),setKeys(codes){for(const k of Object.keys(keys))keys[k]=0;const map={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ShiftLeft:'shift',ShiftRight:'shift',ArrowUp:'arrowup',ArrowDown:'arrowdown',ArrowLeft:'arrowleft',ArrowRight:'arrowright'};for(const c of codes||[]){const k=map[c];if(k)keys[k]=1}}};
-window.__bp={snap:()=>{cullT=0;nearT=0;update(.016);ren.render(scene,cam);return cv.toDataURL('image/png')},meleePose:(id,p,didHit)=>{SL[0]={id,n:1,dur:100};sel=0;adsHeld=false;adsLerp=0;vmId=null;syncVM();drawT=0;render();const isMel=!!(ITEMS[id]&&ITEMS[id].mel);if(isMel){mSt=ITEMS[id].mel.st;mD=.48;mT=mD*(1-p)+.016;swingHit=didHit?1:0;swing=0}else{startSwing(null,!!didHit,.42);swing=swingD*(1-p)+.016;mT=0}bobVM(.001,0);ren.render(scene,cam);return{id,p,pos:[+vmP.position.x.toFixed(3),+vmP.position.y.toFixed(3),+vmP.position.z.toFixed(3)],rot:[+vmP.rotation.x.toFixed(3),+vmP.rotation.y.toFixed(3),+vmP.rotation.z.toFixed(3)]}},shootPose:(id,att,ap,ads)=>{while(FXP.length){const o=FXP.pop();scene.remove(o.m)}SL[0]={id,n:1,mag:ITEMS[id].mag||6,at:ITEMS[id].cal||"ammo",att:att||{}};sel=0;adsHeld=!!ads;adsLerp=ads?1:0;drawT=0;reloadT=0;fireCd=0;vmId=null;syncVM();give("ammo",60,1);fire();if(ap!=null&&actD>0){const targetElapsed=actD*ap;let el=0;while(el<targetElapsed-.0001){const step=Math.min(.01,targetElapsed-el);flashT=Math.max(0,flashT-step);gunPose(step);fxTick(step);el+=step}}const U=(vmM&&vmM.userData)||{},act=U.act,rH=vmP&&vmP.userData&&vmP.userData.rH,lH=vmP&&vmP.userData&&vmP.userData.lH,fl=U.fl;return{id,actT:+actT.toFixed(3),actD:+actD.toFixed(3),trigF:rH&&rH.userData.trigF?+rH.userData.trigF.rotation.x.toFixed(3):null,flashVis:!!(fl&&fl.visible),fx:FXP.length,barrelHeat:+barrelHeat.toFixed(3),actX:act?+act.position.x.toFixed(4):null,actRotX:act?+act.rotation.x.toFixed(3):null,rHandPos:rH?[+rH.position.x.toFixed(3),+rH.position.y.toFixed(3),+rH.position.z.toFixed(3)]:null,lHandPos:lH?[+lH.position.x.toFixed(3),+lH.position.y.toFixed(3),+lH.position.z.toFixed(3)]:null}},setAds:on=>{adsHeld=!!on;adsLerp=on?1:0;if(on)drawT=0;return adsLerp},mount:id=>{const g=gunOf();return g?mountAttachment(g,id,true):false},bp:()=>[...BPK],scrap:()=>cnt('scrap'),research:id=>doResearch(id),launch:()=>launchRaid(),skip:()=>skipToRaid(),phase:()=>raidPhase,heat:()=>RT.heat,rating:()=>rate100(),raiders:()=>EN.filter(e=>e.hp>0).length,siege:()=>EN.filter(e=>e.siege&&e.hp>0).length,near:()=>{const a=EN.filter(e=>e.hp>0).map(e=>Math.hypot(e.x-P.x,e.z-P.z));return a.length?Math.min(...a):-1},pos:()=>({x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),g:+G(P.x,P.z).toFixed(2)}),place:(x,z,fl)=>{P.x=LP.x=x;P.z=LP.z=z;const f=FD.get(key(Math.round(x/C),Math.round(z/C)));const ft=fl==null?undefined:(f?f.y:0)+FH*(+fl||0)+1;P.y=Math.max(G(x,z,ft),-2.9)+1.7;return {x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),gy:+G(x,z,ft).toFixed(2)}},wx:()=>wx,fog:()=>scene.fog.density,sky:()=>({wx,fog:+scene.fog.density.toFixed(4),rain:rainFx.p.visible,snow:snowFx.p.visible}),setWx:(k)=>{if(!WXNAME[k])return false;wx=k;wxT=120;return true},give:(id,n)=>!!give(id,n||1,1),count:(id)=>cnt(id),ords:()=>ORDS.length,blasts:()=>blastN,kits:()=>EN.filter(e=>e.hp>0).map(e=>(e.kit||'melee')+':'+(e.nades||0)),pace:()=>pace,time:()=>({t,days,pace,hr:t*24}),vitals:()=>({...S}),setPace:(v)=>{setPace(v);return pace},face:(x,z,p)=>{yaw=Math.atan2(-(x-P.x),-(z-P.z));pitch=p==null?-.12:+p},beasts:()=>DE.concat(WV).filter(a=>a.hp>0).map(a=>({k:a.k,x:+a.x.toFixed(1),z:+a.z.toFixed(1),d:+Math.hypot(a.x-P.x,a.z-P.z).toFixed(1)})).sort((a,b)=>a.d-b.d).slice(0,4),seal:()=>{const cx=Math.round(P.x/C),cz=Math.round(P.z/C),x=cx*C,z=cz*C,y=Math.max(H(x,z),1),fk=key(cx,cz);if(!FD.has(fk))construct(ITEMS.wood_foundation,{x,y,z,k:fk,p:'foundation',rot:0});const wk=key(cx,cz,'S');if(!WL.has(wk))construct(ITEMS.wood_wall,{x,z:z+C/2,y,k:wk,rot:0,p:'wall'});const c=ALLC.find(q=>q.wk===wk&&q.piece);return c?{hp:c.hp,x:(c.x0+c.x1)/2,z:(c.z0+c.z1)/2,y:(c.y||y)+1.3}:null},boom:(kind,x,y,z)=>{boom({kind:kind||'satchel',x,y,z,owner:'you',mesh:null});return{blasts:blastN,hp:ALLC.filter(c=>c.piece).map(c=>Math.round(c.hp))}},throwCan:()=>{const i=SL.findIndex(s=>s&&s.id==='beancan');if(i<0)return false;sel=i;return !!useSlot(i)},rocket:()=>{const i=SL.findIndex(s=>s&&s.id==='launcher');if(i>=0)sel=i;const info={throwCd,dead,rockets:cnt('rocket'),slot:SL[sel]&&SL[sel].id};fireRocketPlayer();info.after=cnt('rocket');info.ords=ORDS.length;info.throwCd2=throwCd;info.msg=($('msg')&&$('msg').textContent)||'';return info},health:()=>S.health,yards:()=>NP.map(n=>{const mine=d=>d.npc===n&&!d._gone,ts=devs.filter(d=>mine(d)&&d.t==='turret'),ws=wires.filter(w=>w.a.npc===n&&w.b.npc===n);return{ok:!!(n.tc&&!n.tc._gone&&n.devs.furnace&&n.devs.battery&&n.devs.wind&&n.devs.solar&&n.devs.switch&&ts.length===4&&ws.length>=8&&(n.floors||1)>=3),deck:n.devs.turret0&&n.tc?+(n.devs.turret0.y-n.tc.y).toFixed(2):0,floors:n.floors||1,skip:n.skip||0,hp:Math.round(n.hp),aggro:+(n.aggro||0).toFixed(1),step:n.i+'/'+n.bp.length,skip:n.skip||0,tur:ts.length,pw:ts.map(t=>+t.pw.toFixed(2)),wires:ws.length,bat:n.devs.battery?Math.round(n.devs.battery.ch):0,wind:n.devs.wind?+n.devs.wind.out.toFixed(1):0,x:n.tc?+n.tc.x.toFixed(1):+n.x.toFixed(1),z:n.tc?+n.tc.z.toFixed(1):+n.z.toFixed(1)}}),goto:(i)=>{const n=NP[i||0];if(!n||n.hp<=0)return null;jumpSettler(n,i||0);return{i:i||0,x:+P.x.toFixed(1),z:+P.z.toFixed(1),step:n.i,len:(n.bp&&n.bp.length)||0,home:!!n.home}},smack:()=>{const n=NP.find(x=>x.hp>0&&x.tc);if(!n)return null;const before=n.hp;hit(n.m);return{before,hp:Math.round(n.hp),aggro:+n.aggro.toFixed(1),angry:NP.filter(o=>o.aggro>0).length,k:n.m.userData.k}},tryPlace:(id,x,z)=>{const it=ITEMS[id];if(!it)return 'bad';const a=aim(it,x,z,0);if(!a.ok)return a.why||'no';if(it.dv==='tc'&&tcCovering(a.x,a.z))return 'overlap';if(privWhy(a.x,a.z,null))return 'blocked';construct(it,a,0);return 'ok'},anchor:()=>{const a=raidAnchor();return{x:+a.x.toFixed(1),z:+a.z.toFixed(1),tc:!!(a.tc&&!a.tc._gone),live:!!a.live,hp:a.tc?Math.round(a.tc.hp):0}},soak:()=>{const t=playerTC();if(t)t.sl=Array(12).fill(null);const seen=new Set();let hp0=0,n=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen.has(c.mesh))continue;seen.add(c.mesh);c.born=0;hp0+=c.hp;n++}upkeepTick(600);const seen2=new Set();let hp1=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen2.has(c.mesh))continue;seen2.add(c.mesh);hp1+=c.hp}return{pieces:n,before:Math.round(hp0),after:Math.round(hp1),paid:!!(t&&t.paid),short:(t&&t.short)||''}},world:()=>{const c=k=>things.filter(o=>o.userData.k===k).length;const kinds={};let off=0;for(const o of things)if(o.userData.k==='barrel'){const q=o.userData.kind||'?';kinds[q]=(kinds[q]||0)+1;let by=false;visitRoads(o.position.x,o.position.z,h=>{if(h.dist<h.half+h.edge+3.4)by=true});if(!by)off++}return{roads:ROADS.length,barrels:c('barrel'),offRoad:off,ponds:PONDS.map(q=>({x:+q.x.toFixed(1),z:+q.z.toFixed(1),r:+q.r.toFixed(1),y:+H(q.x,q.z).toFixed(2)})),kinds,sulfur:c('sulfur'),ore:c('ore'),junk:c('junk'),rocks:c('rock'),trees:c('tree'),mons:MONS.length}},mons:()=>MONS.map(m=>({n:m.n,x:+m.x.toFixed(1),z:+m.z.toFixed(1),raiderCamp:!!m.raiderCamp})),raiderCamps:()=>RCAMPS.map(c=>({n:c.n,kind:c.campKind,x:+c.x.toFixed(1),z:+c.z.toFixed(1),y:+c.y.toFixed(2),r:+c.r.toFixed(1),targetCount:c.targetCount,alive:c.raiders.filter(r=>r&&r.hp>0).length,roles:c.raiders.filter(r=>r&&r.hp>0).map(r=>r.role+(r.warlord?'*':'')+(r.tower?'^':'')+':'+r.gun),cleared:!!c.cleared,respawnT:+(c.respawnT||0).toFixed(1),warChests:CR.filter(o=>o.userData.tier===4&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length,eliteCrates:CR.filter(o=>o.userData.tier===3&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length})),barrels:()=>{const o={};for(const t of things){if(t.userData.k!=='barrel')continue;const k=t.userData.kind||'?';const a=o[k]=o[k]||[];if(a.length<3)a.push({x:+t.position.x.toFixed(1),z:+t.position.z.toFixed(1),y:+t.position.y.toFixed(2),g:+H(t.position.x,t.position.z).toFixed(2)})}return o},climb:(i)=>{const list=NP.filter(n=>n.tc&&!n.tc._gone),n=list[i||0];if(!n)return null;const y0=n.tc.y,t=n.devs.turret0,h=n.devs.heater,w=n.devs.wind;const cell=(d)=>d&&{x:+d.x.toFixed(2),z:+d.z.toFixed(2),y:+d.y.toFixed(2),cx:Math.round(d.x/C),cz:Math.round(d.z/C),fy:FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y,rf0:RF.has(key(Math.round(d.x/C),Math.round(d.z/C))),rf1:RF.has(key(Math.round(d.x/C),Math.round(d.z/C),1)),g:G(d.x,d.z,(FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y||0)+8)};return{base:+y0.toFixed(2),mid:+G(n.tc.x,n.tc.z+3,y0+4).toFixed(2),deck:+G(n.tc.x+3,n.tc.z,y0+8).toFixed(2),tur:cell(t),heat:cell(h),wind:cell(w),step:n.bp.filter(s=>s[0]==='turret'||s[0]==='heater'||s[0]==='wind').slice(0,4)}},sim:(steps)=>{const N=steps||500;for(let i=0;i<N;i++){npcTick(.05);furnaces(.05)}return NP.map(q=>({i:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home,skip:q.skip||0,w:q.inv.wood||0,s:q.inv.stone||0,m:q.inv.metal||0,o:q.inv.ore||0,g:q.inv.gears||0,c:q.inv.circuit||0}))},smelt:()=>NP.map((n,i)=>{const f=n.devs&&n.devs.furnace;if(!f||f._gone)return{i,step:n.i,close:!!n.close,no:1};return{i,step:n.i,close:!!n.close,burn:+(f.burn||0).toFixed(1),sl:f.sl.map(s=>s?s.id[0]+s.n:0)}}),farms:()=>NP.map((q,i)=>{const nodes=things.filter(o=>o.userData&&o.userData.farm===q),kinds={};for(const o of nodes)kinds[o.userData.k]=(kinds[o.userData.k]||0)+1;let near=1e9;for(const o of NP)if(o!==q)near=Math.min(near,Math.hypot((q.lot?q.lot.x:q.x)-(o.lot?o.lot.x:o.x),(q.lot?q.lot.z:q.z)-(o.lot?o.lot.z:o.z)));return{i,nodes:nodes.length,kinds,near:+(near>1e8?0:near).toFixed(0),spawn:+Math.hypot((q.lot?q.lot.x:q.x)-SP.x,(q.lot?q.lot.z:q.z)-SP.z).toFixed(0),step:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home}}),inv:()=>SL.slice(0,42).map(s=>s?s.id+':'+s.n+(s.mag!=null?'/m'+s.mag:''):null),click:(i)=>{clickSlot(i);return SL[i]?SL[i].id:null},openLast:()=>{const d=[...devs].reverse().find(q=>q&&!q._gone&&(q.t==='box'||isInd(q.t)||q.t==='tc'));if(!d)return null;P.x=LP.x=d.x+1.5;P.z=LP.z=d.z+1.2;P.y=Math.max(G(d.x,d.z),0)+1.7;curBox=d;open=true;tab='bag';pick=null;render();return{t:d.t,owner:d.owner,sl:d.sl.map(s=>s?s.id+':'+s.n:null)}},takeAll:()=>{xferAll('take');pick=null;render();return true},storeBag:()=>{xferAll('store');pick=null;render();return true}};window.__bp.road=()=>{let posts=0,best=null,bd=1e9,lane=[];for(const p of POSTS){if(p.skip)continue;posts++;const d=Math.hypot(p.x-P.x,p.z-P.z);if(d<bd){bd=d;best=p}}for(const o of things){const k=o.userData&&o.userData.k;if(k!=='tree'&&k!=='rock'&&k!=='bush'&&k!=='junk'&&k!=='barrel'&&k!=='ore'&&k!=='sulfur')continue;let hit=null;visitRoads(o.position.x,o.position.z,h=>{if(!hit||h.dist<hit.dist)hit=h});if(hit&&hit.dist<hit.half+hit.edge-.15)lane.push(k+(o.userData.farm?'*':''))}return{posts,segs:SEGS.length,lane,h:+H(P.x,P.z).toFixed(3),feet:+(P.y-1.7).toFixed(3),post:best?{x:+best.x.toFixed(2),z:+best.z.toFixed(2),d:+bd.toFixed(2)}:null}};
+window.__bp={snap:()=>{cullT=0;nearT=0;update(.016);ren.render(scene,cam);return cv.toDataURL('image/png')},meleePose:(id,p,didHit)=>{SL[0]={id,n:1,dur:100};sel=0;adsHeld=false;adsLerp=0;vmId=null;syncVM();drawT=0;render();const isMel=!!(ITEMS[id]&&ITEMS[id].mel);if(isMel){mSt=ITEMS[id].mel.st;mD=.48;mT=mD*(1-p)+.016;swingHit=didHit?1:0;swing=0}else{startSwing(null,!!didHit,.42);swing=swingD*(1-p)+.016;mT=0}bobVM(.001,0);ren.render(scene,cam);return{id,p,pos:[+vmP.position.x.toFixed(3),+vmP.position.y.toFixed(3),+vmP.position.z.toFixed(3)],rot:[+vmP.rotation.x.toFixed(3),+vmP.rotation.y.toFixed(3),+vmP.rotation.z.toFixed(3)]}},shootPose:(id,att,ap,ads)=>{while(FXP.length){const o=FXP.pop();scene.remove(o.m)}SL[0]={id,n:1,mag:ITEMS[id].mag||6,at:ITEMS[id].cal||"ammo",att:att||{}};sel=0;adsHeld=!!ads;adsLerp=ads?1:0;drawT=0;reloadT=0;fireCd=0;vmId=null;syncVM();give("ammo",60,1);fire();if(ap!=null&&actD>0){const targetElapsed=actD*ap;let el=0;while(el<targetElapsed-.0001){const step=Math.min(.01,targetElapsed-el);flashT=Math.max(0,flashT-step);gunPose(step);fxTick(step);el+=step}}const U=(vmM&&vmM.userData)||{},act=U.act,rH=vmP&&vmP.userData&&vmP.userData.rH,lH=vmP&&vmP.userData&&vmP.userData.lH,fl=U.fl;return{id,actT:+actT.toFixed(3),actD:+actD.toFixed(3),trigF:rH&&rH.userData.trigF?+rH.userData.trigF.rotation.x.toFixed(3):null,flashVis:!!(fl&&fl.visible),fx:FXP.length,barrelHeat:+barrelHeat.toFixed(3),actX:act?+act.position.x.toFixed(4):null,actRotX:act?+act.rotation.x.toFixed(3):null,rHandPos:rH?[+rH.position.x.toFixed(3),+rH.position.y.toFixed(3),+rH.position.z.toFixed(3)]:null,lHandPos:lH?[+lH.position.x.toFixed(3),+lH.position.y.toFixed(3),+lH.position.z.toFixed(3)]:null}},setAds:on=>{adsHeld=!!on;adsLerp=on?1:0;if(on)drawT=0;return adsLerp},mount:id=>{const g=gunOf();return g?mountAttachment(g,id,true):false},bp:()=>[...BPK],scrap:()=>cnt('scrap'),research:id=>doResearch(id),launch:()=>launchRaid(),skip:()=>skipToRaid(),phase:()=>raidPhase,heat:()=>RT.heat,rating:()=>rate100(),raiders:()=>EN.filter(e=>e.hp>0).length,barricades:()=>devs.filter(d=>d.t==='barricade'&&!d._gone).map(d=>({x:+d.x.toFixed(1),z:+d.z.toFixed(1),owner:d.owner,hp:d.hp})),tick:(n,dt)=>{for(let i=0;i<(n||1);i++)update(dt||.05)},foes:()=>EN.filter(e=>e.hp>0).map((e,i)=>({i,x:+e.x.toFixed(1),z:+e.z.toFixed(1),siege:!!e.siege,tower:!!e.tower,camp:!!e.camp,gun:e.gun||null,walls:e.walls,hold:e.cvHold>age?+(e.cvHold-age).toFixed(1):0,hp:Math.round(e.hp)})),hitFoe:(i,dmg)=>{const e=EN.filter(r=>r.hp>0)[i];if(!e)return null;shoot(e,dmg||1);return{fireT:+(e.fireT-age).toFixed(1),walls:e.walls}},zap:dmg=>{let b=null,bd=1e9;for(const e of EN){if(e.hp<=0||!e.gun)continue;const q=Math.hypot(e.x-P.x,e.z-P.z);if(q<bd){bd=q;b=e}}if(!b)return null;shoot(b,dmg||1);return{d:+bd.toFixed(1),walls:b.walls,hold:+(b.cvHold-age).toFixed(1)}},siege:()=>EN.filter(e=>e.siege&&e.hp>0).length,near:()=>{const a=EN.filter(e=>e.hp>0).map(e=>Math.hypot(e.x-P.x,e.z-P.z));return a.length?Math.min(...a):-1},pos:()=>({x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),g:+G(P.x,P.z).toFixed(2)}),place:(x,z,fl)=>{P.x=LP.x=x;P.z=LP.z=z;const f=FD.get(key(Math.round(x/C),Math.round(z/C)));const ft=fl==null?undefined:(f?f.y:0)+FH*(+fl||0)+1;P.y=Math.max(G(x,z,ft),-2.9)+1.7;return {x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),gy:+G(x,z,ft).toFixed(2)}},wx:()=>wx,fog:()=>scene.fog.density,sky:()=>({wx,fog:+scene.fog.density.toFixed(4),rain:rainFx.p.visible,snow:snowFx.p.visible}),setWx:(k)=>{if(!WXNAME[k])return false;wx=k;wxT=120;return true},give:(id,n)=>!!give(id,n||1,1),count:(id)=>cnt(id),ords:()=>ORDS.length,blasts:()=>blastN,kits:()=>EN.filter(e=>e.hp>0).map(e=>(e.kit||'melee')+':'+(e.nades||0)),pace:()=>pace,time:()=>({t,days,pace,hr:t*24}),vitals:()=>({...S}),setPace:(v)=>{setPace(v);return pace},face:(x,z,p)=>{yaw=Math.atan2(-(x-P.x),-(z-P.z));pitch=p==null?-.12:+p},beasts:()=>DE.concat(WV).filter(a=>a.hp>0).map(a=>({k:a.k,x:+a.x.toFixed(1),z:+a.z.toFixed(1),d:+Math.hypot(a.x-P.x,a.z-P.z).toFixed(1)})).sort((a,b)=>a.d-b.d).slice(0,4),seal:()=>{const cx=Math.round(P.x/C),cz=Math.round(P.z/C),x=cx*C,z=cz*C,y=Math.max(H(x,z),1),fk=key(cx,cz);if(!FD.has(fk))construct(ITEMS.wood_foundation,{x,y,z,k:fk,p:'foundation',rot:0});const wk=key(cx,cz,'S');if(!WL.has(wk))construct(ITEMS.wood_wall,{x,z:z+C/2,y,k:wk,rot:0,p:'wall'});const c=ALLC.find(q=>q.wk===wk&&q.piece);return c?{hp:c.hp,x:(c.x0+c.x1)/2,z:(c.z0+c.z1)/2,y:(c.y||y)+1.3}:null},boom:(kind,x,y,z)=>{boom({kind:kind||'satchel',x,y,z,owner:'you',mesh:null});return{blasts:blastN,hp:ALLC.filter(c=>c.piece).map(c=>Math.round(c.hp))}},throwCan:()=>{const i=SL.findIndex(s=>s&&s.id==='beancan');if(i<0)return false;sel=i;return !!useSlot(i)},rocket:()=>{const i=SL.findIndex(s=>s&&s.id==='launcher');if(i>=0)sel=i;const info={throwCd,dead,rockets:cnt('rocket'),slot:SL[sel]&&SL[sel].id};fireRocketPlayer();info.after=cnt('rocket');info.ords=ORDS.length;info.throwCd2=throwCd;info.msg=($('msg')&&$('msg').textContent)||'';return info},health:()=>S.health,yards:()=>NP.map(n=>{const mine=d=>d.npc===n&&!d._gone,ts=devs.filter(d=>mine(d)&&d.t==='turret'),ws=wires.filter(w=>w.a.npc===n&&w.b.npc===n);return{ok:!!(n.tc&&!n.tc._gone&&n.devs.furnace&&n.devs.battery&&n.devs.wind&&n.devs.solar&&n.devs.switch&&ts.length===4&&ws.length>=8&&(n.floors||1)>=3),deck:n.devs.turret0&&n.tc?+(n.devs.turret0.y-n.tc.y).toFixed(2):0,floors:n.floors||1,skip:n.skip||0,hp:Math.round(n.hp),aggro:+(n.aggro||0).toFixed(1),step:n.i+'/'+n.bp.length,skip:n.skip||0,tur:ts.length,pw:ts.map(t=>+t.pw.toFixed(2)),wires:ws.length,bat:n.devs.battery?Math.round(n.devs.battery.ch):0,wind:n.devs.wind?+n.devs.wind.out.toFixed(1):0,x:n.tc?+n.tc.x.toFixed(1):+n.x.toFixed(1),z:n.tc?+n.tc.z.toFixed(1):+n.z.toFixed(1)}}),goto:(i)=>{const n=NP[i||0];if(!n||n.hp<=0)return null;jumpSettler(n,i||0);return{i:i||0,x:+P.x.toFixed(1),z:+P.z.toFixed(1),step:n.i,len:(n.bp&&n.bp.length)||0,home:!!n.home}},smack:()=>{const n=NP.find(x=>x.hp>0&&x.tc);if(!n)return null;const before=n.hp;hit(n.m);return{before,hp:Math.round(n.hp),aggro:+n.aggro.toFixed(1),angry:NP.filter(o=>o.aggro>0).length,k:n.m.userData.k}},tryPlace:(id,x,z)=>{const it=ITEMS[id];if(!it)return 'bad';const a=aim(it,x,z,0);if(!a.ok)return a.why||'no';if(it.dv==='tc'&&tcCovering(a.x,a.z))return 'overlap';if(privWhy(a.x,a.z,null))return 'blocked';construct(it,a,0);return 'ok'},anchor:()=>{const a=raidAnchor();return{x:+a.x.toFixed(1),z:+a.z.toFixed(1),tc:!!(a.tc&&!a.tc._gone),live:!!a.live,hp:a.tc?Math.round(a.tc.hp):0}},soak:()=>{const t=playerTC();if(t)t.sl=Array(12).fill(null);const seen=new Set();let hp0=0,n=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen.has(c.mesh))continue;seen.add(c.mesh);c.born=0;hp0+=c.hp;n++}upkeepTick(600);const seen2=new Set();let hp1=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen2.has(c.mesh))continue;seen2.add(c.mesh);hp1+=c.hp}return{pieces:n,before:Math.round(hp0),after:Math.round(hp1),paid:!!(t&&t.paid),short:(t&&t.short)||''}},world:()=>{const c=k=>things.filter(o=>o.userData.k===k).length;const kinds={};let off=0;for(const o of things)if(o.userData.k==='barrel'){const q=o.userData.kind||'?';kinds[q]=(kinds[q]||0)+1;let by=false;visitRoads(o.position.x,o.position.z,h=>{if(h.dist<h.half+h.edge+3.4)by=true});if(!by)off++}return{roads:ROADS.length,barrels:c('barrel'),offRoad:off,ponds:PONDS.map(q=>({x:+q.x.toFixed(1),z:+q.z.toFixed(1),r:+q.r.toFixed(1),y:+H(q.x,q.z).toFixed(2)})),kinds,sulfur:c('sulfur'),ore:c('ore'),junk:c('junk'),rocks:c('rock'),trees:c('tree'),mons:MONS.length}},mons:()=>MONS.map(m=>({n:m.n,x:+m.x.toFixed(1),z:+m.z.toFixed(1),raiderCamp:!!m.raiderCamp})),raiderCamps:()=>RCAMPS.map(c=>({n:c.n,kind:c.campKind,x:+c.x.toFixed(1),z:+c.z.toFixed(1),y:+c.y.toFixed(2),r:+c.r.toFixed(1),targetCount:c.targetCount,alive:c.raiders.filter(r=>r&&r.hp>0).length,roles:c.raiders.filter(r=>r&&r.hp>0).map(r=>r.role+(r.warlord?'*':'')+(r.tower?'^':'')+':'+r.gun),cleared:!!c.cleared,respawnT:+(c.respawnT||0).toFixed(1),warChests:CR.filter(o=>o.userData.tier===4&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length,eliteCrates:CR.filter(o=>o.userData.tier===3&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length})),barrels:()=>{const o={};for(const t of things){if(t.userData.k!=='barrel')continue;const k=t.userData.kind||'?';const a=o[k]=o[k]||[];if(a.length<3)a.push({x:+t.position.x.toFixed(1),z:+t.position.z.toFixed(1),y:+t.position.y.toFixed(2),g:+H(t.position.x,t.position.z).toFixed(2)})}return o},climb:(i)=>{const list=NP.filter(n=>n.tc&&!n.tc._gone),n=list[i||0];if(!n)return null;const y0=n.tc.y,t=n.devs.turret0,h=n.devs.heater,w=n.devs.wind;const cell=(d)=>d&&{x:+d.x.toFixed(2),z:+d.z.toFixed(2),y:+d.y.toFixed(2),cx:Math.round(d.x/C),cz:Math.round(d.z/C),fy:FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y,rf0:RF.has(key(Math.round(d.x/C),Math.round(d.z/C))),rf1:RF.has(key(Math.round(d.x/C),Math.round(d.z/C),1)),g:G(d.x,d.z,(FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y||0)+8)};return{base:+y0.toFixed(2),mid:+G(n.tc.x,n.tc.z+3,y0+4).toFixed(2),deck:+G(n.tc.x+3,n.tc.z,y0+8).toFixed(2),tur:cell(t),heat:cell(h),wind:cell(w),step:n.bp.filter(s=>s[0]==='turret'||s[0]==='heater'||s[0]==='wind').slice(0,4)}},sim:(steps)=>{const N=steps||500;for(let i=0;i<N;i++){npcTick(.05);furnaces(.05)}return NP.map(q=>({i:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home,skip:q.skip||0,w:q.inv.wood||0,s:q.inv.stone||0,m:q.inv.metal||0,o:q.inv.ore||0,g:q.inv.gears||0,c:q.inv.circuit||0}))},smelt:()=>NP.map((n,i)=>{const f=n.devs&&n.devs.furnace;if(!f||f._gone)return{i,step:n.i,close:!!n.close,no:1};return{i,step:n.i,close:!!n.close,burn:+(f.burn||0).toFixed(1),sl:f.sl.map(s=>s?s.id[0]+s.n:0)}}),farms:()=>NP.map((q,i)=>{const nodes=things.filter(o=>o.userData&&o.userData.farm===q),kinds={};for(const o of nodes)kinds[o.userData.k]=(kinds[o.userData.k]||0)+1;let near=1e9;for(const o of NP)if(o!==q)near=Math.min(near,Math.hypot((q.lot?q.lot.x:q.x)-(o.lot?o.lot.x:o.x),(q.lot?q.lot.z:q.z)-(o.lot?o.lot.z:o.z)));return{i,nodes:nodes.length,kinds,near:+(near>1e8?0:near).toFixed(0),spawn:+Math.hypot((q.lot?q.lot.x:q.x)-SP.x,(q.lot?q.lot.z:q.z)-SP.z).toFixed(0),step:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home}}),inv:()=>SL.slice(0,42).map(s=>s?s.id+':'+s.n+(s.mag!=null?'/m'+s.mag:''):null),click:(i)=>{clickSlot(i);return SL[i]?SL[i].id:null},openLast:()=>{const d=[...devs].reverse().find(q=>q&&!q._gone&&(q.t==='box'||isInd(q.t)||q.t==='tc'));if(!d)return null;P.x=LP.x=d.x+1.5;P.z=LP.z=d.z+1.2;P.y=Math.max(G(d.x,d.z),0)+1.7;curBox=d;open=true;tab='bag';pick=null;render();return{t:d.t,owner:d.owner,sl:d.sl.map(s=>s?s.id+':'+s.n:null)}},takeAll:()=>{xferAll('take');pick=null;render();return true},storeBag:()=>{xferAll('store');pick=null;render();return true}};window.__bp.road=()=>{let posts=0,best=null,bd=1e9,lane=[];for(const p of POSTS){if(p.skip)continue;posts++;const d=Math.hypot(p.x-P.x,p.z-P.z);if(d<bd){bd=d;best=p}}for(const o of things){const k=o.userData&&o.userData.k;if(k!=='tree'&&k!=='rock'&&k!=='bush'&&k!=='junk'&&k!=='barrel'&&k!=='ore'&&k!=='sulfur')continue;let hit=null;visitRoads(o.position.x,o.position.z,h=>{if(!hit||h.dist<hit.dist)hit=h});if(hit&&hit.dist<hit.half+hit.edge-.15)lane.push(k+(o.userData.farm?'*':''))}return{posts,segs:SEGS.length,lane,h:+H(P.x,P.z).toFixed(3),feet:+(P.y-1.7).toFixed(3),post:best?{x:+best.x.toFixed(2),z:+best.z.toFixed(2),d:+bd.toFixed(2)}:null}};
 window.__bp.qa=()=>{const segD=(m)=>{let best=1e9;for(const s of SEGS){const dx=s.bx-s.ax,dz=s.bz-s.az;let u=((m.x-s.ax)*dx+(m.z-s.az)*dz)/(s.l2||1);if(u<0)u=0;else if(u>1)u=1;const d=Math.hypot(m.x-(s.ax+dx*u),m.z-(s.az+dz*u));if(d<best)best=d}return best};const mons=MONS.map(m=>{const best=segD(m),half=5.1;return{n:m.n,r:+m.r.toFixed(1),best:+best.toFixed(1),edge:+(best-half).toFixed(1),on:best<m.r-4}});const bases=NP.map(n=>{const plan=n.plan||{},tur=devs.filter(d=>d.npc===n&&!d._gone&&d.t==='turret');let out=0;if(plan.w&&n.tc){const cx=Math.round(n.tc.x/C)-(plan.tx||0),cz=Math.round(n.tc.z/C)-(plan.tz||0),pads=[[cx-1,cz-1],[cx+plan.w,cz-1],[cx-1,cz+plan.d],[cx+plan.w,cz+plan.d]];out=tur.filter(t=>pads.some(p=>Math.round(t.x/C)===p[0]&&Math.round(t.z/C)===p[1])&&FD.has(key(Math.round(t.x/C),Math.round(t.z/C)))).length}return{w:plan.w||0,d:plan.d||0,fl:plan.floors||n.floors||0,tc:!!(n.tc&&!n.tc._gone),wb:!!(n.devs.workbench&&!n.devs.workbench._gone),fur:!!(n.devs.furnace&&!n.devs.furnace._gone),wind:!!(n.devs.wind&&!n.devs.wind._gone),bat:!!(n.devs.battery&&!n.devs.battery._gone),tur:tur.length,out,pw:tur.map(t=>+t.pw.toFixed(2)),wW:n.devs.wind?+n.devs.wind.out.toFixed(1):0,ch:n.devs.battery?Math.round(n.devs.battery.ch):0,wires:wires.filter(w=>w.a.npc===n||w.b.npc===n).length,job:n.job?n.job.k:null,away:+Math.hypot(n.x-(n.home?n.home.x:n.hx),n.z-(n.home?n.home.z:n.hz)).toFixed(1),step:(n.i||0)+'/'+(n.bp?n.bp.length:0),home:!!n.home,skip:n.skip||0}});const c=k=>things.filter(o=>o.userData.k===k).length;return{np:NP.length,forest:FOREST,trees:c('tree'),rocks:c('rock'),ore:c('ore'),sulfur:c('sulfur'),junk:c('junk'),mons,onRoad:mons.filter(m=>m.on).length,bases,calls:ren.info.render.calls,times:window.__times}};
 window.__bp.shapes=()=>{const o={};for(const t of things){if(!t.userData||t.userData.k!=='barrel')continue;const k=t.userData.variant||'drum';o[k]=(o[k]||0)+1}return o};
 window.__bp.tiers=()=>{const o={};for(const r of PCS)if(r.owner==='npc'&&r.m&&r.m.parent){const k=r.t;o[k]=(o[k]||0)+1}return o};window.__bp.mapOpen=()=>mapOpen;window.__bp.tracers=()=>TRP.filter(q=>q.busy).length;window.__bp.lodStats=()=>{const s=[0,0,0];for(const o of things)o.traverse(x=>{if(x.isLOD){const i=x.levels.findIndex(l=>l.object.visible);if(i>=0)s[i]++}});return s};window.__bp.rich=()=>{for(const n of NP){n.inv.stone=9000;n.inv.wood=6500;n.inv.metal=1800;n.inv.gears=320;n.inv.circuit=120;n.inv.ore=80;n.inv.fuel=80}};
@@ -6145,6 +6251,6 @@ let last=performance.now();
 let rafId=0;
 function loop(n){if(gen!==GEN)return;const rawDt=(n-last)/1000,dt=Math.max(0,Math.min(.1,rawDt))||0;last=n;if(!window.__bpPause&&!window.__bpPortrait){update(dt);hudT+=dt;if(hudT>=.08){hudT=0;hud()}adaptRes(rawDt);ren.render(scene,cam)}else if(window.__bpSnap){window.__bpSnap=0;update(.016);hud();ren.render(scene,cam)}rafId=requestAnimationFrame(loop)}
 rafId=requestAnimationFrame(loop);
-return {setGather:v=>{GATHER=v},getGather:()=>GATHER,cheats:()=>toggleCheat(),setPace:v=>setPace(v),getPace:()=>pace,paces:PACES,getClaimName:()=>claimName,setClaimName:nm=>{claimName=String(nm||'').trim()||claimName;persist('manual');return claimName},getSlotId:()=>slotId,setSlotId:id=>{if(id)slotId=id;return slotId},saveNow:(kind)=>{persist(kind||'manual');say('Saved claim: '+claimName+'.');return snapshot()},saveAsNew:(nm)=>{slotId='slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);if(nm)claimName=String(nm).trim()||claimName;persist('manual');say('Saved new slot: '+claimName+'.');return snapshot()},getSnapshot:nm=>snapshot(nm),exportSave:()=>{persist('manual');return JSON.stringify(snapshot())},lock:()=>lookLock(true),destroy(){try{if(document.pointerLockElement===cv)document.exitPointerLock()}catch(e){}window.removeEventListener('resize',rs);window.removeEventListener('blur',onBlurClear);document.removeEventListener('visibilitychange',onVis);window.removeEventListener('pointermove',tipGuard);window.removeEventListener('pointerdown',tipGuard);window.removeEventListener('blur',tipGuard);document.removeEventListener('mouseleave',tipGuard);document.removeEventListener('visibilitychange',tipGuard);if(GEN===gen)GEN++;cancelAnimationFrame(rafId);try{ren.dispose();ren.forceContextLoss()}catch(e){}window.__controlsTest=undefined;window.__bp=undefined;root.replaceChildren()}};
+return {setGather:v=>{GATHER=v},getGather:()=>GATHER,getDifficulty:()=>DIFFK,difficulties:Object.keys(DIFFS),setDifficulty:k=>{if(!DIFFS[k])return DIFFK;DIFFK=k;DF=DIFFS[k];CAMP_RESPAWN=DF.campResp;for(const c of RCAMPS)if(c.reinforceT>CAMP_RESPAWN)c.reinforceT=CAMP_RESPAWN;persist('manual');say('Difficulty: '+DF.n+'. Raids, camps and settlers use it from now on.');return DIFFK},cheats:()=>toggleCheat(),setPace:v=>setPace(v),getPace:()=>pace,paces:PACES,getClaimName:()=>claimName,setClaimName:nm=>{claimName=String(nm||'').trim()||claimName;persist('manual');return claimName},getSlotId:()=>slotId,setSlotId:id=>{if(id)slotId=id;return slotId},saveNow:(kind)=>{persist(kind||'manual');say('Saved claim: '+claimName+'.');return snapshot()},saveAsNew:(nm)=>{slotId='slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);if(nm)claimName=String(nm).trim()||claimName;persist('manual');say('Saved new slot: '+claimName+'.');return snapshot()},getSnapshot:nm=>snapshot(nm),exportSave:()=>{persist('manual');return JSON.stringify(snapshot())},lock:()=>lookLock(true),destroy(){try{if(document.pointerLockElement===cv)document.exitPointerLock()}catch(e){}window.removeEventListener('resize',rs);window.removeEventListener('blur',onBlurClear);document.removeEventListener('visibilitychange',onVis);window.removeEventListener('pointermove',tipGuard);window.removeEventListener('pointerdown',tipGuard);window.removeEventListener('blur',tipGuard);document.removeEventListener('mouseleave',tipGuard);document.removeEventListener('visibilitychange',tipGuard);if(GEN===gen)GEN++;cancelAnimationFrame(rafId);try{ren.dispose();ren.forceContextLoss()}catch(e){}window.__controlsTest=undefined;window.__bp=undefined;root.replaceChildren()}};
 
 }

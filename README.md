@@ -14,10 +14,34 @@ GitHub’s file list only shows source. The button above is what runs it. On a p
 
 - **Computer.** WASD to move. Click the game, then the mouse looks. Shift sprints. E or click uses, gathers, and fires. R reloads. T swaps ammo. G drops the held stack (Shift+G drops one). V opens attachments. Z aims. F toggles the light. M opens the island map. 1–6 is the hotbar. I or Tab opens the bag. F5 quick-saves. F9 quick-loads. Esc pauses.
 - **Phone.** Landscape only. Stick to move, drag to look, Use / Fire, Sprint, and Bag.
-- **Claims.** On the title screen, set the name, day speed, gather rate, and starting kit. Saved claims can be continued, renamed, cloned, exported, or deleted.
+- **Claims.** On the title screen, set the name, day speed, gather rate, difficulty, and starting kit. Saved claims can be continued, renamed, cloned, exported, or deleted.
+
+## Difficulty
+
+Pick **Easy, Medium, Hard or Extreme** when you name a claim (or cycle it later in Pause > Settings). It is saved with the claim.
+
+| | Easy | Medium | Hard | Extreme |
+|---|---|---|---|---|
+| Raid size | 0.6x (max 24) | 1x (max 60) | 1.4x (max 64) | 2x (max 72) |
+| Raider health / damage | 0.6x / 0.7x | 0.8x / 1x | 1x / 1.25x | 1.2x / 1.6x |
+| Raider health growth per raid (max 1.8x) | +3% | +5% | +7% | +9% |
+| Armor and heavy-build resistance (kept) | 50% | 65% | 80% | 100% |
+| Raider gear tier | one raid behind | normal | one raid ahead | two raids ahead |
+| Share of raiders sent at settlers | 2 in 10 | 3 in 10 | 4 in 10 | 5 in 10 |
+| Night wanderers at once | 1 | 2 | 3 | 4 |
+| Camp garrison | 0.7x | 1x | 1.25x | 1.5x (max 14) |
+| Camp respawn | 4 min | 3 min | 2 min | 75 s |
+| Camp sight range | 0.85x | 1x | 1.2x | 1.4x |
+| Camp raiding parties | every 8 min, 2 raiders | every 5 min, 2 | every 3.3 min, 3 | every 2 min, 4 |
+| Settler health | 1.3x | 1x | 0.9x | 0.75x |
+| Settler guns | a raid early | normal | normal | a raid late |
+
+**Settlers and camps.** Settlers without a gun (pistol or better) will not gather, wander or path inside a live camp's range. If they find themselves there they back out, and they run home from camp raiders. Once armed they stop avoiding camps. Raiders go for settlers too: camp towers snipe them, the garrison rallies on any settler it sees, and camps send raiding parties at the nearest settler on a timer. Wandering night raiders and siege raiders also pick settlers over you when the settler is closer.
 
 ## What’s new
 
+- **Difficulty.** Easy, Medium, Hard, or Extreme, picked when you name a claim and changed later in Pause > Settings. It changes raid size, raider health and damage, how fast they get tougher, armor, gear, how many go after settlers, night wanderers, and how hard the camps are. The table is above.
+- **Wood barricade.** Craft one from 30 wood. It is a 2.6 m plank wall (260 HP) that blocks movement and bullets. If a raider or a settler is shot with nothing between them and the shooter, they duck behind a barricade or set one down. Raider ones fall apart after 4 minutes. Settler ones last 8. Walls and doors now stop bullets on a true line, so a thin wall cannot be shot through.
 - **Raider camps.** Three occupied camps sit on the island. The **Raider Warlord Citadel** holds 8 to 10 raiders behind a skull gate, with watchtowers and a warlord. The **Raider Siege Armory** holds 6 to 8 around a munitions hangar and an armored truck. The **Raider Blood-Pit Stockade** holds 4 to 6 inside a timber palisade and a bonfire pit. They patrol until they see you, then the whole garrison is called in. Marksmen stay on the towers. They shoot, throw charges, and bandage. Wipe them and the game calls the **Raider War-Chests** open. Those chests hold guns, explosives, attachments, and scrap. Leave a few alive and they refill. Kill them all and a new crew retakes the camp in about 3 minutes and restocks the chests. On the map (**M**) camps are red skulls with a headcount, or a respawn timer once they are down.
 - **Wild hemp.** Tall hemp plants grow across the island and a few stand by the road where you wake. Pick one for cloth and plant fiber. They grow back.
 - **Barrel scrap.** Every barrel drops scrap, on top of whatever else is inside.

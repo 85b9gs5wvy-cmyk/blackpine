@@ -22,6 +22,7 @@
 <div class="bp-cfg-field"><label for="claimNameIn">Claim Name</label><div class="bp-cfg-inline"><input id="claimNameIn" type="text" maxlength="28" value="Blackpine Ridge"><button class="bp-dice-btn" id="randNameBtn" type="button" title="Randomize Name">🎲</button></div></div>
 <div class="bp-cfg-field"><label for="newPaceSel">Day Speed</label><select id="newPaceSel"><option value="1">1× (24h)</option><option value="3">3× (8h)</option><option value="5" selected>5× (4.8h)</option><option value="10">10× (2.4h)</option><option value="20">20× (1.2h)</option></select></div>
 <div class="bp-cfg-field"><label for="newGatherSel">Gather Rate</label><select id="newGatherSel"><option value="0.5">0.5× Scarce</option><option value="1" selected>1× Standard</option><option value="2">2× Abundant</option><option value="5">5× Rich</option><option value="10">10× Sandbox</option></select></div>
+<div class="bp-cfg-field"><label for="newDiffSel">Difficulty</label><select id="newDiffSel"><option value="easy">Easy — fewer, weaker raiders</option><option value="medium" selected>Medium</option><option value="hard">Hard — bigger, tougher raids</option><option value="extreme">Extreme — relentless</option></select></div>
 <div class="bp-cfg-field"><label for="newKitSel">Starting Loadout</label><select id="newKitSel"><option value="standard" selected>Standard (Rock)</option><option value="pioneer">Pioneer (Tools &amp; Rations)</option><option value="builder">Outpost Builder (TC &amp; Mats)</option></select></div>
 </div>
 </div>
@@ -55,7 +56,7 @@ import * as THREE from "./three.module.js";
 import { bootSurvival } from "./blackpine.js";
 (function(){
 const root=document.getElementById('blackpine'),title=document.getElementById('title'),load=document.getElementById('load'),err=document.getElementById('err'),go=document.getElementById('go'),cont=document.getElementById('cont');
-const claimNameIn=document.getElementById('claimNameIn'),randNameBtn=document.getElementById('randNameBtn'),newPaceSel=document.getElementById('newPaceSel'),newGatherSel=document.getElementById('newGatherSel'),newKitSel=document.getElementById('newKitSel');
+const claimNameIn=document.getElementById('claimNameIn'),randNameBtn=document.getElementById('randNameBtn'),newPaceSel=document.getElementById('newPaceSel'),newGatherSel=document.getElementById('newGatherSel'),newKitSel=document.getElementById('newKitSel'),newDiffSel=document.getElementById('newDiffSel');
 const preSetBtn=document.getElementById('preSetBtn'),preSetDrawer=document.getElementById('preSetDrawer'),preSetGrid=document.getElementById('preSetGrid');
 const saveListEl=document.getElementById('saveList'),saveCountBadge=document.getElementById('saveCountBadge'),seedDemoBtn=document.getElementById('seedDemoBtn'),impSaveBtn=document.getElementById('impSaveBtn');
 let api=null;
@@ -88,7 +89,7 @@ function summarizeSave(s,fallbackName,kind){
   scrap:m.scrap??0,
   held:m.held||'Rock',
   coords:m.coords||`(${(s.p&&s.p.x)|0}, ${(s.p&&s.p.z)|0})`,
-  pace:s.pace||5,gather:s.gather||1
+  pace:s.pace||5,gather:s.gather||1,diff:s.diff||'medium'
  };
 }
 
@@ -304,7 +305,7 @@ function buildSaveCard(rec,isLatest,inPause){
   <div class="bp-sc-meta">
    <span>📅 <b>Day ${m.day}</b> · ${m.timeStr}</span>
    <span>🌤 ${m.wx} · ${m.biome}</span>
-   <span>⭐ <b>${m.rating}</b> · ${m.rank} (Heat ${m.heat}/5)</span>
+   <span>⭐ <b>${m.rating}</b> · ${m.rank} (Heat ${m.heat}/5) · ${String(m.diff||'medium').replace(/^./,c=>c.toUpperCase())}</span>
   </div>
   <div class="bp-sc-pills">
    <span>♥ ${m.hp}%</span>
@@ -430,7 +431,7 @@ function view(name){
   const iv=row('Invert Y: '+(window.__bpInv?'on':'off'),()=>{window.__bpInv=!window.__bpInv;iv.textContent='Invert Y: '+(window.__bpInv?'on':'off');saveSet()});
   const tc=row('Touch controls: '+(SET.touch?'on':'off'),()=>{SET.touch=!SET.touch;tc.textContent='Touch controls: '+(SET.touch?'on':'off');saveSet();applySet()});
   const dp=row('Day speed: '+api.getPace()+'x',()=>{const P=api.paces,n=P[(P.indexOf(api.getPace())+1)%P.length];api.setPace(n);dp.textContent='Day speed: '+api.getPace()+'x'});
-  const gp=row('Gather rate: '+api.getGather()+'x',()=>{const G=[.5,1,2,5,10],n=G[(G.indexOf(api.getGather())+1)%G.length];api.setGather(n);window.__bpGather=n;SET.gather=n;saveSet();gp.textContent='Gather rate: '+n+'x'});const mp=row('Minimap: '+(SET.mm!==false?'on':'off'),()=>{SET.mm=SET.mm===false;applySet();saveSet();mp.textContent='Minimap: '+(SET.mm!==false?'on':'off')});row('Back',()=>view('main'))
+  const gp=row('Gather rate: '+api.getGather()+'x',()=>{const G=[.5,1,2,5,10],n=G[(G.indexOf(api.getGather())+1)%G.length];api.setGather(n);window.__bpGather=n;SET.gather=n;saveSet();gp.textContent='Gather rate: '+n+'x'});const dn=k=>k.replace(/^./,c=>c.toUpperCase());const df=row('Difficulty: '+dn(api.getDifficulty()),()=>{const D=api.difficulties,n=D[(D.indexOf(api.getDifficulty())+1)%D.length];api.setDifficulty(n);df.textContent='Difficulty: '+dn(api.getDifficulty())});const mp=row('Minimap: '+(SET.mm!==false?'on':'off'),()=>{SET.mm=SET.mm===false;applySet();saveSet();mp.textContent='Minimap: '+(SET.mm!==false?'on':'off')});row('Back',()=>view('main'))
  }else{
   h.textContent='Controls';const p=document.createElement('p');p.innerHTML='<b>W A S D</b> move<br><b>Mouse</b> look (click to capture)<br><b>Click / E</b> use, fire, gather<br><b>Right Click</b> aim down sights (ADS)<br><b>Shift</b> sprint &nbsp; <b>R</b> reload<br><b>V</b> attachments &nbsp; <b>T</b> ammo type<br><b>1 - 6</b> hotbar &nbsp; <b>I / Tab</b> bag<br><b>F5 / F9</b> quick save / quick load<br><b>Esc</b> pause menu';c.appendChild(p);row('Back',()=>view('main'))
  }
@@ -471,6 +472,7 @@ function begin(next,customOpts){
    bootOpts.slotId='slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
    bootOpts.pace=newPaceSel?+newPaceSel.value:5;
    bootOpts.gather=newGatherSel?+newGatherSel.value:1;
+   bootOpts.difficulty=newDiffSel?newDiffSel.value:'medium';
    bootOpts.kit=newKitSel?newKitSel.value:'standard';
   }else if(next&&!bootOpts.saveData){
    const lat=SaveStore.latest();

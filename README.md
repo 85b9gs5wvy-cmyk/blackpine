@@ -18,6 +18,9 @@ GitHub’s file list only shows source. The button above is what runs it. On a p
 
 ## What’s new
 
+- **Raider camps.** Three occupied camps sit on the island. The **Raider Warlord Citadel** holds 8 to 10 raiders behind a skull gate, with watchtowers and a warlord. The **Raider Siege Armory** holds 6 to 8 around a munitions hangar and an armored truck. The **Raider Blood-Pit Stockade** holds 4 to 6 inside a timber palisade and a bonfire pit. They patrol until they see you, then the whole garrison is called in. Marksmen stay on the towers. They shoot, throw charges, and bandage. Wipe them and the game calls the **Raider War-Chests** open. Those chests hold guns, explosives, attachments, and scrap. Leave a few alive and they refill. Kill them all and a new crew retakes the camp in about 3 minutes and restocks the chests. On the map (**M**) camps are red skulls with a headcount, or a respawn timer once they are down.
+- **Wild hemp.** Tall hemp plants grow across the island and a few stand by the road where you wake. Pick one for cloth and plant fiber. They grow back.
+- **Barrel scrap.** Every barrel drops scrap, on top of whatever else is inside.
 - **Solid world.** You, settlers, and animals stop on trees, rocks, ore, barrels, crates, and junk instead of walking through them. Props sit down into slopes so they don’t float, and they get pushed off the road.
 - **Chop and mine feedback.** A swing kicks the camera. Wood chips, stone sparks, and a hit sound follow the tool.
 - **Saved claims.** Name the claim before you wake. Pick day speed, gather rate, and a kit: Rock, Pioneer (tools and rations), or Outpost Builder (a cupboard and materials). **+ Starter Outpost** adds a fortified Day 3 camp. **F5** quick-saves. **F9** quick-loads.

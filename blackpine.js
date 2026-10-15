@@ -15,7 +15,7 @@ const MK=[],MKC=['#ff4d4d','#ffb020','#38d46a','#33a8ff','#b86bff','#ff6bd0'];le
 let FOVB=72,VK=1,mapOpen=false;let attOpen=false,attTarget=null,adsHeld=false,adsLerp=0,tacLightOn=true;
 function rs(){const w=root.clientWidth||innerWidth,h=root.clientHeight||innerHeight;ren.setSize(w,h);const a=w/h;cam.aspect=a;FOVB=Math.min(100,Math.max(72,2*Math.atan(Math.tan(35*Math.PI/180)/a)*180/Math.PI));cam.fov=FOVB;VK=Math.min(1,Math.tan(FOVB*Math.PI/360)*a/1.28);cam.updateProjectionMatrix()}window.addEventListener('resize',rs);rs();
 function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-const R=rng(11),B=760,REAL_DAY=86400,REF_PACE=144,PACES=[5,15,30,60,120];
+const R=rng(11),B=760,REAL_DAY=86400,REF_PACE=144,PACES=[1,3,5,10,15,20,30,60,120];
 const hash=(x,z)=>{const s=Math.sin(x*127.1+z*311.7)*43758.5453;return s-Math.floor(s)};
 function vn(x,z){const xi=Math.floor(x),zi=Math.floor(z),xf=x-xi,zf=z-zi,u=xf*xf*(3-2*xf),v=zf*zf*(3-2*zf);return hash(xi,zi)*(1-u)*(1-v)+hash(xi+1,zi)*u*(1-v)+hash(xi,zi+1)*(1-u)*v+hash(xi+1,zi+1)*u*v}
 function fbm(x,z){let a=.5,f=1,s=0;for(let i=0;i<4;i++){s+=a*vn(x*f+i*17,z*f+i*31);a*=.5;f*=2}return s}
@@ -325,8 +325,8 @@ function impactSurfaceFx(kind,ox,oy,oz){
 }
 function meleeAct(){const s=SL[sel],M=s&&ITEMS[s.id].mel;if(!M)return false;if(mCd>0)return true;
  const fx=-Math.sin(yaw),fz=-Math.cos(yaw);let best=null,bd=M.reach+.6;
- for(const o of NEAR){const a=o.userData.a;if(!a||a.hp<=0)continue;const dx=o.position.x-P.x,dz=o.position.z-P.z,d=Math.hypot(dx,dz)||1;if(d>bd)continue;if((dx*fx+dz*fz)/d<.6&&d>1)continue;bd=d;best=o}
- if(!best){const t=target();if(t&&!t.userData.a&&(t.userData.k==='crate'||t.userData.k==='dev'||t.userData.k==='drop'||t.userData.k==='recycler'||t.userData.k==='hemp'))return false}
+ for(const o of NEAR){const a=o.userData.a;if(!a||a.hp<=0)continue;const dx=o.position.x-P.x,dz=o.position.z-P.z,d=Math.hypot(dx,dz)||1;if(d>bd)continue;if((dx*fx+dz*fz)/d<.6&&d>1)continue;if(!turretSees({x:P.x,y:P.y-1.7,z:P.z},a))continue;bd=d;best=o}
+ if(!best){const t=target();if(t&&!t.userData.a&&(t.userData.k==='crate'||t.userData.k==='dev'||t.userData.k==='drop'||t.userData.k==='recycler'||t.userData.k==='hemp'||t.userData.k==='bush'||t.userData.k==='junk'||t.userData.k==='barrel'))return false}
  mCd=M.cd;mSt=M.st;mD=M.cd*1.12;mT=mD;slashDir=-slashDir;swingHit=best?1:0;
  camK+=M.st==='smash'?.014:M.st==='thrust'?.008:.006;
  blip(M.st==='smash'?110:M.st==='thrust'?195:285,.065,'sawtooth');
@@ -355,7 +355,7 @@ function act(){if(dead)return;{const s=SL[sel];if(s&&(ITEMS[s.id].bd||ITEMS[s.id
  S.energy=Math.max(0,S.energy-(toolTier()>=3?.4:toolTier()===2?1.4:2));const k=o.userData.k;
  if(k==='tree'){const h=tool('hatchet'),rk=tool('rock');if(!h&&!rk)return say('You need a rock or hatchet to chop trees.');const n=dropN(ty('tree'));if(!room('wood',n))return say('Inventory full.');impactSurfaceFx('tree',o.position.x,o.position.y,o.position.z);if(give('wood',n)){if(h)wear();if(--o.userData.uses<=0)remove(o)}}
  else if(k==='junk'||k==='barrel'){
-  if(k==='barrel'&&!tool('hatchet')&&!tool('pickaxe')&&!tool('rock'))return say('You need a tool to break open barrels. Hold a rock, hatchet or pickaxe.');
+  if(k==='barrel'&&!tool('hatchet')&&!tool('pickaxe')&&!tool('rock')&&!(SL[sel]&&ITEMS[SL[sel].id]&&ITEMS[SL[sel].id].mel))return say('You need a tool or melee weapon to break open barrels.');
   const raw=k==='barrel'?barrelLoot(o.userData.kind):loot(),L={};
   for(const q in raw)if(raw[q]){
    // Guaranteed 2-6 Scrap on barrels (never scaled below raw[q])
@@ -826,8 +826,9 @@ const G=(x,z,ft)=>{if(ft===undefined)ft=P.y-1.7;let y=H(x,z);
   const c=DECKS[i];
   if(x<c.x0-.25||x>c.x1+.25||z<c.z0-.25||z>c.z1+.25)continue;
   if(c.ramp){
-   if(ft>=c.y0-.6&&ft<=c.y1+.85){
-    const u=Math.max(0,Math.min(1,(x-c.x0)/Math.max(.1,c.x1-c.x0)));
+   const lo=Math.min(c.y0,c.y1),hi=Math.max(c.y0,c.y1);
+   if(ft>=lo-.6&&ft<=hi+.85){
+    const u=Math.max(0,Math.min(1,c.az?(z-c.z0)/Math.max(.1,c.z1-c.z0):(x-c.x0)/Math.max(.1,c.x1-c.x0)));
     y=Math.max(y,c.y0+(c.y1-c.y0)*u);
    }
   }else if(c.top!==undefined&&ft>=c.top-(c.pad?.68:.55)){
@@ -1678,9 +1679,9 @@ function mkMan(c,raider,V){V=V||{};const pk=a=>a[rnd()*a.length|0],val=(k,f)=>V[
  const leg=s=>{const l=new MB();l.box(.17,.38,.17,0,-.19,0,pants);l.box(.15,.34,.15,0,-.55,0,pants);l.box(.18,.12,.28,0,-.76,.04,boot);l.box(.19,.02,.19,0,-.7,.02,shade(boot,1.4));if(raider)l.box(.19,.12,.19,0,-.37,.02,0x555555);else if(ot===3||ot===2)l.box(.16,.1,.02,0,-.3,.09,shade(pants,1.2));return piv(l.build(),s*.14,.8,0)},
  legL=leg(-1),legR=leg(1);
  // Held weapon/tool with grip centered at (0,0,0), barrel/blade along +Y, and magazine/grip along +Z (downward in world when aimed)
- const isGunTool=!!(raider&&((V.gun&&(!V.kit||V.kit==='melee'))||V.kit==='rocket'));
+ const isGunTool=!!(raider&&((V.gun&&V.kit!=='rocket')||V.kit==='rocket'));
  let tool;if(raider){const m=new MB(),kk=V.kit||'';
-  if(V.gun&&(!kk||kk==='melee')){
+  if(V.gun&&kk!=='rocket'){
    const L=(RGUN[V.gun]||RGUN.pistol).len;
    m.box(.044,.14,.075,0,0,.035,0x3a2818,[-.22,0,0]);
    m.box(.066,.26,.092,0,.10,-.01,V.warlord?0x2b1d1d:0x3a3d42);
@@ -2249,7 +2250,7 @@ function campGunTier(){return 3}
 function settlerArmed(n){return !!n&&(n.wt||0)>=campGunTier()}
 function campPad(){return Math.ceil(58*DF.sight)+10}
 function campDanger(n,x,z){try{if(!n||n.k!=='settler'||(n.wt||0)>=campGunTier())return null;const hm=n.home||n.lot||{x:n.hx,z:n.hz};if(Math.hypot(n.x-hm.x,n.z-hm.z)<26&&Math.hypot(x-hm.x,z-hm.z)<30)return null;const pad=campPad();for(const c of RCAMPS){if(!c.raiders||!c.raiders.some(r=>r&&r.hp>0))continue;if(Math.hypot(x-c.x,z-c.z)<c.r+pad)return c}}catch(e){}return null}
-function setSettlerWeapon(n,w){n.wp=w;n.wt=w.t;const tw=n.m&&n.m.userData&&n.m.userData.tw;if(!tw)return;while(tw.children.length)tw.remove(tw.children[0]);let m;if(w.rng&&ITM[w.id]){m=itemModel(w.id);m.rotation.set(0,0,Math.PI/2);m.position.set(0,.28,0);tw.scale.setScalar(.52)}else if(w.rng){const L=(RGUN[w.id]||RGUN.pistol).len,b=new MB();b.cyl(.022,.028,L,6,0,.3+L/2,0,0x2a2d31);b.box(.08,.24,.1,0,.2,0,0x3a3d42);m=b.build();tw.scale.setScalar(.8)}else{m=itemModel(w.id);tw.scale.setScalar(.5)}tw.add(m)}
+function setSettlerWeapon(n,w){n.wp=w;n.wt=w.t;const tw=n.m&&n.m.userData&&n.m.userData.tw;if(!tw)return;while(tw.children.length)tw.remove(tw.children[0]);tw.userData.isGun=!!w.rng;let m;if(w.rng&&ITM[w.id]){m=itemModel(w.id);m.rotation.set(0,Math.PI/2,Math.PI/2);m.position.set(0,.08,0);tw.scale.setScalar(.52)}else if(w.rng){const L=(RGUN[w.id]||RGUN.pistol).len,b=new MB();b.cyl(.022,.028,L,6,0,.3+L/2,0,0x2a2d31);b.box(.08,.24,.1,0,.2,0,0x3a3d42);m=b.build();tw.scale.setScalar(.8)}else{m=itemModel(w.id);tw.scale.setScalar(.5)}tw.add(m)}
 function weaponWork(n,dt){
  if(n.hp<=0)return false;
  const have=n.wt||0,want=wantTier();
@@ -2545,7 +2546,7 @@ function spawnSiege(idx){const sT=NP.filter(n=>n.hp>0&&!n._dead&&Math.hypot(n.x-
 function launchRaid(){if(ch('peace'))return say('Peace is on.');raidSawDark=false;raidWarned=days;siegeAnchor=raidAnchor();const n=raidCount();let made=0;for(let i=0;i<n;i++)if(spawnSiege(i))made++;if(!made){say('Nowhere dry to land a raid.');return}raidPhase='active';raidSpawned=days;say('Raid crew incoming. '+made+' on the ridge.');blip(68,.5,'square')}
 function skipToRaid(){const dayNum=days+1;if(dayNum%5!==0)days+=5-dayNum%5;else days+=5;t=.84;raidPhase='calm';raidSawDark=false;raidWarned=-1;raidSpawned=-1;say('Evening before a raid night. Day '+(days+1)+'. Tap the clock to speed the day, or start the crew now.')}
 let claimName=(opts&&opts.claimName)||'Blackpine Ridge',slotId=(opts&&opts.slotId)||('slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
-function serSlot(s){return s?{id:s.id,n:s.n,dur:s.dur,mag:s.mag,at:s.at,mods:Array.isArray(s.mods)?[...s.mods]:undefined,att:s.att?{...s.att}:undefined}:null}
+function serSlot(s){return s?{id:s.id,n:s.n,dur:s.dur,mag:s.mag,at:s.at,mods:s.mods&&typeof s.mods==='object'?(Array.isArray(s.mods)?[...s.mods]:{...s.mods}):undefined,att:s.att?{...s.att}:undefined}:null}
 function snapshot(customName){
  if(customName)claimName=String(customName).trim()||claimName;
  const slots=[];for(let i=0;i<30;i++)slots.push(serSlot(SL[i]));
@@ -2584,14 +2585,14 @@ function applySave(s){if(!s||s.v!==1||!s.p)return false;
  BPK.clear();if(Array.isArray(s.bp))for(const k of s.bp)BPK.add(k);else for(const k in RCOST)BPK.add(k);
  t=s.t??t;days=s.days||0;if(PACES.includes(s.pace))setPace(s.pace);
  yaw=s.yaw||0;pitch=s.pitch||0;P.x=LP.x=s.p.x;P.z=LP.z=s.p.z;P.y=s.p.y;
- if(Array.isArray(s.slots))for(let i=0;i<30;i++){const x=s.slots[i];SL[i]=x?{...x,mods:Array.isArray(x.mods)?[...x.mods]:undefined,att:x.att?{...x.att}:undefined}:null}
+ if(Array.isArray(s.slots))for(let i=0;i<30;i++){const x=s.slots[i];SL[i]=x?{...x,mods:x.mods&&typeof x.mods==='object'?(Array.isArray(x.mods)?[...x.mods]:{...x.mods}):undefined,att:x.att?{...x.att}:undefined}:null}
  if(s.eq){EQ.head=s.eq.head||0;EQ.chest=s.eq.chest||0;EQ.legs=s.eq.legs||0;EQ.feet=s.eq.feet||0}
  if(s.rt)Object.assign(RT,s.rt);raidWarned=s.raidWarned??-1;raidSpawned=s.raidSpawned??-1;
  if(s.rs)Object.assign(RAIDSZ,s.rs);if(s.wx&&WXNAME[s.wx.k]){wx=s.wx.k;wxT=s.wx.t||70}
  if(s.claim)placeClaimAt(s.claim.x,s.claim.z,true,s.claim.kind);
  replayBuilds(s.blog);flushTerrain();
  for(const f of s.fires||[])lightFire(f.x,f.z,f.life||120);
- for(const rec of s.devices||[]){const d=devAt(rec);if(!d)continue;if(Array.isArray(rec.sl))d.sl=rec.sl.map(x=>x?{...x,mods:Array.isArray(x.mods)?[...x.mods]:undefined,att:x.att?{...x.att}:undefined}:null);if(rec.hp!=null)d.hp=rec.hp;if(rec.water!=null)d.water=rec.water;d.burn=rec.burn||0;d.ch=rec.ch||0;d.on=rec.on!==false;d.open=!!rec.open}
+ for(const rec of s.devices||[]){const d=devAt(rec);if(!d)continue;if(Array.isArray(rec.sl))d.sl=rec.sl.map(x=>x?{...x,mods:x.mods&&typeof x.mods==='object'?(Array.isArray(x.mods)?[...x.mods]:{...x.mods}):undefined,att:x.att?{...x.att}:undefined}:null);if(rec.hp!=null)d.hp=rec.hp;if(rec.water!=null)d.water=rec.water;d.burn=rec.burn||0;d.ch=rec.ch||0;d.on=rec.on!==false;d.open=!!rec.open}
  for(const pair of s.wires||[]){const A=devAt(pair[0]),B=devAt(pair[1]);if(A&&B&&A!==B)addWire(A,B)}
  vmId=null;syncVM();render();say(claimName+' restored · Day '+(days+1)+' · Rating '+rate100()+'.');return true}
 function placeClaimAt(x,z,quiet,kind){const y=Math.max(G(x,z),H(x,z),.2),isBed=kind==='bed';if(claimMesh){scene.remove(claimMesh);claimMesh=null}const b=new MB();
@@ -3222,10 +3223,10 @@ function rcKit(k,K){
    const steps=8,rLen=3.4;
    if(rampDir==='S'){
     for(let s=0;s<steps;s++){const u=(s+1)/steps;b.box(1.35,h*u,rLen/steps,x,h*u/2,z+hw+rLen*(1-(s+.5)/steps),MC.woodD)}
-    const rp={x0:k.X+x-.68,x1:k.X+x+.68,z0:k.Z+z+hw,z1:k.Z+z+hw+rLen,y0:k.y+h+.04,y1:k.y,ramp:1};ALLC.push(rp);DECKS.push(rp);
+    const rp={x0:k.X+x-.68,x1:k.X+x+.68,z0:k.Z+z+hw,z1:k.Z+z+hw+rLen,y0:k.y+h+.04,y1:k.y,ramp:1,az:1};ALLC.push(rp);DECKS.push(rp);
    }else if(rampDir==='N'){
     for(let s=0;s<steps;s++){const u=(s+1)/steps;b.box(1.35,h*u,rLen/steps,x,h*u/2,z-hw-rLen*(1-(s+.5)/steps),MC.woodD)}
-    const rp={x0:k.X+x-.68,x1:k.X+x+.68,z0:k.Z+z-hw-rLen,z1:k.Z+z-hw,y0:k.y,y1:k.y+h+.04,ramp:1};ALLC.push(rp);DECKS.push(rp);
+    const rp={x0:k.X+x-.68,x1:k.X+x+.68,z0:k.Z+z-hw-rLen,z1:k.Z+z-hw,y0:k.y,y1:k.y+h+.04,ramp:1,az:1};ALLC.push(rp);DECKS.push(rp);
    }else if(rampDir==='E'){
     for(let s=0;s<steps;s++){const u=(s+1)/steps;b.box(rLen/steps,h*u,1.35,x+hw+rLen*(1-(s+.5)/steps),h*u/2,z,MC.woodD)}
     const rp={x0:k.X+x+hw,x1:k.X+x+hw+rLen,z0:k.Z+z-.68,z1:k.Z+z+.68,y0:k.y+h+.04,y1:k.y,ramp:1};ALLC.push(rp);DECKS.push(rp);
@@ -3254,7 +3255,7 @@ function rcKit(k,K){
    for(const sx of[-1.12,1.12])b.box(.12,.75,3.2,x+sx,1.35,z+1.15,0x3c3e42);
    // Walkable rear boarding ramp at z+2.9..z+4.3
    for(let s=0;s<4;s++){const u=(s+1)/4;b.box(1.8,.98*u,.36,x,.98*u/2,z+2.9+(1-u)*1.4,MC.steel)}
-   const rp={x0:k.X+x-.9,x1:k.X+x+.9,z0:k.Z+z+2.9,z1:k.Z+z+4.35,y0:k.y+.98,y1:k.y,ramp:1};
+   const rp={x0:k.X+x-.9,x1:k.X+x+.9,z0:k.Z+z+2.9,z1:k.Z+z+4.35,y0:k.y+.98,y1:k.y,ramp:1,az:1};
    ALLC.push(rp);DECKS.push(rp);
    k.rc(x-1.25,z-3.3,x+1.25,z-.55,2.3);
   }
@@ -3298,7 +3299,7 @@ function raiderCitadel(){
   // Make bunker roof a walkable overwatch deck (y+3.5) with exterior stepped ramp on West side
   {const dk={x0:k.X-3.9,x1:k.X+3.9,z0:k.Z-5.9,z1:k.Z-.3,y:k.y+2.9,top:k.y+3.5,found:1,pad:1};ALLC.push(dk);DECKS.push(dk);
    for(let st=0;st<8;st++){const u=(st+1)/8;b.box(1.3,3.5*u,.55,-4.55,3.5*u/2,-1.0-st*.55,MC.steel)}
-   const rp={x0:k.X-5.2,x1:k.X-3.9,z0:k.Z-5.4,z1:k.Z-.7,y0:k.y+3.5,y1:k.y,ramp:1};ALLC.push(rp);DECKS.push(rp)}
+   const rp={x0:k.X-5.2,x1:k.X-3.9,z0:k.Z-4.95,z1:k.Z-.7,y0:k.y+3.5,y1:k.y,ramp:1,az:1};ALLC.push(rp);DECKS.push(rp)}
   K.sandbags(-2.2,-.5,2.4,true);K.sandbags(2.2,-.5,2.4,true);
   // Interior Warlord Map Table & Armory Gun Racks
   k.solid(0,-3.2,2.2,1.2,.88,MC.woodD);b.box(1.8,.05,.9,0,.92,-3.2,0x8a2820);
@@ -4067,10 +4068,10 @@ Object.assign(ITM,{
   b.box(.012,.065,.038,-.01,.062,0,0x3a3f47);
   b.box(.105,.012,.038,-.06,.032,0,0x3a3f47);
   b.box(.016,.048,.018,-.05,.072,0,0xb8c0c8,[0,0,.22]);
-  // Spurred target hammer (a)
-  a.box(.045,.058,.024,0,.025,0,0x4a5058,[0,0,-.25]);
-  a.box(.038,.018,.032,-.022,.052,0,0x2a2e34);
-  return{act:[-.13,.23,0],cyl:[.01,.172,0],grip:[-.12,.04,0],fore:null,gd:[-1,-.8,.35]};
+  // Spurred target hammer (a) — contoured below the rear U-notch sight line so ADS sight picture is clear
+  a.box(.042,.042,.022,0,.016,0,0x4a5058,[0,0,-.32]);
+  a.box(.034,.014,.028,-.020,.034,0,0x2a2e34);
+  return{act:[-.135,.188,0],cyl:[.01,.172,0],grip:[-.12,.04,0],fore:null,gd:[-1,-.8,.35]};
  }),
  ak:()=>gunM((b,a,mg,c)=>{
   // Classic AKM / Assault Rifle with stamped receiver, gas tube, wood furniture, banana mag & slanted brake
@@ -4192,7 +4193,7 @@ function ico(id){const it=ITEMS[id];if(!it)return'';if(IC[id]===undefined){IC[id
  return IC[id]?'<img alt="" src="'+IC[id]+'">':it.i}
 // viewmodel
 const vm=new T.Group();cam.add(vm);const muzzle=new T.PointLight(0xffddaa,0,10);muzzle.position.set(.3,-.2,-1);cam.add(muzzle);
-let vmId=null,vmM=null,kickV=0,flashT=0,fireCd=0,reloadT=0,reloadD=1,reloadS=null,fireHeld=false,lnT=0,mT=0,mD=.5,mSt='slash',mCd=0,swing=0,swX=0,swY=0,mdx=0,mdy=0;
+let vmId=null,vmSig=null,vmM=null,kickV=0,flashT=0,fireCd=0,reloadT=0,reloadD=1,reloadS=null,fireHeld=false,lnT=0,mT=0,mD=.5,mSt='slash',mCd=0,swing=0,swX=0,swY=0,mdx=0,mdy=0;
 let vmP=null,gz=0,gzv=0,gr=0,grv=0,gy=0,gyv=0,gro=0,grov=0,camK=0,camY=0,camR=0,actT=0,actD=1,ejDone=true,invT=0,drawT=0,flashK=1,flashR=0,flashCol=0xffcc66,cylR=0,cylT=0,rlF=0;const BURN=[],vmG=new T.Vector3();
 const VMS={revolver:[.9,.22,-.2,-.55],ak:[.46,.24,-.24,-.8],pistol:[.9,.22,-.2,-.55],smg:[.65,.24,-.22,-.65],shotgun:[.48,.24,-.24,-.75],rifle:[.42,.24,-.24,-.8]};
 const gunOf=()=>{const s=SL[sel];return s&&ITEMS[s.id].gun?s:null};
@@ -4666,7 +4667,10 @@ Object.assign(ITM,{
 
 function gunMods(s) {
   if (!s || !ITEMS[s.id] || !ITEMS[s.id].gun) return null;
-  if (!s.mods) s.mods = { sight: null, barrel: null, under: null };
+  if (!s.mods || typeof s.mods !== 'object' || Array.isArray(s.mods)) {
+    const a = (s.att && typeof s.att === 'object') ? s.att : {};
+    s.mods = { sight: a.sight || null, barrel: a.barrel || null, under: a.under || null };
+  }
   return s.mods;
 }
 
@@ -4743,6 +4747,12 @@ function mountAttachment(gSlot, attId, fromUseSlot) {
     }
   }
   mods[def.slot] = attId;
+  const maxM = gunMagMax(gSlot);
+  if ((gSlot.mag || 0) > maxM) {
+    const extra = gSlot.mag - maxM, ld = gSlot.at || 'ammo';
+    if (!give(ld, extra, 1)) tossItemFromPlayer(ld, extra);
+    gSlot.mag = maxM;
+  }
   vmId = null; // Force 3D viewmodel rebuild so attachment mesh appears immediately
   syncVM();
   blip(560, 0.06, 'triangle');
@@ -4765,7 +4775,7 @@ function detachAttachment(gSlot, slotKey) {
   if ((gSlot.mag || 0) > maxM) {
     const extra = gSlot.mag - maxM;
     const ld = gSlot.at || 'ammo';
-    if (room(ld, extra)) give(ld, extra, 1);
+    if (!give(ld, extra, 1)) tossItemFromPlayer(ld, extra);
     gSlot.mag = maxM;
   }
   vmId = null;
@@ -5733,9 +5743,9 @@ function isShaftItem(id){
 }
 function isTwoHandHold(id){
  const it=ITEMS[id];if(!it)return false;
- return !!(it.bd||it.dv||it.tool==="hatchet"||it.tool==="pickaxe"||id==="spear"||id==="club"||id==="bow"||id==="launcher"||id==="medkit"||id==="c4"||id==="satchel"||id==="wood"||id==="stone"||id==="ore");
+ return !!(it.bd||it.dv||id==="spear"||id==="bow"||id==="launcher"||id==="medkit"||id==="c4"||id==="satchel"||id==="wood"||id==="stone"||id==="ore");
 }
-function syncVM(){const s=SL[sel],id=s?s.id:null;if(id===vmId)return;vmId=id;lnT=0;mT=0;bloom=0;fireCd=0;while(vm.children.length)vm.remove(vm.children[0]);vmM=null;vmP=null;if(!id)return;
+function syncVM(){const s=SL[sel],id=s?s.id:null,m0=s&&gunMods(s),sig=id?(id+"|"+(m0?(m0.sight||"")+","+(m0.barrel||"")+","+(m0.under||""):"")):null;if(id===vmId&&sig===vmSig)return;vmId=id;vmSig=sig;lnT=0;mT=0;bloom=0;fireCd=0;while(vm.children.length)vm.remove(vm.children[0]);vmM=null;vmP=null;if(!id)return;
  if(!ITEMS[id])return;if(!ITEMS[id].gun&&!ITM[id])registerAllMissingItemModels();vmM=itemModel(id);vmM.scale.setScalar(ITEMS[id].gun?VMS[id][0]:id==="chainsaw"?.6:id==="jackhammer"?.52:(ITEMS[id].tool==="hatchet"||ITEMS[id].tool==="pickaxe")?.62:id==="rock"?.66:(HOLD[id]||.45));
  drawT=.24;gz=gzv=gr=grv=gy=gyv=gro=grov=0;actT=0;ejDone=true;cylR=cylT=0;
  if(ITEMS[id].gun){
@@ -5753,10 +5763,14 @@ function syncVM(){const s=SL[sel],id=s?s.id:null;if(id===vmId)return;vmId=id;lnT
   vmP.userData.rH=rH;vmP.userData.lH=lH;
   vm.add(vmP);const fl=makeFlash();vmM.userData.fl=fl;vmM.userData.fm=fl.userData.m;vmM.add(fl);fl.visible=false;drawT=.36;
  }else if(id==="launcher"){
-  vmM.rotation.set(0,Math.PI/2,0);vmP=new T.Group();vmP.add(vmM);
+  vmM.rotation.set(0,Math.PI/2,0);const gp=vmM.userData.grip||[.20,.04,0],fp=vmM.userData.fore||[-.18,.04,0],sc=HOLD.launcher||.4;
+  vmG.set(gp[2]*sc,gp[1]*sc,-gp[0]*sc);vmM.position.set(-vmG.x,-vmG.y,-vmG.z);
+  vmP=new T.Group();vmP.add(vmM);
   const rH=mkFpHand(1,"gun_r"),lH=mkFpHand(-1,"gun_l");
-  rH.position.set(.02,-.08,-.06);rH.rotation.set(.15,.08,-.1);
-  lH.position.set(-.035,-.06,-.26);lH.rotation.set(.1,.2,.18);
+  rH.position.set(.014,-.018,.018);rH.rotation.set(.18,.08,-.12);
+  const fx=(fp[2]-gp[2])*sc-.022,fy=(fp[1]-gp[1])*sc-.026,fz=-(fp[0]-gp[0])*sc;
+  lH.position.set(fx,fy,fz);lH.rotation.set(.08,.22,.18);
+  lH.userData.base=[fx,fy,fz];rH.userData.base=[.014,-.018,.018];
   vmP.userData.rH=rH;vmP.userData.lH=lH;vmP.add(rH,lH);vm.add(vmP);
  }else if(id==="rock"){
   // Survival Hammerstone in right hand + independent left guard hand
@@ -5793,8 +5807,8 @@ function syncVM(){const s=SL[sel],id=s?s.id:null;if(id===vmId)return;vmId=id;lnT
    if(id==="chainsaw"||id==="jackhammer")rH.userData.base=[rH.position.x,rH.position.y,rH.position.z];else rH.userData.base=[.008,-.018,.014];vmP.userData.rH=rH;vmP.add(rH);
    if(twoH){
     const lH=mkFpHand(-1,"shaft");
-    lH.position.set(...(id==="chainsaw"?[-.012,.052,-.1]:id==="jackhammer"?[-.1,-.012,.02]:[-.014,id==="bow"?.04:id==="spear"?-.035:-.095,id==="bow"?-.06:id==="spear"?-.16:.038]));
-    lH.rotation.set(.16,.24,.14);lH.userData.base=[lH.position.x,lH.position.y,lH.position.z];
+    lH.position.set(...(id==="chainsaw"?[-.085,.048,-.11]:id==="jackhammer"?[-.1,-.012,.02]:id==="spear"?[-.048,-.035,-.16]:[-.014,.04,-.06]));
+    lH.rotation.set(.16,id==="chainsaw"?.42:id==="spear"?.36:.24,id==="chainsaw"?.28:.14);lH.userData.base=[lH.position.x,lH.position.y,lH.position.z];
     vmP.userData.lH=lH;vmP.add(lH);
    }else{
     const lH=mkFpHand(-1,"guard");
@@ -5943,8 +5957,8 @@ function bobVM(dt,mv){if(!vmM||!vmP)return;const it=ITEMS[vmId],b=Math.sin(age*9
    }
   }
   if(vmId==="launcher"){
-   vmP.position.set(.22*VK+swX+bx,-.25+swY+b+br-lk*.04-ld*.12-dr*.22,-.66+lk*.26);
-   vmP.rotation.set(lk*.16+ld*.18+swY*.7-dr*.45,Math.PI/2-swX*.7,lk*.08-ld*.12);
+   vmP.position.set(.20*VK+swX+bx,-.19+swY+b+br-lk*.04-ld*.12-dr*.22,-.46+lk*.22);
+   vmP.rotation.set(lk*.16+ld*.18+swY*.7-dr*.45,-swX*.7,lk*.08-ld*.12);
   }else{
    const shaft=isShaftItem(vmId),isRock=vmId==="rock";
    const baseX=(isRock?.20:shaft?.22:.20)*VK,baseY=isRock?-.195:shaft?-.215:-.185,baseZ=isRock?-.44:shaft?-.48:-.45;
@@ -6191,14 +6205,14 @@ function fire(){const s=gunOf();if(!s||dead||open||chOpen||attOpen||fireCd>0||re
  {const{f,r,u}=vb(),lat=.18*(1-adsLerp*.65),dn=(.11+.03*adsLerp),mx=ox+f[0]*.72+r[0]*lat-u[0]*dn,my=oy+f[1]*.72-u[1]*dn,mz=oz+f[2]*.72+r[2]*lat-u[2]*dn,smkSc=(1-adsLerp*.55);
   for(let i=0;i<(st.silent?2:3);i++)fxAdd(0,i?0x8a909a:0xb8bec8,mx+f[0]*(i*.09)+r[0]*.03,my+f[1]*(i*.09),mz+f[2]*(i*.09)+r[2]*.03,f[0]*(1.4+i*.5)+r[0]*.35+(Math.random()-.5)*.25,f[1]*1.2+.28+Math.random()*.18,f[2]*(1.4+i*.5)+r[2]*.35+(Math.random()-.5)*.25,.24+i*.05,(.016+i*.005)*smkSc,(.016+i*.005)*smkSc,(.016+i*.005)*smkSc,-.38);
   if(!st.silent)for(let i=0;i<3;i++)fxAdd(0,0xffdc78,mx,my,mz,f[0]*(4+Math.random()*3)+(Math.random()-.5)*1.4,f[1]*4+(Math.random()-.3)*1.4,f[2]*(4+Math.random()*3)+(Math.random()-.5)*1.4,.12,.009,.009,.009,3.5)}
- let broke=false;if(!ch('inf')&&--s.dur<=0){SL[sel]=null;broke=true}
+ let broke=false;if(!ch('inf')&&--s.dur<=0){const bm=s.mods;SL[sel]=null;broke=true;if(bm)for(const k of['sight','barrel','under'])if(bm[k]){if(!give(bm[k],1,1))tossItemFromPlayer(bm[k],1)}}
  const cands=things.filter(o=>{const ex=o.position.x-ox,ez=o.position.z-oz;return o.visible!==false&&ex*ex+ez*ez<(g.range+6)**2});
  let anyHit=false,anyCrit=false,anyKill=false;
  for(let p=0;p<g.pellets;p++){const yw=yaw+(Math.random()-.5)*2*effSpread,pt=pitch+(Math.random()-.5)*2*effSpread,cp=Math.cos(pt),dx=-Math.sin(yw)*cp,dy=Math.sin(pt),dz=-Math.cos(yw)*cp;
   ray.set(new T.Vector3(ox,oy,oz),new T.Vector3(dx,dy,dz));ray.far=g.range;
   let ho=null,hd=g.range,hp1=null,ho2=null,hd2=0,hp2=null;
-  for(const h of ray.intersectObjects(cands,true)){let o=h.object;while(o&&!o.userData.k)o=o.parent;if(!o||(o.userData.k==='bush'&&o.userData.ready>0))continue;
-   if(!ho){ho=o;hd=h.distance;hp1=h.point;if(at!=='ammo_ap')break}else if(o!==ho&&o.userData.a){ho2=o;hd2=h.distance;hp2=h.point;break}}
+  for(const h of ray.intersectObjects(cands,true)){let o=h.object;while(o&&!o.userData.k)o=o.parent;if(!o||o.userData.k==='bush'||o.userData.k==='hemp'||o.userData.k==='drop'||(o.userData.a&&o.userData.a.hp<=0)||(o.userData.k==='barrel'&&o.userData.uses!==undefined&&o.userData.uses<=0))continue;
+   if(!ho){ho=o;hd=h.distance;hp1=h.point;if(at!=='ammo_ap'||!ho.userData.a)break}else if(o!==ho&&o.userData.a){ho2=o;hd2=h.distance;hp2=h.point;break}}
   let end=hd;const lim=ho2?hd2:hd,bd=blockDist(ox,oy,oz,dx,dy,dz,lim);
   if(bd<lim){if(bd<hd){ho=null;ho2=null;hd=bd;end=bd}else{ho2=null;end=bd}}else end=lim;
   if(ho&&ho.userData.a){
@@ -6213,7 +6227,8 @@ function fire(){const s=gunOf();if(!s||dead||open||chOpen||attOpen||fireCd>0||re
    anyHit=true;if(crit)anyCrit=true;if(wasAlive&&a.hp<=0)anyKill=true;
    hitFx(ox+dx*hd,oy+dy*hd,oz+dz*hd,true,at,g.pellets,crit);
   }else if(ho&&ho.userData.k==='barrel'){
-   {const raw=barrelLoot(ho.userData.kind);for(const q in raw)if(raw[q]){const n=q==='scrap'?Math.max(raw[q],dropN(raw[q])):dropN(raw[q]);if(n&&room(q,n))give(q,n)}RT.scavenge+=.28;bumpHeat(.05);if(ho.userData.uses==null)ho.userData.uses=2;if(--ho.userData.uses<=0)remove(ho)}anyHit=true;
+   if(ho.userData.uses==null)ho.userData.uses=2;
+   if(ho.userData.uses>0){const raw=barrelLoot(ho.userData.kind);for(const q in raw)if(raw[q]){const n=q==='scrap'?Math.max(raw[q],dropN(raw[q])):dropN(raw[q]);if(n&&room(q,n))give(q,n)}RT.scavenge+=.28;bumpHeat(.05);if(--ho.userData.uses<=0)remove(ho)}anyHit=true;
    hitFx(ox+dx*hd,oy+dy*hd,oz+dz*hd,false,at,g.pellets,false);
   }else if(end<g.range-.05)hitFx(ox+dx*end,oy+dy*end,oz+dz*end,false,at,g.pellets,false);
   if(ho2&&ho2.userData.a){
@@ -6309,7 +6324,7 @@ function renderCheat(){const p=$('cheat');$('chb').textContent=chOpen?'Close':'C
   giv('Build kits',()=>{for(const t of['wood','stone','metal'])for(const k in PT)give(t+'_'+k,10,1)},'Wood, stone and metal building kits added.'),
   giv('Tool tiers',()=>{for(const k of['hatchet','pickaxe','metal_hatchet','metal_pickaxe','chainsaw','jackhammer'])give(k,1,1)},'Stone, metal and powered tools added.'),
   giv('Devices + tools',()=>{for(const k in DV)give(k,k==='lamp'?10:2,1);give('bed',1,1);give('wire',1,1);give('hatchet',1,1);give('pickaxe',1,1)},'Devices, doors, refinery, pump jack, quarry & bed added.'),
-  giv('Guns + armor',()=>{for(const k of['pistol','revolver','shotgun','smg','rifle','ak','helmet','vest','legs','boots'])give(k,1,1);give('medkit',3,1);give('rations',5,1);give('ammo',200,1);for(const k of AMMO_IDS)if(k!=='ammo')give(k,60,1)},'Guns, armor and ammo added.'),
+  giv('Guns + armor',()=>{for(const k of['pistol','revolver','shotgun','pump','smg','thompson','sar','rifle','ak','helmet','vest','legs','boots'])give(k,1,1);give('medkit',3,1);give('rations',5,1);give('ammo',200,1);for(const k of AMMO_IDS)if(k!=='ammo')give(k,60,1)},'Guns, armor and ammo added.'),
   giv('Explosives + Tech',()=>{give('sulfur',40,1);give('charcoal',30,1);give('powder',40,1);give('explosives',20,1);give('targeting_computer',5,1);give('cctv',5,1);give('beancan',6,1);give('satchel',4,1);give('c4',2,1);give('rocket',6,1);give('launcher',1,1)},'Explosives, targeting tech, charges & rockets added.'),
   giv('Elite loot',()=>{for(const[id,n]of lootTable(3))give(id,n)},'Elite loot added.'),
   giv('War-Chest loot',()=>{for(const[id,n]of crateLoot(4))give(id,n)},'Raider War-Chest loot added.'),
@@ -6484,7 +6499,7 @@ ensureStarter();render();persist(opts&&opts.saveData?'load':'auto');
 const wakeBtn=$('wake');if(wakeBtn)wakeBtn.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();wake();if(ev.pointerType==='mouse')lookLock(true)});
 root.addEventListener('pointerdown',()=>{try{if(actx&&actx.state==='suspended')actx.resume()}catch(e){}},{passive:true});
 window.__controlsTest={getYaw:()=>yaw,getSpeed:()=>lastMv,getPos:()=>({x:P.x,z:P.z,yaw}),setKeys(codes){for(const k of Object.keys(keys))keys[k]=0;const map={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ShiftLeft:'shift',ShiftRight:'shift',ArrowUp:'arrowup',ArrowDown:'arrowdown',ArrowLeft:'arrowleft',ArrowRight:'arrowright'};for(const c of codes||[]){const k=map[c];if(k)keys[k]=1}}};
-window.__bp={snap:()=>{cullT=0;nearT=0;update(.016);ren.render(scene,cam);return cv.toDataURL('image/png')},meleePose:(id,p,didHit)=>{SL[0]={id,n:1,dur:100};sel=0;adsHeld=false;adsLerp=0;vmId=null;syncVM();drawT=0;render();const isMel=!!(ITEMS[id]&&ITEMS[id].mel);if(isMel){mSt=ITEMS[id].mel.st;mD=.48;mT=mD*(1-p)+.016;swingHit=didHit?1:0;swing=0}else{startSwing(null,!!didHit,.42);swing=swingD*(1-p)+.016;mT=0}bobVM(.001,0);ren.render(scene,cam);return{id,p,pos:[+vmP.position.x.toFixed(3),+vmP.position.y.toFixed(3),+vmP.position.z.toFixed(3)],rot:[+vmP.rotation.x.toFixed(3),+vmP.rotation.y.toFixed(3),+vmP.rotation.z.toFixed(3)]}},shootPose:(id,att,ap,ads)=>{while(FXP.length){const o=FXP.pop();scene.remove(o.m)}SL[0]={id,n:1,mag:ITEMS[id].mag||6,at:ITEMS[id].cal||"ammo",att:att||{}};sel=0;adsHeld=!!ads;adsLerp=ads?1:0;drawT=0;reloadT=0;fireCd=0;vmId=null;syncVM();give("ammo",60,1);fire();if(ap!=null&&actD>0){const targetElapsed=actD*ap;let el=0;while(el<targetElapsed-.0001){const step=Math.min(.01,targetElapsed-el);flashT=Math.max(0,flashT-step);gunPose(step);fxTick(step);el+=step}}const U=(vmM&&vmM.userData)||{},act=U.act,rH=vmP&&vmP.userData&&vmP.userData.rH,lH=vmP&&vmP.userData&&vmP.userData.lH,fl=U.fl;return{id,actT:+actT.toFixed(3),actD:+actD.toFixed(3),trigF:rH&&rH.userData.trigF?+rH.userData.trigF.rotation.x.toFixed(3):null,flashVis:!!(fl&&fl.visible),fx:FXP.length,barrelHeat:+barrelHeat.toFixed(3),actX:act?+act.position.x.toFixed(4):null,actRotX:act?+act.rotation.x.toFixed(3):null,rHandPos:rH?[+rH.position.x.toFixed(3),+rH.position.y.toFixed(3),+rH.position.z.toFixed(3)]:null,lHandPos:lH?[+lH.position.x.toFixed(3),+lH.position.y.toFixed(3),+lH.position.z.toFixed(3)]:null}},setAds:on=>{adsHeld=!!on;adsLerp=on?1:0;if(on)drawT=0;return adsLerp},mount:id=>{const g=gunOf();return g?mountAttachment(g,id,true):false},bp:()=>[...BPK],scrap:()=>cnt('scrap'),research:id=>doResearch(id),launch:()=>launchRaid(),skip:()=>skipToRaid(),phase:()=>raidPhase,heat:()=>RT.heat,rating:()=>rate100(),raiders:()=>EN.filter(e=>e.hp>0).length,barricades:()=>devs.filter(d=>d.t==='barricade'&&!d._gone).map(d=>({x:+d.x.toFixed(1),z:+d.z.toFixed(1),owner:d.owner,hp:d.hp})),tick:(n,dt)=>{for(let i=0;i<(n||1);i++)update(dt||.05)},foes:()=>EN.filter(e=>e.hp>0).map((e,i)=>({i,x:+e.x.toFixed(1),z:+e.z.toFixed(1),siege:!!e.siege,tower:!!e.tower,camp:!!e.camp,gun:e.gun||null,walls:e.walls,hold:e.cvHold>age?+(e.cvHold-age).toFixed(1):0,hp:Math.round(e.hp)})),hitFoe:(i,dmg)=>{const e=EN.filter(r=>r.hp>0)[i];if(!e)return null;shoot(e,dmg||1);return{fireT:+(e.fireT-age).toFixed(1),walls:e.walls}},zap:dmg=>{let b=null,bd=1e9;for(const e of EN){if(e.hp<=0||!e.gun)continue;const q=Math.hypot(e.x-P.x,e.z-P.z);if(q<bd){bd=q;b=e}}if(!b)return null;shoot(b,dmg||1);return{d:+bd.toFixed(1),walls:b.walls,hold:+(b.cvHold-age).toFixed(1)}},siege:()=>EN.filter(e=>e.siege&&e.hp>0).length,near:()=>{const a=EN.filter(e=>e.hp>0).map(e=>Math.hypot(e.x-P.x,e.z-P.z));return a.length?Math.min(...a):-1},pos:()=>({x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),g:+G(P.x,P.z).toFixed(2)}),place:(x,z,fl)=>{P.x=LP.x=x;P.z=LP.z=z;const f=FD.get(key(Math.round(x/C),Math.round(z/C)));const ft=fl==null?undefined:(f?f.y:0)+FH*(+fl||0)+1;P.y=Math.max(G(x,z,ft),-2.9)+1.7;return {x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),gy:+G(x,z,ft).toFixed(2)}},wx:()=>wx,fog:()=>scene.fog.density,sky:()=>({wx,fog:+scene.fog.density.toFixed(4),rain:rainFx.p.visible,snow:snowFx.p.visible}),setWx:(k)=>{if(!WXNAME[k])return false;wx=k;wxT=120;return true},give:(id,n)=>!!give(id,n||1,1),count:(id)=>cnt(id),ords:()=>ORDS.length,blasts:()=>blastN,kits:()=>EN.filter(e=>e.hp>0).map(e=>(e.kit||'melee')+':'+(e.nades||0)),pace:()=>pace,time:()=>({t,days,pace,hr:t*24}),vitals:()=>({...S}),setPace:(v)=>{setPace(v);return pace},face:(x,z,p)=>{yaw=Math.atan2(-(x-P.x),-(z-P.z));pitch=p==null?-.12:+p},beasts:()=>DE.concat(WV).filter(a=>a.hp>0).map(a=>({k:a.k,x:+a.x.toFixed(1),z:+a.z.toFixed(1),d:+Math.hypot(a.x-P.x,a.z-P.z).toFixed(1)})).sort((a,b)=>a.d-b.d).slice(0,4),seal:()=>{const cx=Math.round(P.x/C),cz=Math.round(P.z/C),x=cx*C,z=cz*C,y=Math.max(H(x,z),1),fk=key(cx,cz);if(!FD.has(fk))construct(ITEMS.wood_foundation,{x,y,z,k:fk,p:'foundation',rot:0});const wk=key(cx,cz,'S');if(!WL.has(wk))construct(ITEMS.wood_wall,{x,z:z+C/2,y,k:wk,rot:0,p:'wall'});const c=ALLC.find(q=>q.wk===wk&&q.piece);return c?{hp:c.hp,x:(c.x0+c.x1)/2,z:(c.z0+c.z1)/2,y:(c.y||y)+1.3}:null},boom:(kind,x,y,z)=>{boom({kind:kind||'satchel',x,y,z,owner:'you',mesh:null});return{blasts:blastN,hp:ALLC.filter(c=>c.piece).map(c=>Math.round(c.hp))}},throwCan:()=>{const i=SL.findIndex(s=>s&&s.id==='beancan');if(i<0)return false;sel=i;return !!useSlot(i)},rocket:()=>{const i=SL.findIndex(s=>s&&s.id==='launcher');if(i>=0)sel=i;const info={throwCd,dead,rockets:cnt('rocket'),slot:SL[sel]&&SL[sel].id};fireRocketPlayer();info.after=cnt('rocket');info.ords=ORDS.length;info.throwCd2=throwCd;info.msg=($('msg')&&$('msg').textContent)||'';return info},health:()=>S.health,yards:()=>NP.map(n=>{const mine=d=>d.npc===n&&!d._gone,ts=devs.filter(d=>mine(d)&&d.t==='turret'),ws=wires.filter(w=>w.a.npc===n&&w.b.npc===n);return{ok:!!(n.tc&&!n.tc._gone&&n.devs.furnace&&n.devs.battery&&n.devs.wind&&n.devs.solar&&n.devs.switch&&ts.length===4&&ws.length>=8&&(n.floors||1)>=3),deck:n.devs.turret0&&n.tc?+(n.devs.turret0.y-n.tc.y).toFixed(2):0,floors:n.floors||1,skip:n.skip||0,hp:Math.round(n.hp),aggro:+(n.aggro||0).toFixed(1),step:n.i+'/'+n.bp.length,skip:n.skip||0,tur:ts.length,pw:ts.map(t=>+t.pw.toFixed(2)),wires:ws.length,bat:n.devs.battery?Math.round(n.devs.battery.ch):0,wind:n.devs.wind?+n.devs.wind.out.toFixed(1):0,x:n.tc?+n.tc.x.toFixed(1):+n.x.toFixed(1),z:n.tc?+n.tc.z.toFixed(1):+n.z.toFixed(1)}}),goto:(i)=>{const n=NP[i||0];if(!n||n.hp<=0)return null;jumpSettler(n,i||0);return{i:i||0,x:+P.x.toFixed(1),z:+P.z.toFixed(1),step:n.i,len:(n.bp&&n.bp.length)||0,home:!!n.home}},smack:()=>{const n=NP.find(x=>x.hp>0&&x.tc);if(!n)return null;const before=n.hp;hit(n.m);return{before,hp:Math.round(n.hp),aggro:+n.aggro.toFixed(1),angry:NP.filter(o=>o.aggro>0).length,k:n.m.userData.k}},tryPlace:(id,x,z)=>{const it=ITEMS[id];if(!it)return 'bad';const a=aim(it,x,z,0);if(!a.ok)return a.why||'no';if(it.dv==='tc'&&tcCovering(a.x,a.z))return 'overlap';if(privWhy(a.x,a.z,null))return 'blocked';construct(it,a,0);return 'ok'},anchor:()=>{const a=raidAnchor();return{x:+a.x.toFixed(1),z:+a.z.toFixed(1),tc:!!(a.tc&&!a.tc._gone),live:!!a.live,hp:a.tc?Math.round(a.tc.hp):0}},soak:()=>{const t=playerTC();if(t)t.sl=Array(12).fill(null);const seen=new Set();let hp0=0,n=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen.has(c.mesh))continue;seen.add(c.mesh);c.born=0;hp0+=c.hp;n++}upkeepTick(600);const seen2=new Set();let hp1=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen2.has(c.mesh))continue;seen2.add(c.mesh);hp1+=c.hp}return{pieces:n,before:Math.round(hp0),after:Math.round(hp1),paid:!!(t&&t.paid),short:(t&&t.short)||''}},world:()=>{const c=k=>things.filter(o=>o.userData.k===k).length;const kinds={};let off=0;for(const o of things)if(o.userData.k==='barrel'){const q=o.userData.kind||'?';kinds[q]=(kinds[q]||0)+1;let by=false;visitRoads(o.position.x,o.position.z,h=>{if(h.dist<h.half+h.edge+3.4)by=true});if(!by)off++}return{roads:ROADS.length,barrels:c('barrel'),offRoad:off,ponds:PONDS.map(q=>({x:+q.x.toFixed(1),z:+q.z.toFixed(1),r:+q.r.toFixed(1),y:+H(q.x,q.z).toFixed(2)})),kinds,sulfur:c('sulfur'),ore:c('ore'),junk:c('junk'),rocks:c('rock'),trees:c('tree'),mons:MONS.length}},mons:()=>MONS.map(m=>({n:m.n,x:+m.x.toFixed(1),z:+m.z.toFixed(1),raiderCamp:!!m.raiderCamp})),raiderCamps:()=>RCAMPS.map(c=>({n:c.n,kind:c.campKind,x:+c.x.toFixed(1),z:+c.z.toFixed(1),y:+c.y.toFixed(2),r:+c.r.toFixed(1),targetCount:c.targetCount,alive:c.raiders.filter(r=>r&&r.hp>0).length,roles:c.raiders.filter(r=>r&&r.hp>0).map(r=>r.role+(r.warlord?'*':'')+(r.tower?'^':'')+':'+r.gun),cleared:!!c.cleared,respawnT:+(c.respawnT||0).toFixed(1),warChests:CR.filter(o=>o.userData.tier===4&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length,eliteCrates:CR.filter(o=>o.userData.tier===3&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length})),barrels:()=>{const o={};for(const t of things){if(t.userData.k!=='barrel')continue;const k=t.userData.kind||'?';const a=o[k]=o[k]||[];if(a.length<3)a.push({x:+t.position.x.toFixed(1),z:+t.position.z.toFixed(1),y:+t.position.y.toFixed(2),g:+H(t.position.x,t.position.z).toFixed(2)})}return o},climb:(i)=>{const list=NP.filter(n=>n.tc&&!n.tc._gone),n=list[i||0];if(!n)return null;const y0=n.tc.y,t=n.devs.turret0,h=n.devs.heater,w=n.devs.wind;const cell=(d)=>d&&{x:+d.x.toFixed(2),z:+d.z.toFixed(2),y:+d.y.toFixed(2),cx:Math.round(d.x/C),cz:Math.round(d.z/C),fy:FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y,rf0:RF.has(key(Math.round(d.x/C),Math.round(d.z/C))),rf1:RF.has(key(Math.round(d.x/C),Math.round(d.z/C),1)),g:G(d.x,d.z,(FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y||0)+8)};return{base:+y0.toFixed(2),mid:+G(n.tc.x,n.tc.z+3,y0+4).toFixed(2),deck:+G(n.tc.x+3,n.tc.z,y0+8).toFixed(2),tur:cell(t),heat:cell(h),wind:cell(w),step:n.bp.filter(s=>s[0]==='turret'||s[0]==='heater'||s[0]==='wind').slice(0,4)}},sim:(steps)=>{const N=steps||500;for(let i=0;i<N;i++){npcTick(.05);furnaces(.05)}return NP.map(q=>({i:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home,skip:q.skip||0,w:q.inv.wood||0,s:q.inv.stone||0,m:q.inv.metal||0,o:q.inv.ore||0,g:q.inv.gears||0,c:q.inv.circuit||0}))},smelt:()=>NP.map((n,i)=>{const f=n.devs&&n.devs.furnace;if(!f||f._gone)return{i,step:n.i,close:!!n.close,no:1};return{i,step:n.i,close:!!n.close,burn:+(f.burn||0).toFixed(1),sl:f.sl.map(s=>s?s.id[0]+s.n:0)}}),farms:()=>NP.map((q,i)=>{const nodes=things.filter(o=>o.userData&&o.userData.farm===q),kinds={};for(const o of nodes)kinds[o.userData.k]=(kinds[o.userData.k]||0)+1;let near=1e9;for(const o of NP)if(o!==q)near=Math.min(near,Math.hypot((q.lot?q.lot.x:q.x)-(o.lot?o.lot.x:o.x),(q.lot?q.lot.z:q.z)-(o.lot?o.lot.z:o.z)));return{i,nodes:nodes.length,kinds,near:+(near>1e8?0:near).toFixed(0),spawn:+Math.hypot((q.lot?q.lot.x:q.x)-SP.x,(q.lot?q.lot.z:q.z)-SP.z).toFixed(0),step:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home}}),inv:()=>SL.slice(0,42).map(s=>s?s.id+':'+s.n+(s.mag!=null?'/m'+s.mag:''):null),click:(i)=>{clickSlot(i);return SL[i]?SL[i].id:null},openLast:()=>{const d=[...devs].reverse().find(q=>q&&!q._gone&&(isBox(q.t)||isInd(q.t)||q.t==='tc'));if(!d)return null;P.x=LP.x=d.x+1.5;P.z=LP.z=d.z+1.2;P.y=Math.max(G(d.x,d.z),0)+1.7;curBox=d;open=true;tab='bag';pick=null;render();return{t:d.t,owner:d.owner,sl:d.sl.map(s=>s?s.id+':'+s.n:null)}},takeAll:()=>{xferAll('take');pick=null;render();return true},storeBag:()=>{xferAll('store');pick=null;render();return true}};window.__bp.road=()=>{let posts=0,best=null,bd=1e9,lane=[];for(const p of POSTS){if(p.skip)continue;posts++;const d=Math.hypot(p.x-P.x,p.z-P.z);if(d<bd){bd=d;best=p}}for(const o of things){const k=o.userData&&o.userData.k;if(k!=='tree'&&k!=='rock'&&k!=='bush'&&k!=='junk'&&k!=='barrel'&&k!=='ore'&&k!=='sulfur')continue;let hit=null;visitRoads(o.position.x,o.position.z,h=>{if(!hit||h.dist<hit.dist)hit=h});if(hit&&hit.dist<hit.half+hit.edge-.15)lane.push(k+(o.userData.farm?'*':''))}return{posts,segs:SEGS.length,lane,h:+H(P.x,P.z).toFixed(3),feet:+(P.y-1.7).toFixed(3),post:best?{x:+best.x.toFixed(2),z:+best.z.toFixed(2),d:+bd.toFixed(2)}:null}};
+window.__bp={snap:()=>{cullT=0;nearT=0;update(.016);ren.render(scene,cam);return cv.toDataURL('image/png')},meleePose:(id,p,didHit)=>{SL[0]={id,n:1,dur:100};sel=0;adsHeld=false;adsLerp=0;vmId=null;syncVM();drawT=0;render();const isMel=!!(ITEMS[id]&&ITEMS[id].mel);if(isMel){mSt=ITEMS[id].mel.st;mD=.48;mT=mD*(1-p)+.016;swingHit=didHit?1:0;swing=0}else{startSwing(null,!!didHit,.42);swing=swingD*(1-p)+.016;mT=0}bobVM(.001,0);ren.render(scene,cam);return{id,p,pos:[+vmP.position.x.toFixed(3),+vmP.position.y.toFixed(3),+vmP.position.z.toFixed(3)],rot:[+vmP.rotation.x.toFixed(3),+vmP.rotation.y.toFixed(3),+vmP.rotation.z.toFixed(3)]}},shootPose:(id,att,ap,ads)=>{while(FXP.length){const o=FXP.pop();scene.remove(o.m)}const m=att&&typeof att==="object"?{sight:att.sight||null,barrel:att.barrel||null,under:att.under||null}:{sight:null,barrel:null,under:null};SL[0]={id,n:1,dur:ITEMS[id].dur||200,mag:(ITEMS[id].gun&&ITEMS[id].gun.mag)||6,at:"ammo",mods:m,att:att||{}};sel=0;adsHeld=!!ads;adsLerp=ads?1:0;drawT=0;reloadT=0;fireCd=0;vmId=null;syncVM();give("ammo",60,1);fire();if(ap!=null&&actD>0){const targetElapsed=actD*ap;let el=0;while(el<targetElapsed-.0001){const step=Math.min(.01,targetElapsed-el);flashT=Math.max(0,flashT-step);gunPose(step);fxTick(step);el+=step}}const U=(vmM&&vmM.userData)||{},act=U.act,rH=vmP&&vmP.userData&&vmP.userData.rH,lH=vmP&&vmP.userData&&vmP.userData.lH,fl=U.fl;return{id,actT:+actT.toFixed(3),actD:+actD.toFixed(3),trigF:rH&&rH.userData.trigF?+rH.userData.trigF.rotation.x.toFixed(3):null,flashVis:!!(fl&&fl.visible),fx:FXP.length,barrelHeat:+barrelHeat.toFixed(3),actX:act?+act.position.x.toFixed(4):null,actRotX:act?+act.rotation.x.toFixed(3):null,rHandPos:rH?[+rH.position.x.toFixed(3),+rH.position.y.toFixed(3),+rH.position.z.toFixed(3)]:null,lHandPos:lH?[+lH.position.x.toFixed(3),+lH.position.y.toFixed(3),+lH.position.z.toFixed(3)]:null}},setAds:on=>{adsHeld=!!on;adsLerp=on?1:0;if(on)drawT=0;return adsLerp},mount:id=>{const g=gunOf();return g?mountAttachment(g,id,true):false},bp:()=>[...BPK],scrap:()=>cnt('scrap'),research:id=>doResearch(id),launch:()=>launchRaid(),skip:()=>skipToRaid(),phase:()=>raidPhase,heat:()=>RT.heat,rating:()=>rate100(),raiders:()=>EN.filter(e=>e.hp>0).length,barricades:()=>devs.filter(d=>d.t==='barricade'&&!d._gone).map(d=>({x:+d.x.toFixed(1),z:+d.z.toFixed(1),owner:d.owner,hp:d.hp})),tick:(n,dt)=>{for(let i=0;i<(n||1);i++)update(dt||.05)},foes:()=>EN.filter(e=>e.hp>0).map((e,i)=>({i,x:+e.x.toFixed(1),z:+e.z.toFixed(1),siege:!!e.siege,tower:!!e.tower,camp:!!e.camp,gun:e.gun||null,walls:e.walls,hold:e.cvHold>age?+(e.cvHold-age).toFixed(1):0,hp:Math.round(e.hp)})),hitFoe:(i,dmg)=>{const e=EN.filter(r=>r.hp>0)[i];if(!e)return null;shoot(e,dmg||1);return{fireT:+(e.fireT-age).toFixed(1),walls:e.walls}},zap:dmg=>{let b=null,bd=1e9;for(const e of EN){if(e.hp<=0||!e.gun)continue;const q=Math.hypot(e.x-P.x,e.z-P.z);if(q<bd){bd=q;b=e}}if(!b)return null;shoot(b,dmg||1);return{d:+bd.toFixed(1),walls:b.walls,hold:+(b.cvHold-age).toFixed(1)}},siege:()=>EN.filter(e=>e.siege&&e.hp>0).length,near:()=>{const a=EN.filter(e=>e.hp>0).map(e=>Math.hypot(e.x-P.x,e.z-P.z));return a.length?Math.min(...a):-1},pos:()=>({x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),g:+G(P.x,P.z).toFixed(2)}),place:(x,z,fl)=>{P.x=LP.x=x;P.z=LP.z=z;const f=FD.get(key(Math.round(x/C),Math.round(z/C)));const ft=fl==null?undefined:(f?f.y:0)+FH*(+fl||0)+1;P.y=Math.max(G(x,z,ft),-2.9)+1.7;return {x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),gy:+G(x,z,ft).toFixed(2)}},wx:()=>wx,fog:()=>scene.fog.density,sky:()=>({wx,fog:+scene.fog.density.toFixed(4),rain:rainFx.p.visible,snow:snowFx.p.visible}),setWx:(k)=>{if(!WXNAME[k])return false;wx=k;wxT=120;return true},give:(id,n)=>!!give(id,n||1,1),count:(id)=>cnt(id),ords:()=>ORDS.length,blasts:()=>blastN,kits:()=>EN.filter(e=>e.hp>0).map(e=>(e.kit||'melee')+':'+(e.nades||0)),pace:()=>pace,time:()=>({t,days,pace,hr:t*24}),vitals:()=>({...S}),setPace:(v)=>{setPace(v);return pace},face:(x,z,p)=>{yaw=Math.atan2(-(x-P.x),-(z-P.z));pitch=p==null?-.12:+p},beasts:()=>DE.concat(WV).filter(a=>a.hp>0).map(a=>({k:a.k,x:+a.x.toFixed(1),z:+a.z.toFixed(1),d:+Math.hypot(a.x-P.x,a.z-P.z).toFixed(1)})).sort((a,b)=>a.d-b.d).slice(0,4),seal:()=>{const cx=Math.round(P.x/C),cz=Math.round(P.z/C),x=cx*C,z=cz*C,y=Math.max(H(x,z),1),fk=key(cx,cz);if(!FD.has(fk))construct(ITEMS.wood_foundation,{x,y,z,k:fk,p:'foundation',rot:0});const wk=key(cx,cz,'S');if(!WL.has(wk))construct(ITEMS.wood_wall,{x,z:z+C/2,y,k:wk,rot:0,p:'wall'});const c=ALLC.find(q=>q.wk===wk&&q.piece);return c?{hp:c.hp,x:(c.x0+c.x1)/2,z:(c.z0+c.z1)/2,y:(c.y||y)+1.3}:null},boom:(kind,x,y,z)=>{boom({kind:kind||'satchel',x,y,z,owner:'you',mesh:null});return{blasts:blastN,hp:ALLC.filter(c=>c.piece).map(c=>Math.round(c.hp))}},throwCan:()=>{const i=SL.findIndex(s=>s&&s.id==='beancan');if(i<0)return false;sel=i;return !!useSlot(i)},rocket:()=>{const i=SL.findIndex(s=>s&&s.id==='launcher');if(i>=0)sel=i;const info={throwCd,dead,rockets:cnt('rocket'),slot:SL[sel]&&SL[sel].id};fireRocketPlayer();info.after=cnt('rocket');info.ords=ORDS.length;info.throwCd2=throwCd;info.msg=($('msg')&&$('msg').textContent)||'';return info},health:()=>S.health,yards:()=>NP.map(n=>{const mine=d=>d.npc===n&&!d._gone,ts=devs.filter(d=>mine(d)&&d.t==='turret'),ws=wires.filter(w=>w.a.npc===n&&w.b.npc===n);return{ok:!!(n.tc&&!n.tc._gone&&n.devs.furnace&&n.devs.battery&&n.devs.wind&&n.devs.solar&&n.devs.switch&&ts.length===4&&ws.length>=8&&(n.floors||1)>=3),deck:n.devs.turret0&&n.tc?+(n.devs.turret0.y-n.tc.y).toFixed(2):0,floors:n.floors||1,skip:n.skip||0,hp:Math.round(n.hp),aggro:+(n.aggro||0).toFixed(1),step:n.i+'/'+n.bp.length,skip:n.skip||0,tur:ts.length,pw:ts.map(t=>+t.pw.toFixed(2)),wires:ws.length,bat:n.devs.battery?Math.round(n.devs.battery.ch):0,wind:n.devs.wind?+n.devs.wind.out.toFixed(1):0,x:n.tc?+n.tc.x.toFixed(1):+n.x.toFixed(1),z:n.tc?+n.tc.z.toFixed(1):+n.z.toFixed(1)}}),goto:(i)=>{const n=NP[i||0];if(!n||n.hp<=0)return null;jumpSettler(n,i||0);return{i:i||0,x:+P.x.toFixed(1),z:+P.z.toFixed(1),step:n.i,len:(n.bp&&n.bp.length)||0,home:!!n.home}},smack:()=>{const n=NP.find(x=>x.hp>0&&x.tc);if(!n)return null;const before=n.hp;hit(n.m);return{before,hp:Math.round(n.hp),aggro:+n.aggro.toFixed(1),angry:NP.filter(o=>o.aggro>0).length,k:n.m.userData.k}},tryPlace:(id,x,z)=>{const it=ITEMS[id];if(!it)return 'bad';const a=aim(it,x,z,0);if(!a.ok)return a.why||'no';if(it.dv==='tc'&&tcCovering(a.x,a.z))return 'overlap';if(privWhy(a.x,a.z,null))return 'blocked';construct(it,a,0);return 'ok'},anchor:()=>{const a=raidAnchor();return{x:+a.x.toFixed(1),z:+a.z.toFixed(1),tc:!!(a.tc&&!a.tc._gone),live:!!a.live,hp:a.tc?Math.round(a.tc.hp):0}},soak:()=>{const t=playerTC();if(t)t.sl=Array(12).fill(null);const seen=new Set();let hp0=0,n=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen.has(c.mesh))continue;seen.add(c.mesh);c.born=0;hp0+=c.hp;n++}upkeepTick(600);const seen2=new Set();let hp1=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen2.has(c.mesh))continue;seen2.add(c.mesh);hp1+=c.hp}return{pieces:n,before:Math.round(hp0),after:Math.round(hp1),paid:!!(t&&t.paid),short:(t&&t.short)||''}},world:()=>{const c=k=>things.filter(o=>o.userData.k===k).length;const kinds={};let off=0;for(const o of things)if(o.userData.k==='barrel'){const q=o.userData.kind||'?';kinds[q]=(kinds[q]||0)+1;let by=false;visitRoads(o.position.x,o.position.z,h=>{if(h.dist<h.half+h.edge+3.4)by=true});if(!by)off++}return{roads:ROADS.length,barrels:c('barrel'),offRoad:off,ponds:PONDS.map(q=>({x:+q.x.toFixed(1),z:+q.z.toFixed(1),r:+q.r.toFixed(1),y:+H(q.x,q.z).toFixed(2)})),kinds,sulfur:c('sulfur'),ore:c('ore'),junk:c('junk'),rocks:c('rock'),trees:c('tree'),mons:MONS.length}},mons:()=>MONS.map(m=>({n:m.n,x:+m.x.toFixed(1),z:+m.z.toFixed(1),raiderCamp:!!m.raiderCamp})),raiderCamps:()=>RCAMPS.map(c=>({n:c.n,kind:c.campKind,x:+c.x.toFixed(1),z:+c.z.toFixed(1),y:+c.y.toFixed(2),r:+c.r.toFixed(1),targetCount:c.targetCount,alive:c.raiders.filter(r=>r&&r.hp>0).length,roles:c.raiders.filter(r=>r&&r.hp>0).map(r=>r.role+(r.warlord?'*':'')+(r.tower?'^':'')+':'+r.gun),cleared:!!c.cleared,respawnT:+(c.respawnT||0).toFixed(1),warChests:CR.filter(o=>o.userData.tier===4&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length,eliteCrates:CR.filter(o=>o.userData.tier===3&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length})),barrels:()=>{const o={};for(const t of things){if(t.userData.k!=='barrel')continue;const k=t.userData.kind||'?';const a=o[k]=o[k]||[];if(a.length<3)a.push({x:+t.position.x.toFixed(1),z:+t.position.z.toFixed(1),y:+t.position.y.toFixed(2),g:+H(t.position.x,t.position.z).toFixed(2)})}return o},climb:(i)=>{const list=NP.filter(n=>n.tc&&!n.tc._gone),n=list[i||0];if(!n)return null;const y0=n.tc.y,t=n.devs.turret0,h=n.devs.heater,w=n.devs.wind;const cell=(d)=>d&&{x:+d.x.toFixed(2),z:+d.z.toFixed(2),y:+d.y.toFixed(2),cx:Math.round(d.x/C),cz:Math.round(d.z/C),fy:FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y,rf0:RF.has(key(Math.round(d.x/C),Math.round(d.z/C))),rf1:RF.has(key(Math.round(d.x/C),Math.round(d.z/C),1)),g:G(d.x,d.z,(FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y||0)+8)};return{base:+y0.toFixed(2),mid:+G(n.tc.x,n.tc.z+3,y0+4).toFixed(2),deck:+G(n.tc.x+3,n.tc.z,y0+8).toFixed(2),tur:cell(t),heat:cell(h),wind:cell(w),step:n.bp.filter(s=>s[0]==='turret'||s[0]==='heater'||s[0]==='wind').slice(0,4)}},sim:(steps)=>{const N=steps||500;for(let i=0;i<N;i++){npcTick(.05);furnaces(.05)}return NP.map(q=>({i:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home,skip:q.skip||0,w:q.inv.wood||0,s:q.inv.stone||0,m:q.inv.metal||0,o:q.inv.ore||0,g:q.inv.gears||0,c:q.inv.circuit||0}))},smelt:()=>NP.map((n,i)=>{const f=n.devs&&n.devs.furnace;if(!f||f._gone)return{i,step:n.i,close:!!n.close,no:1};return{i,step:n.i,close:!!n.close,burn:+(f.burn||0).toFixed(1),sl:f.sl.map(s=>s?s.id[0]+s.n:0)}}),farms:()=>NP.map((q,i)=>{const nodes=things.filter(o=>o.userData&&o.userData.farm===q),kinds={};for(const o of nodes)kinds[o.userData.k]=(kinds[o.userData.k]||0)+1;let near=1e9;for(const o of NP)if(o!==q)near=Math.min(near,Math.hypot((q.lot?q.lot.x:q.x)-(o.lot?o.lot.x:o.x),(q.lot?q.lot.z:q.z)-(o.lot?o.lot.z:o.z)));return{i,nodes:nodes.length,kinds,near:+(near>1e8?0:near).toFixed(0),spawn:+Math.hypot((q.lot?q.lot.x:q.x)-SP.x,(q.lot?q.lot.z:q.z)-SP.z).toFixed(0),step:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home}}),inv:()=>SL.slice(0,42).map(s=>s?s.id+':'+s.n+(s.mag!=null?'/m'+s.mag:''):null),click:(i)=>{clickSlot(i);return SL[i]?SL[i].id:null},openLast:()=>{const d=[...devs].reverse().find(q=>q&&!q._gone&&(isBox(q.t)||isInd(q.t)||q.t==='tc'));if(!d)return null;P.x=LP.x=d.x+1.5;P.z=LP.z=d.z+1.2;P.y=Math.max(G(d.x,d.z),0)+1.7;curBox=d;open=true;tab='bag';pick=null;render();return{t:d.t,owner:d.owner,sl:d.sl.map(s=>s?s.id+':'+s.n:null)}},takeAll:()=>{xferAll('take');pick=null;render();return true},storeBag:()=>{xferAll('store');pick=null;render();return true}};window.__bp.road=()=>{let posts=0,best=null,bd=1e9,lane=[];for(const p of POSTS){if(p.skip)continue;posts++;const d=Math.hypot(p.x-P.x,p.z-P.z);if(d<bd){bd=d;best=p}}for(const o of things){const k=o.userData&&o.userData.k;if(k!=='tree'&&k!=='rock'&&k!=='bush'&&k!=='junk'&&k!=='barrel'&&k!=='ore'&&k!=='sulfur')continue;let hit=null;visitRoads(o.position.x,o.position.z,h=>{if(!hit||h.dist<hit.dist)hit=h});if(hit&&hit.dist<hit.half+hit.edge-.15)lane.push(k+(o.userData.farm?'*':''))}return{posts,segs:SEGS.length,lane,h:+H(P.x,P.z).toFixed(3),feet:+(P.y-1.7).toFixed(3),post:best?{x:+best.x.toFixed(2),z:+best.z.toFixed(2),d:+bd.toFixed(2)}:null}};
 window.__bp.qa=()=>{const segD=(m)=>{let best=1e9;for(const s of SEGS){const dx=s.bx-s.ax,dz=s.bz-s.az;let u=((m.x-s.ax)*dx+(m.z-s.az)*dz)/(s.l2||1);if(u<0)u=0;else if(u>1)u=1;const d=Math.hypot(m.x-(s.ax+dx*u),m.z-(s.az+dz*u));if(d<best)best=d}return best};const mons=MONS.map(m=>{const best=segD(m),half=5.1;return{n:m.n,r:+m.r.toFixed(1),best:+best.toFixed(1),edge:+(best-half).toFixed(1),on:best<m.r-4}});const bases=NP.map(n=>{const plan=n.plan||{},tur=devs.filter(d=>d.npc===n&&!d._gone&&d.t==='turret');let out=0;if(plan.w&&n.tc){const cx=Math.round(n.tc.x/C)-(plan.tx||0),cz=Math.round(n.tc.z/C)-(plan.tz||0),pads=[[cx-1,cz-1],[cx+plan.w,cz-1],[cx-1,cz+plan.d],[cx+plan.w,cz+plan.d]];out=tur.filter(t=>pads.some(p=>Math.round(t.x/C)===p[0]&&Math.round(t.z/C)===p[1])&&FD.has(key(Math.round(t.x/C),Math.round(t.z/C)))).length}return{w:plan.w||0,d:plan.d||0,fl:plan.floors||n.floors||0,tc:!!(n.tc&&!n.tc._gone),wb:!!(n.devs.workbench&&!n.devs.workbench._gone),fur:!!(n.devs.furnace&&!n.devs.furnace._gone),wind:!!(n.devs.wind&&!n.devs.wind._gone),bat:!!(n.devs.battery&&!n.devs.battery._gone),tur:tur.length,out,pw:tur.map(t=>+t.pw.toFixed(2)),wW:n.devs.wind?+n.devs.wind.out.toFixed(1):0,ch:n.devs.battery?Math.round(n.devs.battery.ch):0,wires:wires.filter(w=>w.a.npc===n||w.b.npc===n).length,job:n.job?n.job.k:null,away:+Math.hypot(n.x-(n.home?n.home.x:n.hx),n.z-(n.home?n.home.z:n.hz)).toFixed(1),step:(n.i||0)+'/'+(n.bp?n.bp.length:0),home:!!n.home,skip:n.skip||0}});const c=k=>things.filter(o=>o.userData.k===k).length;return{np:NP.length,forest:FOREST,trees:c('tree'),rocks:c('rock'),ore:c('ore'),sulfur:c('sulfur'),junk:c('junk'),mons,onRoad:mons.filter(m=>m.on).length,bases,calls:ren.info.render.calls,times:window.__times}};
 window.__bp.shapes=()=>{const o={};for(const t of things){if(!t.userData||t.userData.k!=='barrel')continue;const k=t.userData.variant||'drum';o[k]=(o[k]||0)+1}return o};
 window.__bp.tiers=()=>{const o={};for(const r of PCS)if(r.owner==='npc'&&r.m&&r.m.parent){const k=r.t;o[k]=(o[k]||0)+1}return o};window.__bp.mapOpen=()=>mapOpen;window.__bp.tracers=()=>TRP.filter(q=>q.busy).length;window.__bp.lodStats=()=>{const s=[0,0,0];for(const o of things)o.traverse(x=>{if(x.isLOD){const i=x.levels.findIndex(l=>l.object.visible);if(i>=0)s[i]++}});return s};window.__bp.rich=()=>{for(const n of NP){n.inv.stone=9000;n.inv.wood=6500;n.inv.metal=1800;n.inv.gears=320;n.inv.circuit=120;n.inv.ore=80;n.inv.fuel=80}};
@@ -6507,7 +6522,7 @@ window.__bp.raiderShowcase=(pose)=>{
   const m=spawnMan(0x8a2222,true,{heavy:s.heavy,face:s.face,gun:s.gun,kit:s.kit});
   m.position.set(x,y,z);
   m.rotation.y=Math.atan2(P.x-x,P.z-z)+(s.yawOff||0);
-  const e={k:"raider",x,y,z,hp:90,maxHp:90,heavy:s.heavy,gun:s.gun,kit:s.kit,aimT:s.aimT||0,sw:s.sw||0,armUp:s.armUp||0,_mv:0,ph:0,m};
+  const e={k:"raider",x,y,z,hp:90,maxHp:90,heavy:s.heavy,gun:s.gun,kit:s.kit,aimT:s.aimT||0,sw:s.sw||0,armUp:s.armUp||0,_mv:0,ph:0,cheat:true,m};
   m.userData.k="raider";m.userData.a=e;
   animMan(e,.016);
   things.push(m);EN.push(e);

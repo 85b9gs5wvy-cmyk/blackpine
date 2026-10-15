@@ -1,8 +1,9 @@
 // Pulls the AI cover logic out of blackpine.js and runs it against a tiny mock world.
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-const js = fs.readFileSync(new URL('../blackpine.js', import.meta.url), 'utf8');
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const js = fs.readFileSync(path.join(__dirname, '..', 'blackpine.js'), 'utf8');
 const grab = (a, b) => { const i = js.indexOf(a); assert.ok(i >= 0, a); const j = js.indexOf(b, i); assert.ok(j > i, b); return js.slice(i, j); };
 const mk = () => new Function(`
 let age=10;const devs=[],ALLC=[],P={x:0,z:0},ITEMS={barricade:{}},RGUN={pistol:{mag:12}},H=()=>1,moves=[];

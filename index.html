@@ -181,8 +181,8 @@ const SaveStore=(()=>{
    {id:'box',g:{x:x0+.6,y:2.4,z:z0-.6,rot:0}}
   ];
   const slotsArr=Array(30).fill(null);
-  slotsArr[0]={id:'ak',n:1,dur:220,mag:30,at:'ammo',att:{sight:'holo',barrel:'muzzle_brake'}};
-  slotsArr[1]={id:'pump',n:1,dur:130,mag:6,at:'ammo',att:{}};
+  slotsArr[0]={id:'ak',n:1,dur:220,mag:30,at:'ammo',mods:{sight:'holo',barrel:'muzzle_brake',under:null},att:{sight:'holo',barrel:'muzzle_brake'}};
+  slotsArr[1]={id:'pump',n:1,dur:130,mag:6,at:'ammo',mods:{sight:null,barrel:null,under:null},att:{}};
   slotsArr[2]={id:'hatchet',n:1,dur:80};
   slotsArr[3]={id:'pickaxe',n:1,dur:80};
   slotsArr[4]={id:'hammer',n:1};

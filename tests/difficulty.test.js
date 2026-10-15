@@ -1,8 +1,9 @@
 // Pulls the difficulty table and camp-avoidance helpers straight out of blackpine.js and checks them.
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-const js = fs.readFileSync(new URL('../blackpine.js', import.meta.url), 'utf8');
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const js = fs.readFileSync(path.join(__dirname, '..', 'blackpine.js'), 'utf8');
 const grab = (a, b) => { const i = js.indexOf(a); assert.ok(i >= 0, a); const j = js.indexOf(b, i); assert.ok(j > i, b); return js.slice(i, j); };
 const mk = () => new Function(`${grab('const DIFFS={', 'let DIFFK')}
 let DF=DIFFS.medium;${grab('function foeMit(', 'let REPLAY')}const RCAMPS=[{x:0,z:0,r:20,raiders:[{hp:50}]}];let raidNo=()=>1,daysToRaid=()=>0;

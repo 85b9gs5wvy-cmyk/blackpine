@@ -28,7 +28,7 @@ Crafted at a **workbench** unless noted. Fiber items craft by hand.
 - Rocket: 16 powder, 8 metal, pipe, gear
 - Armor: helmet 1 sheet/2 cloth/1 rope; vest 3 sheet/4 cloth/1 rope/10 metal; legs 2 sheet/3 cloth/1 rope
 
-Components recycle in the Recycler. Junk piles drop tier 1 parts (rope, cloth, pipe). Supply crates and red barrels also give tier 2 parts (sheet, pipe). Military crates can drop Rifles and Semi-Auto Rifles.
+Components recycle in the Recycler. Junk piles drop tier 1 parts (rope, cloth, pipe). Supply crates and red barrels also give tier 2 parts (sheet, pipe). Military crates can hold a Pistol or Shotgun, Elite crates an SMG or Shotgun (random). Junk piles no longer drop circuit boards. Cloth stacks to 1000.
 
 Springs are tier 3: only Elite crates drop them, otherwise craft with fuel.
 Medkit is craftable: 2 bandages, 3 cloth, 2 Low Grade Fuel. Furnace now costs 3 Low Grade Fuel extra.
@@ -52,6 +52,13 @@ Scrap drops: junk piles (55%, 1-3), barrels (brown 22%, blue/oil 50%, red 65%, w
 Recycler: tech trash -> 10 scrap + circuit; spring -> 5 scrap + 6 metal; sheet -> 3 scrap + 8 metal; pipe -> 2 scrap + 6 metal; semi body -> 8 scrap + 15 metal; SMG body -> 12 scrap + 20 metal.
 
 **Research Table**: 60 wood, 20 metal, 40 scrap. Use it, pick a locked item, pay the scrap and hand over one copy. The copy is used up and the blueprint is kept for good (it is saved).
+
+You can also research at a **Workbench** (Research tab appears within 8 m). It costs **2x** the scrap listed below and only covers items up to that bench's tier; stand at a Research Table for the listed price and every item.
+
+**Workbench tiers** (best tier within 8 m counts; Tier 2 and 3 must be built next to the previous tier):
+- Tier 1: 40 wood, 12 stone, 6 metal, 20 scrap. Components, clothing, melee, electrics, traps, Revolver.
+- Tier 2: 60 wood, 40 metal, 2 gears, 60 scrap. Pistol, Shotgun, Pump, SMG, Thompson, semi/SMG bodies, Auto Turret, Targeting Computer, Camera, AP/Incendiary ammo, Snap Trap, HQ Door.
+- Tier 3: 80 wood, 100 metal, 4 gears, 2 circuits, 150 scrap. Rifle, Semi-Auto, AK, Launcher, Rocket, C4, Explosives. Barrels now need a held tool (rock, hatchet or pickaxe) to break open.
 
 | Blueprint | Scrap |
 |---|---|

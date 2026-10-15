@@ -12,7 +12,7 @@ GitHub’s file list only shows source. The button above is what runs it. On a p
 
 ## How to play
 
-- **Computer.** WASD to move. Click the game, then the mouse looks. Shift sprints. E or click uses, gathers, and fires. R reloads. T swaps ammo. G drops the held stack (Shift+G drops one). V opens attachments. Z aims. F toggles the light. M opens the island map. 1–6 is the hotbar. I or Tab opens the bag. F5 quick-saves. F9 quick-loads. Esc pauses.
+- **Computer.** WASD to move. Click the game, then the mouse looks. Shift sprints. E or click uses, gathers, and fires. R reloads. T swaps ammo. G drops the held stack (Shift+G drops one). V opens attachments. Z aims. F toggles the light. M opens the island map. On the map, scroll or pinch to zoom, drag to pan, and double-click or press the marker button to drop a pin. Pins save with the claim. 1–6 is the hotbar. I or Tab opens the bag. F5 quick-saves. F9 quick-loads. Esc pauses.
 - **Phone.** Landscape only. Stick to move, drag to look, Use / Fire, Sprint, and Bag.
 - **Claims.** On the title screen, set the name, day speed, gather rate, difficulty, and starting kit. Saved claims can be continued, renamed, cloned, exported, or deleted.
 
@@ -40,11 +40,14 @@ Pick **Easy, Medium, Hard or Extreme** when you name a claim (or cycle it later 
 
 ## What’s new
 
-- **Difficulty.** Easy, Medium, Hard, or Extreme, picked when you name a claim and changed later in Pause > Settings. It changes raid size, raider health and damage, how fast they get tougher, armor, gear, how many go after settlers, night wanderers, and how hard the camps are. The table is above.
-- **Wood barricade.** Craft one from 30 wood. It is a 2.6 m plank wall (260 HP) that blocks movement and bullets. If a raider or a settler is shot with nothing between them and the shooter, they duck behind a barricade or set one down. Raider ones fall apart after 4 minutes. Settler ones last 8. Walls and doors now stop bullets on a true line, so a thin wall cannot be shot through.
+- **Bag and boxes.** The bag is a belt (keys 1–6) plus a 24-slot backpack. Click an item for a side panel: use it, split a stack, drop one or the whole stack, or sort the backpack. Crates, the storage box, the tool cupboard, the furnace, and the recycler open as real inventories. Drag stacks between them, or use Take all and Store bag. A crate stays empty until you loot it, then it waits out its timer and refills.
+- **Worn gear.** The Wear tab shows a 3D figure. Drag to turn it. Helmet, vest, leg guards, and boots each cut damage, and the panel adds them up.
+- **Map pins.** Press **M**. Scroll or pinch to zoom up to 10×, drag to pan, and double-click to drop a marker. Name it and change its color. Markers save with the claim. Roads, a north arrow, and a scale bar are drawn on the map. Camps stay red skulls with a headcount or a respawn timer.
+- **Difficulty.** Easy, Medium, Hard, or Extreme, picked when you name a claim and changed later in Pause > Settings. The table is above.
+- **Wood barricade.** Craft one from 30 wood. It is a 2.6 m plank wall (260 HP) that blocks movement and bullets. If a raider or a settler is shot with nothing between them and the shooter, they duck behind a barricade or set one down. Walls and doors stop bullets on a true line.
 - **Raider camps.** Three occupied camps sit on the island. The **Raider Warlord Citadel** holds 8 to 10 raiders behind a skull gate, with watchtowers and a warlord. The **Raider Siege Armory** holds 6 to 8 around a munitions hangar and an armored truck. The **Raider Blood-Pit Stockade** holds 4 to 6 inside a timber palisade and a bonfire pit. They patrol until they see you, then the whole garrison is called in. Marksmen stay on the towers. They shoot, throw charges, and bandage. Wipe them and the game calls the **Raider War-Chests** open. Those chests hold guns, explosives, attachments, and scrap. Leave a few alive and they refill. Kill them all and a new crew retakes the camp in about 3 minutes and restocks the chests. On the map (**M**) camps are red skulls with a headcount, or a respawn timer once they are down.
 - **Wild hemp.** Tall hemp plants grow across the island and a few stand by the road where you wake. Pick one for cloth and plant fiber. They grow back.
-- **Barrel scrap.** Every barrel drops scrap, on top of whatever else is inside.
+- **Barrel scrap.** Every barrel drops scrap, on top of whatever else is inside. Barrels are sealed: hold a rock, hatchet or pickaxe to break one open (hatchet and pickaxe wear down, the rock does not).
 - **Solid world.** You, settlers, and animals stop on trees, rocks, ore, barrels, crates, and junk instead of walking through them. Props sit down into slopes so they don’t float, and they get pushed off the road.
 - **Chop and mine feedback.** A swing kicks the camera. Wood chips, stone sparks, and a hit sound follow the tool.
 - **Saved claims.** Name the claim before you wake. Pick day speed, gather rate, and a kit: Rock, Pioneer (tools and rations), or Outpost Builder (a cupboard and materials). **+ Starter Outpost** adds a fortified Day 3 camp. **F5** quick-saves. **F9** quick-loads.
@@ -55,7 +58,16 @@ Pick **Easy, Medium, Hard or Extreme** when you name a claim (or cycle it later 
 - **Doors upgrade.** Hit a door with the hammer to step it up, all the way to armored HQ metal.
 - **3D items and drops.** Every item now has a 3D model in your hand and on the ground. Press **G** to toss the held stack (**Shift+G** for one). Dropped items arc, bounce, settle, hover and spin, merge with nearby stacks, and fly to you when picked up. The bag has Drop 1 / Drop Stack instead of Discard.
 - **Tools gate gathering.** Bare hands can no longer chop trees or mine rocks. You wake with a **Rock** in your hotbar: it chops trees for 2 wood and chips stone for 1, and never breaks. Use it to collect 4 wood and 4 stone, craft a **Stone Hatchet** (needed for wood) and a **Stone Pickaxe** (needed for stone, ore and sulfur). Berries and loot still work by hand. Settlers ignore this rule. If you lose the Rock and lack both tools, you get a new one when you wake or load.
-- **Scrap and research.** Scrap turns up in junk piles, barrels, crates and on raiders, and the recycler turns tech trash, springs, sheet, pipes and gun bodies into it. Build a **Research Table** (60 wood, 20 metal, 40 scrap), then spend scrap plus one copy of an item to learn its blueprint. Pipes, sheet metal, springs, gun bodies, guns, special ammo, rockets, C4, turrets and snap traps all start locked.
+- **Scrap and research.** Scrap turns up in junk piles, barrels, crates and on raiders, and the recycler turns tech trash, springs, sheet, pipes and gun bodies into it. Build a **Research Table** (60 wood, 20 metal, 40 scrap), then spend scrap plus one copy of an item to learn its blueprint. 
+- **Three workbench tiers.** Workbenches now cost scrap and come in Tiers 1 to 3 (the best one within 8 m counts):
+
+  | Bench | Cost | Unlocks |
+  |---|---|---|
+  | Tier 1 | 40 wood, 12 stone, 6 metal, 20 scrap | components, clothing, melee, electrics, traps, Revolver |
+  | Tier 2 (needs a Tier 1 in reach) | 60 wood, 40 metal, 2 gears, 60 scrap | pistol, shotguns, SMGs, gun bodies, turrets, targeting gear, special ammo, snap traps, HQ doors |
+  | Tier 3 (needs a Tier 2 in reach) | 80 wood, 100 metal, 4 gears, 2 circuits, 150 scrap | rifles, AK, launcher, rockets, C4, explosives |
+
+  Benches can research blueprints too, but at 2x the Research Table's scrap and only for items up to their own tier. Press Use on a bench to open crafting. Pipes, sheet metal, springs, gun bodies, guns, special ammo, rockets, C4, turrets and snap traps all start locked.
 - Settlers craft weapons and get better ones as raid day nears: clubs and spears first, then knives and machetes, then pistols, shotguns, SMGs, rifles and AKs. Guns shoot raiders from range.
 - Screen flashes red when you take damage. Crates hold 1 to 3 items. Roads route around settler bases.
 - Full island map: press **M** (or tap the minimap) to open it, **M** or **Esc** to close. Shows monuments, bases, settlers, raiders, fires and you.

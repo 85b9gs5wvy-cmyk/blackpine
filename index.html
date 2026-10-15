@@ -444,7 +444,7 @@ window.addEventListener('keydown',e=>{
  if(e.code==='F5'){e.preventDefault();if(api.saveNow){const s=api.saveNow('quick');flash('Quick Saved: '+s.name)}return}
  if(e.code==='F9'){e.preventDefault();const l=SaveStore.latest();if(l){launchSlot(l.id);flash('Quick Loaded: '+l.name)}return}
  if(mOpen){if(e.code==='Escape'){e.preventDefault();e.stopPropagation();mView==='main'?closeMenu():view('main')}else e.stopPropagation();return}
- if(e.code==='Escape'&&!root.classList.contains('menu')&&!document.pointerLockElement)openMenu();
+ if(e.code==='Escape'&&!e.repeat&&!root.classList.contains('menu')&&!document.pointerLockElement&&performance.now()-(window.__bpEscT||-1e9)>600)openMenu();
 },true);
 
 document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElement||!api||mOpen)return;setTimeout(()=>{const o=root.querySelector('#over');if(api&&!mOpen&&!document.pointerLockElement&&!root.classList.contains('menu')&&!(o&&getComputedStyle(o).display!=='none'))openMenu()},150)});

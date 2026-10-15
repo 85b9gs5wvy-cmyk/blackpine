@@ -132,3 +132,17 @@ test('spawn area is gentle enough to build on', () => {
   }
   assert.ok(worst < 0.45, `spawn-area max slope ${worst.toFixed(2)}`);
 });
+
+test('rolling hills rise above 9.5 m outside the spawn clearing', () => {
+  let maxHill = 0;
+  for (const [x, z] of grid(16)) {
+    if (Math.hypot(x, z) <= R) maxHill = Math.max(maxHill, Hraw(x, z));
+  }
+  assert.ok(maxHill > 9.5 && maxHill < 14, `expected rolling hills in (9.5, 14), got ${maxHill.toFixed(2)}`);
+});
+
+test('rivers, bridges, biome tree species, diverse rocks, and ground snow are wired in blackpine.js', () => {
+  for (const fn of ['digRivers', 'buildBridges', 'bridgeAt', 'onBridge', 'inRiver', 'firGeo', 'oakGeo', 'mapleGeo', 'willowGeo', 'juniperGeo', 'mossRockGeo', 'cragRockGeo', 'mesaRockGeo', 'applySnowCover', 'fillUndergrowth']) {
+    assert.match(text, new RegExp('function ' + fn + '\\s*\\('), `missing ${fn}`);
+  }
+});

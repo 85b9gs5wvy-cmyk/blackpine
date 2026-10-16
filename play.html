@@ -51373,7 +51373,11 @@ const ITEMS={
  campfire:{n:'Campfire',i:'🔥',max:5,use:'Place',d:'Place in front of you. Burns for about half a day at whatever speed the clock is set to.',fx:()=>campfire()},bedroll:{n:'Bedroll',i:'🛏',max:1,use:'Place',d:'Where you wake. The tenth-night crew still goes for your tool cupboard first.',fx:()=>placeClaim()}
 };
 const REC=[{out:'hatchet',q:1,need:{wood:4,stone:3}},{out:'pickaxe',q:1,need:{wood:4,stone:4}},{out:'campfire',q:1,need:{wood:4}},{out:'bandage',q:1,need:{fiber:3}},{out:'bedroll',q:1,need:{cloth:10,rope:1,fiber:6}}];
-let curBox=null;const SL=new Proxy(Array(54).fill(null),{get(t,k){const i=typeof k==='string'?+k:NaN;return i>=30&&i<54?(curBox?curBox.sl[i-30]:null):t[k]},set(t,k,v){const i=typeof k==='string'?+k:NaN;if(i>=30&&i<54){if(curBox)curBox.sl[i-30]=v;return true}t[k]=v;return true}});// 0-5 hotbar, 6-29 bag, 30+ open container
+let curBox=null;const SL=new Proxy(Array(66).fill(null),{get(t,k){const i=typeof k==='string'?+k:NaN;return i>=30&&i<54?(curBox?curBox.sl[i-30]:null):t[k]},set(t,k,v){const i=typeof k==='string'?+k:NaN;if(i>=30&&i<54){if(curBox)curBox.sl[i-30]=v;return true}t[k]=v;return true}});// 0-5 hotbar, 6-29 bag, 30-53 open container, 54-65 worn backpack slots
+let PACK=0;const PX=54,packN=()=>PACK&&ITEMS[PACK]?ITEMS[PACK].pack||0:0;
+function bagIdx(){const a=[];for(let i=0;i<30;i++)a.push(i);for(let i=0,n=packN();i<n;i++)a.push(PX+i);return a}
+const PSL=()=>bagIdx().map(i=>SL[i]);
+const isCont=i=>i>=30&&i<PX;
 let sel=0,pick=null,tab='bag',open=false,fxS='',lq=-1;let craftSel=null,eqPick=null,CHV=null,fxQ=-1,wearLayerView='all',wearBagFilter='all';const EQS=[['head','Head','⛑','🧢'],['chest','Chest','🦺','🧥'],['legs','Legs','🛡','👖'],['feet','Feet','🥾','👟']],EQB={head:15,chest:35,legs:15,feet:5};
 // ===== TOOL TIERS: Rock (0), Stone (1), Metal (2), Powered (3) =====
 Object.assign(ITEMS,{
@@ -51393,15 +51397,15 @@ let toolCd=0,engT=0;
 const heldIt=()=>{const q=SL[sel];return q?ITEMS[q.id]:null};
 const toolTier=()=>{const it=heldIt();return it&&it.tool?(it.tier||0):0};
 const ty=k=>TOOLTY[k][toolTier()];
-const cnt=id=>SL.slice(0,30).reduce((a,s)=>a+(s&&s.id===id?s.n:0),0);
-function room(id,n){let r=0;const m=ITEMS[id].max;for(const s of SL.slice(0,30)){if(!s)r+=m;else if(s.id===id)r+=m-s.n}return r>=n}
+const cnt=id=>PSL().reduce((a,s)=>a+(s&&s.id===id?s.n:0),0);
+function room(id,n){let r=0;const m=ITEMS[id].max;for(const s of PSL()){if(!s)r+=m;else if(s.id===id)r+=m-s.n}return r>=n}
 let CHEAT_GIVE=false,CHEAT_DROP=0;
 function give(id,n,quiet){if(!room(id,n)){if(CHEAT_GIVE&&typeof spawnDrop==='function'){spawnDrop(id,n,P.x+(Math.random()-.5)*1.2,P.y-1.5,P.z+(Math.random()-.5)*1.2,0,1.5,0);CHEAT_DROP++;return true}say('Inventory full.');return false}
  const m=ITEMS[id].max;let left=n;
- for(const s of SL.slice(0,30))if(s&&s.id===id&&left>0){const a=Math.min(m-s.n,left);s.n+=a;left-=a}
- for(let i=0;i<30&&left>0;i++)if(!SL[i]){const a=Math.min(m,left);SL[i]={id,n:a,dur:ITEMS[id].dur,mag:ITEMS[id].gun?0:undefined};left-=a}
+ for(const s of PSL())if(s&&s.id===id&&left>0){const a=Math.min(m-s.n,left);s.n+=a;left-=a}
+ for(const i of bagIdx()){if(left<=0)break;if(SL[i])continue;const a=Math.min(m,left);SL[i]={id,n:a,dur:ITEMS[id].dur,mag:ITEMS[id].gun?0:undefined};left-=a}
  if(!quiet)toast(id,n);render();return true}
-function take(id,n){for(let i=29;i>=0&&n>0;i--){const s=SL[i];if(s&&s.id===id){const a=Math.min(s.n,n);s.n-=a;n-=a;if(!s.n)SL[i]=null}}render()}
+function take(id,n){const ix=bagIdx().reverse();for(const i of ix){if(n<=0)break;const s=SL[i];if(s&&s.id===id){const a=Math.min(s.n,n);s.n-=a;n-=a;if(!s.n)SL[i]=null}}render()}
 function toolPiece(){const fx=-Math.sin(yaw),fz=-Math.cos(yaw);let best=null,bd=2.35;for(const c of ALLC){if(!(c.piece&&c.hp>0)&&!(c.d&&c.d.hp>0&&!c.d.open&&!c.d._gone))continue;const cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2,dx=cx-P.x,dz=cz-P.z,d=Math.hypot(dx,dz)||1;if(d>2.2)continue;if((dx*fx+dz*fz)/d<0.05&&d>1.2)continue;if(d<bd){bd=d;best=c}}return best}
 function chopPiece(c){startSwing(null,true);impactSurfaceFx('wood',(c.x0+c.x1)/2,c.y||1,(c.z0+c.z1)/2);const pk=tool('pickaxe'),dmg=(pk?22:14)*TMUL[toolTier()]*(c.d?1.15:1);wear();
  const own=c.owner||(c.d&&c.d.owner),cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2;
@@ -51522,16 +51526,16 @@ function lightningAt(x,z){const y=Math.max(H(x,z),0),m=new T.Mesh(new T.BoxGeome
  const dist=Math.hypot(P.x-x,P.z-z);if(dist<7.5&&precipAt(P.x,P.z))hurtP(18+Math.random()*16,'Lightning');else if(dist<22)shake=Math.max(shake,(1-dist/22)*.28);blip(48,.22,'square')}
 function weatherTick(dt,fwd){const step=Math.min(dt*(fwd||0)*(pace/REF_PACE),.5);if(step<=0)return;wxT-=step;if(wxT<=0){wx=rollWx();wxT=55+Math.random()*70;say(WXSAY[wx]);wxBolt=2+Math.random()*4}
  if(wx==='storm'){wxBolt-=step;if(wxBolt<=0){wxBolt=5+Math.random()*8;boltT=.16;const ang=Math.random()*6.28,r=8+Math.random()*34;lightningAt(P.x+Math.cos(ang)*r,P.z+Math.sin(ang)*r)}}}
-function ensureStarter(){const has=id=>SL.slice(0,30).some(s=>s&&s.id===id);if(!has('rock')&&!(has('hatchet')&&has('pickaxe')))give('rock',1,true)}
+function ensureStarter(){const has=id=>PSL().some(s=>s&&s.id===id);if(!has('rock')&&!(has('hatchet')&&has('pickaxe')))give('rock',1,true)}
 function wear(){const s=SL[sel];if(s&&ITEMS[s.id].tool==='rock')return;if(s&&--s.dur<=0){SL[sel]=null;say(ITEMS[s.id].n+' broke!')}render()}
 function tool(k){const s=SL[sel];return s&&ITEMS[s.id].tool===k?s:null}
 function toast(id,n){const d=document.createElement('div');d.className='toast';d.innerHTML='+'+n+' '+ico(id)+' '+ITEMS[id].n;$('toasts').prepend(d);setTimeout(()=>d.remove(),2600)}
 function useSlot(i){const s=SL[i];if(!s||dead||!ITEMS[s.id].use)return false;if(ITEMS[s.id].fx()===false)return false;startSwing('use',false,.34);if(--s.n<=0)SL[i]=null;render();return true}
 function selSlot(i){if(i===sel&&SL[i]&&ITEMS[SL[i].id].use)useSlot(i);else{sel=i;const q=SL[i];if(q&&(ITEMS[q.id].bd||ITEMS[q.id].dv))say('Aim and press Use to place. Green ghost = valid.');else if(q&&q.id==='wire')say('Wire tool: Use on one device, then on another.');else if(q&&ITEMS[q.id].plant)say('Aim at a wall and press Use to set the charge.');else if(q&&ITEMS[q.id].nade)say(q.id==='satchel'?'Use throws it. It sticks to the first wall.':'Use / Fire to throw.');else if(q&&q.id==='launcher')say('Loads rockets. Use / Fire to launch.');else if(q&&ITEMS[q.id].mel)say('Use / Fire to swing. Aim at what you want to hit.');else if(q&&ITEMS[q.id].gun)say('Use / Fire to shoot. R reloads. T swaps ammo.')}render()}
-function canPlace(i,s){if(!s)return true;if(i<30)return true;if(!curBox||i-30>=curBox.sl.length)return false;if(curBox.t==='tc')return s.id==='wood'||s.id==='stone'||s.id==='metal';if(curBox.t==='furnace'){const k=i-30;return k<3&&(s.id==='ore'||s.id==='wood'||s.id==='fuel')}if(curBox.t==='recycler')return i-30<3&&!!RY[s.id];return true}
-function move(a,b,quiet){if(a===b)return true;const x=SL[a],y=SL[b],same=!!(x&&y&&x.id===y.id&&ITEMS[x.id].max>1&&y.n<ITEMS[x.id].max);if(same?!canPlace(b,x):((x&&!canPlace(b,x))||(y&&!canPlace(a,y)))){if(!quiet){if(curBox&&curBox.t==='tc')say('The cupboard only holds wood, stone and metal. That is the upkeep.');else if(curBox&&curBox.t==='furnace')say('Furnace inputs take Metal Ore, Wood and Low Grade Fuel. The output slots are take-only.');else say('That slot will not take it.')}return false}if(same){const m=Math.min(ITEMS[x.id].max-y.n,x.n);y.n+=m;x.n-=m;if(!x.n)SL[a]=null}else{SL[a]=y;SL[b]=x}return true}
-function xferPick(){if(pick===null||!SL[pick])return;if(!curBox)return say('Open a box, furnace or cupboard first.');const dest=[];if(pick>=30)for(let i=0;i<30;i++)dest.push(i);else for(let i=0;i<curBox.sl.length;i++)dest.push(30+i);for(const b of dest){if(!SL[pick])break;const y=SL[b];if(!y||(y.id===SL[pick].id&&ITEMS[y.id].max>1&&y.n<ITEMS[y.id].max))move(pick,b,true)}if(!SL[pick])pick=null;else say('No room for the rest.')}
-function xferAll(dir){if(!curBox)return;const src=[],dest=[];if(dir==='take'){for(let i=0;i<curBox.sl.length;i++)src.push(30+i);for(let i=0;i<30;i++)dest.push(i)}else{for(let i=6;i<30;i++)src.push(i);for(let i=0;i<curBox.sl.length;i++)dest.push(30+i)}for(const a of src){if(!SL[a])continue;for(const b of dest){if(!SL[a])break;const y=SL[b];if(!y||(y.id===SL[a].id&&ITEMS[y.id].max>1&&y.n<ITEMS[y.id].max))move(a,b,true)}}}
+function canPlace(i,s){if(!s)return true;if(i<30||i>=PX)return true;if(!curBox||i-30>=curBox.sl.length)return false;if(curBox.t==='tc')return s.id==='wood'||s.id==='stone'||s.id==='metal';if(curBox.t==='furnace'){const k=i-30;return k<3&&(s.id==='ore'||s.id==='sulfur'||s.id==='wood'||s.id==='fuel')}if(curBox.t==='recycler')return i-30<3&&!!RY[s.id];return true}
+function move(a,b,quiet){if(a===b)return true;const x=SL[a],y=SL[b],same=!!(x&&y&&x.id===y.id&&ITEMS[x.id].max>1&&y.n<ITEMS[x.id].max);if(same?!canPlace(b,x):((x&&!canPlace(b,x))||(y&&!canPlace(a,y)))){if(!quiet){if(curBox&&curBox.t==='tc')say('The cupboard only holds wood, stone and metal. That is the upkeep.');else if(curBox&&curBox.t==='furnace')say('Furnace inputs take Metal Ore, Sulfur, Wood and Low Grade Fuel. Burning wood leaves charcoal. The output slots are take-only.');else say('That slot will not take it.')}return false}if(same){const m=Math.min(ITEMS[x.id].max-y.n,x.n);y.n+=m;x.n-=m;if(!x.n)SL[a]=null}else{SL[a]=y;SL[b]=x}return true}
+function xferPick(){if(pick===null||!SL[pick])return;if(!curBox)return say('Open a box, furnace or cupboard first.');const dest=[];if(isCont(pick))dest.push(...bagIdx());else for(let i=0;i<curBox.sl.length;i++)dest.push(30+i);for(const b of dest){if(!SL[pick])break;const y=SL[b];if(!y||(y.id===SL[pick].id&&ITEMS[y.id].max>1&&y.n<ITEMS[y.id].max))move(pick,b,true)}if(!SL[pick])pick=null;else say('No room for the rest.')}
+function xferAll(dir){if(!curBox)return;const src=[],dest=[];if(dir==='take'){for(let i=0;i<curBox.sl.length;i++)src.push(30+i);dest.push(...bagIdx())}else{src.push(...bagIdx().filter(i=>i>=6));for(let i=0;i<curBox.sl.length;i++)dest.push(30+i)}for(const a of src){if(!SL[a])continue;for(const b of dest){if(!SL[a])break;const y=SL[b];if(!y||(y.id===SL[a].id&&ITEMS[y.id].max>1&&y.n<ITEMS[y.id].max))move(a,b,true)}}}
 function clickSlot(i){if(!open)return selSlot(i);eqPick=null;
  if(pick===null||!SL[pick]||pick===i){if(pick===i)pick=null;else{if(i<6)sel=i;pick=SL[i]?i:null}}
  else if(!SL[i]||SL[i].id===SL[pick].id){const from=pick;if(move(from,i))pick=SL[from]?from:(SL[i]?i:null)}
@@ -51549,22 +51553,22 @@ function dragStart(ev,i,el){const x0=ev.clientX,y0=ev.clientY;let g=null;
  addEventListener('pointermove',mv);addEventListener('pointerup',up);addEventListener('pointercancel',cx)}
 let bagFilter='all',craftSearch='',craftOnlyOk=false,prevCraftSel=null,lastSlotClickT=0,lastSlotClickIdx=-1;
 const MAT_STRIP_IDS=['wood','stone','metal','scrap','cloth','fiber','leather','ore','sulfur','powder','fuel'];
-const SHORT_NM={wood:'Wood',stone:'Stone',metal:'Metal',scrap:'Scrap',cloth:'Cloth',fiber:'Fiber',leather:'Leather',ore:'Ore',sulfur:'Sulfur',charcoal:'Charcoal',powder:'Powder',fuel:'Fuel',crude:'Crude',blade:'Blade',rope:'Rope',sheet:'Sheet',propane:'Propane',sewing_kit:'Sewing Kit',tarp:'Tarp',fuse:'Fuse',pipe:'Pipe',spring:'Spring',road_sign:'Road Sign',semi_body:'Semi Body',smg_body:'SMG Body',tech:'Tech Trash',gears:'Gears',circuit:'Circuit',explosives:'Explosives'};
+const SHORT_NM={wood:'Wood',stone:'Stone',metal:'Metal',scrap:'Scrap',cloth:'Cloth',fiber:'Fiber',leather:'Leather',ore:'Ore',sulfur:'Sulfur',sulfur_s:'Sm. Sulphur',charcoal:'Charcoal',powder:'Powder',fuel:'Fuel',crude:'Crude',blade:'Blade',rope:'Rope',sheet:'Sheet',propane:'Propane',sewing_kit:'Sewing Kit',tarp:'Tarp',fuse:'Fuse',pipe:'Pipe',spring:'Spring',road_sign:'Road Sign',semi_body:'Semi Body',smg_body:'SMG Body',tech:'Tech Trash',gears:'Gears',circuit:'Circuit',explosives:'Explosives'};
 function bagCatOf(id){
  const it=ITEMS[id];if(!it)return 'other';
  if(it.gun||it.mel||it.tool||it.nade||id==='launcher'||id.startsWith('ammo')||id==='rocket'||ATT_DEFS[id])return 'weap';
- if(it.use&&!it.bd&&!it.dv&&!it.arm&&id!=='campfire'&&id!=='bedroll'&&id!=='bed')return 'med';
- if(it.arm||it.bd||it.dv||id==='campfire'||id==='bedroll'||id==='bed')return 'gear';
+ if(it.use&&!it.bd&&!it.dv&&!it.arm&&!it.pack&&id!=='campfire'&&id!=='bedroll'&&id!=='bed')return 'med';
+ if(it.arm||it.pack||it.bd||it.dv||id==='campfire'||id==='bedroll'||id==='bed')return 'gear';
  return 'res';
 }
 function quickMoveSlot(i){
  if(!SL[i])return false;
  let dest=[];
  if(curBox){
-  if(i>=30)for(let k=0;k<30;k++)dest.push(k);
+  if(isCont(i))dest.push(...bagIdx());
   else for(let k=0;k<curBox.sl.length;k++)dest.push(30+k);
  }else if(i<6){
-  for(let k=6;k<30;k++)dest.push(k);
+  dest.push(...bagIdx().filter(k=>k>=6));
  }else{
   for(let k=0;k<6;k++)dest.push(k);
  }
@@ -51580,11 +51584,11 @@ function quickMoveSlot(i){
  pick=null;render();persist();return true;
 }
 function sEl(i){const s=SL[i],it=s&&ITEMS[s.id],d=document.createElement('div');
- const dim=open&&tab==='bag'&&i>=6&&i<30&&bagFilter!=='all'&&s&&bagCatOf(s.id)!==bagFilter;
+ const dim=open&&tab==='bag'&&i>=6&&!isCont(i)&&bagFilter!=='all'&&s&&bagCatOf(s.id)!==bagFilter;
  d.className='slot'+(i===sel&&i<6?' on':'')+(pick===i?' pk':'')+(dim?' dim-slot':'');
  const showNm=open&&i>=6&&s&&it;
  const shortLabel=showNm?(SHORT_NM[s.id]||it.n.replace(/^(Stone |Metal |Wooden |Wood |Sheet |Armored |Arctic |Burlap |Hide )/,'').slice(0,11)):'';
- d.innerHTML=(i<6?'<small>'+(i+1)+'</small>':(i>=30&&curBox&&(isInd(curBox.t)||curBox.t==='recycler')?'<small>'+(i-30<3?'IN':'OUT')+'</small>':(s&&it&&(it.arm||it.tool)&&it.tier?'<small class="tbadge '+(it.layer==='cloth'?'cl':'ar')+'">T'+it.tier+'</small>':'')))+(s?ico(s.id)+(it.gun?'<em>'+(s.mag||0)+'</em>':s.n>1?'<em>'+s.n+'</em>':'')+(showNm?'<span class="sl-nm">'+shortLabel+'</span>':'')+(s.dur?'<u style="width:'+(s.dur/it.dur*46)+'px"></u>':''):'');
+ d.innerHTML=(i<6?'<small>'+(i+1)+'</small>':(isCont(i)&&curBox&&(isInd(curBox.t)||curBox.t==='recycler')?'<small>'+(i-30<3?'IN':'OUT')+'</small>':(s&&it&&(it.arm||it.tool)&&it.tier?'<small class="tbadge '+(it.layer==='cloth'?'cl':'ar')+'">T'+it.tier+'</small>':'')))+(s?ico(s.id)+(it.gun?'<em>'+(s.mag||0)+'</em>':s.n>1?'<em>'+s.n+'</em>':'')+(showNm?'<span class="sl-nm">'+shortLabel+'</span>':'')+(s.dur?'<u style="width:'+(s.dur/it.dur*46)+'px"></u>':''):'');
  d.dataset.i=i;
  d.onpointerdown=ev=>{
   hideTip();
@@ -51601,11 +51605,11 @@ function sEl(i){const s=SL[i],it=s&&ITEMS[s.id],d=document.createElement('div');
  return d}
 const VD={health:'Damage taken. Bandages and food restore it.',hunger:'Eat to keep stamina regenerating.',thirst:'Drink to stay hydrated.',energy:'Spent sprinting and fighting.',warmth:'Stay near a campfire when it is cold.'};
 function vit(k){const v=Math.round(S[k]),col=defs[k][1],low=v<(k==='warmth'?35:25);return '<div class="vit'+(low?' low':'')+'"><div class="vh"><span>'+defs[k][0]+' '+defs[k][2]+'</span><b>'+(k==='warmth'?tempWord(v)+' · ':'')+v+'</b></div><div class="bar"><i style="width:'+v+'%;background:'+(typeof col==='string'&&col[0]==='#'?col:'#cd412b')+'"></i></div><small>'+(VD[k]||'')+'</small></div>'}
-function sortBag(){const all=[];for(let i=6;i<30;i++)if(SL[i]){all.push(SL[i]);SL[i]=null}all.sort((a,b)=>ITEMS[a.id].n.localeCompare(ITEMS[b.id].n)||b.n-a.n);const out=[];for(const q of all){const m=ITEMS[q.id].max,t=m>1&&out.find(o=>o.id===q.id&&o.n<m);if(t){const a=Math.min(m-t.n,q.n);t.n+=a;q.n-=a}if(q.n>0)out.push(q)}out.forEach((q,i)=>SL[6+i]=q)}
+function sortBag(){const all=[],ix=bagIdx().filter(i=>i>=6);for(const i of ix)if(SL[i]){all.push(SL[i]);SL[i]=null}all.sort((a,b)=>ITEMS[a.id].n.localeCompare(ITEMS[b.id].n)||b.n-a.n);const out=[];for(const q of all){const m=ITEMS[q.id].max,t=m>1&&out.find(o=>o.id===q.id&&o.n<m);if(t){const a=Math.min(m-t.n,q.n);t.n+=a;q.n-=a}if(q.n>0)out.push(q)}out.forEach((q,i)=>SL[ix[i]]=q)}
 const CATS=['Survival','Weapons','Components','Building','Electrical','Clothing'];let craftCat='Survival';
 const isDoor=t=>t==='door'||t==='metal_door'||t==='hq_door',isWin=t=>t==='window_bars'||t==='embrasure',isBox=t=>t==='box'||t==='box_s'||t==='box_l',isInd=t=>t==='furnace'||t==='refinery'||t==='pump_jack'||t==='quarry';
-const COMP=['gears','circuit','charcoal','powder','explosives','leather','crude','targeting_computer','cctv'],ELEC=['solar','wind','battery','lamp','heater','switch','turret','wire'],BLD=['door','metal_door','hq_door','window_bars','embrasure','water_collector','bed','box_s','box','box_l','tc','furnace','refinery','pump_jack','quarry','workbench','spike','snap','barricade'],SURV=['medkit','hatchet','pickaxe','metal_hatchet','metal_pickaxe','chainsaw','jackhammer','spear','club','campfire','bandage','bedroll','bed','water_collector','cooked'];
-function catOf(id){const it=ITEMS[id];if(it.arm)return 'Clothing';if(COMP.includes(id))return 'Components';if(ELEC.includes(id))return 'Electrical';if(it.bd||BLD.includes(id))return 'Building';if(SURV.includes(id))return 'Survival';return 'Weapons'}
+const COMP=['gears','circuit','charcoal','sulfur_s','powder','explosives','leather','crude','targeting_computer','cctv'],ELEC=['solar','wind','battery','lamp','heater','switch','turret','wire'],BLD=['door','metal_door','hq_door','window_bars','embrasure','water_collector','bed','box_s','box','box_l','tc','furnace','refinery','pump_jack','quarry','workbench','spike','snap','barricade'],SURV=['medkit','hatchet','pickaxe','metal_hatchet','metal_pickaxe','chainsaw','jackhammer','spear','club','campfire','bandage','bedroll','bed','water_collector','cooked'];
+function catOf(id){const it=ITEMS[id];if(it.arm||it.pack)return 'Clothing';if(COMP.includes(id))return 'Components';if(ELEC.includes(id))return 'Electrical';if(it.bd||BLD.includes(id))return 'Building';if(SURV.includes(id))return 'Survival';return 'Weapons'}
 const CLOTH_T1=['burlap_headwrap','burlap_shirt','burlap_trousers','burlap_shoes'];
 const needWB=r=>{if(CLOTH_T1.includes(r.out))return false;const c=catOf(r.out);return c==='Electrical'||c==='Weapons'||c==='Clothing'||['blade','sheet','propane','sewing_kit','tarp','fuse','pipe','spring','road_sign','semi_body','smg_body','explosives','targeting_computer','cctv','hq_door','gears','circuit','turret','metal_hatchet','metal_pickaxe','chainsaw','jackhammer'].includes(r.out)};
 const WB_TIERS={workbench:1,workbench2:2,workbench3:3};
@@ -51615,7 +51619,7 @@ const nearWB=()=>wbTier()>0;
 const wbNeed=r=>r.out==='workbench2'?1:r.out==='workbench3'?2:!needWB(r)?0:WB_T3.includes(r.out)?3:WB_T2.includes(r.out)?2:1;
 const wbMsg=n=>n>1?'You need a Tier '+n+' Workbench in reach for that.':'You need a workbench in reach for that.';
 REC.push({out:'gears',q:1,need:{metal:8,wood:2}});REC.push({out:'circuit',q:1,need:{metal:6,fiber:5}});
-const RY={tech:{scrap:10,circuit:1},targeting_computer:{scrap:15,tech:1,circuit:2,metal:8},cctv:{scrap:8,circuit:1,gears:1,metal:4},explosives:{powder:6,sulfur:2,fuel:1},spring:{scrap:5,metal:6},sheet:{scrap:3,metal:8},pipe:{scrap:2,metal:6},semi_body:{scrap:8,metal:15},smg_body:{scrap:12,metal:20},gears:{metal:6},circuit:{metal:4,fiber:3},powder:{sulfur:1,charcoal:1},snap:{metal:6,gears:1},wire:{metal:2},turret:{metal:14,gears:2,circuit:1},rocket:{metal:6,powder:8}};
+const RY={tech:{scrap:10,circuit:1},targeting_computer:{scrap:15,tech:1,circuit:2,metal:8},cctv:{scrap:8,circuit:1,gears:1,metal:4},explosives:{powder:6,sulfur_s:2,fuel:1},spring:{scrap:5,metal:6},sheet:{scrap:3,metal:8},pipe:{scrap:2,metal:6},semi_body:{scrap:8,metal:15},smg_body:{scrap:12,metal:20},gears:{metal:6},circuit:{metal:4,fiber:3},powder:{sulfur:1,charcoal:1},snap:{metal:6,gears:1},wire:{metal:2},turret:{metal:14,gears:2,circuit:1},rocket:{metal:6,powder:8}};
 const RECYS=[];let ra=0;
 function recyTick(){const dt=Math.min(.25,Math.max(0,age-ra));ra=age;for(const r of RECYS){const sl=r.sl,ii=sl.findIndex((q,i)=>i<3&&q&&RY[q.id]);if(ii<0){r.p=0;continue}r.p=(r.p||0)+dt;if(r.p<1.6)continue;const q=sl[ii],out=RY[q.id];
  const can=Object.keys(out).every(k=>{let sp=0;for(let i=3;i<6;i++){const o=sl[i];sp+=!o?ITEMS[k].max:o.id===k?ITEMS[k].max-o.n:0}return sp>=out[k]});if(!can)continue;r.p=0;
@@ -51660,7 +51664,7 @@ function renderMatStrip(c){
   p.onpointerdown=ev=>{
    ev.stopPropagation();
    if(tab==='bag'){
-    const idx=SL.slice(0,30).findIndex(s=>s&&s.id===id);
+    const idx=(()=>{const j=bagIdx().find(i=>SL[i]&&SL[i].id===id);return j===undefined?-1:j})();
     if(idx>=0){pick=idx;render()}else say('No '+ITEMS[id].n+' in your bag right now.');
    }else if(tab==='craft'){
     const r=REC.find(x=>x.out===id);
@@ -51710,14 +51714,14 @@ function sideItem(sd,id,s,acts){const it=ITEMS[id];
    ub.onpointerdown=ev=>{ev.stopPropagation();tab='craft';craftCat=catOf(r.out);craftSel=r.out;craftSearch='';craftOnlyOk=false;render()};
    uBox.appendChild(ub);
   }
-  det.appendChild(uBox);sd.appendChild(det);
+  det.appendChild(uBox);sd.appendChild(det);if(usedIn.length<=3){det.open=true;requestAnimationFrame(()=>{det.open=true})}
  }}
 function bagItemActs(){const s=SL[pick],it=ITEMS[s.id],a=[];
  if(it.use)a.push(pbtn(it.use,()=>{useSlot(pick);if(!SL[pick])pick=null;render()},'pri'));
- if(pick<30)a.push(pbtn(pick<6?'To Backpack':'To Belt',()=>quickMoveSlot(pick)));
+ if(!isCont(pick))a.push(pbtn(pick<6?'To Backpack':'To Belt',()=>quickMoveSlot(pick)));
  if(it.gun)a.push(pbtn('Attachments',()=>{attTarget=SL[pick];if(pick<6)sel=pick;openAttUI()}));
- if(curBox)a.push(pbtn(pick>=30?'Take':'Store',()=>{xferPick();render()}));
- if(s.n>1)a.push(pbtn('Split',()=>{const e=SL.slice(0,30).findIndex(x=>!x);if(e<0)return say('No free slot.');const q=s.n>>1;s.n-=q;SL[e]={id:s.id,n:q,dur:s.dur,mag:s.mag};render()}));
+ if(curBox)a.push(pbtn(isCont(pick)?'Take':'Store',()=>{xferPick();render()}));
+ if(s.n>1)a.push(pbtn('Split',()=>{const e=bagIdx().find(i=>!SL[i]);if(e===undefined)return say('No free slot.');const q=s.n>>1;s.n-=q;SL[e]={id:s.id,n:q,dur:s.dur,mag:s.mag};render()}));
  if(s.n>1)a.push(pbtn('Drop 1',()=>{tossItemFromPlayer(s,1);if(--s.n<=0){SL[pick]=null;pick=null}render();persist()}));
  a.push(pbtn(s.n>1?'Drop stack':'Drop',()=>{tossItemFromPlayer(s,s.n);SL[pick]=null;pick=null;render();persist()}));
  return a}
@@ -51740,6 +51744,7 @@ function bagUI(c,sd){
   const g2=bpEl('div','igrid');for(let i=0;i<curBox.sl.length;i++)g2.appendChild(sEl(30+i));c.appendChild(g2)}
  c.appendChild(bpEl('div','ch2','Belt (Hotbar) <span>keys 1–6 · '+SL.slice(0,6).filter(Boolean).length+' / 6</span>'));c.appendChild(igrid(0,6,'belt'));
  c.appendChild(bpEl('div','ch2','Backpack <span>'+SL.slice(6,30).filter(Boolean).length+' / 24 slots · double-click slot to move to Belt</span>'));c.appendChild(igrid(6,30));
+ if(packN()){const pn=packN(),pg=bpEl('div','igrid packg');for(let i=0;i<pn;i++)pg.appendChild(sEl(PX+i));c.appendChild(bpEl('div','ch2',ITEMS[PACK].n+' <span>'+SL.slice(PX,PX+pn).filter(Boolean).length+' / '+pn+' extra slots</span>'));c.appendChild(pg)}
  if(pick!==null&&SL[pick])sideItem(sd,SL[pick].id,SL[pick],bagItemActs());else sideEmpty(sd,curBox?'Open container':'Select an item')}
 function craftUI(c,sd){
  renderMatStrip(c);
@@ -52023,7 +52028,7 @@ function wearUI(c,sd){
 
  wrap.appendChild(vp);wrap.appendChild(col);c.appendChild(wrap);
 
- const allIdx=[];for(let i=0;i<30;i++)if(SL[i]&&ITEMS[SL[i].id]&&ITEMS[SL[i].id].arm)allIdx.push(i);
+ const allIdx=[];for(const i of bagIdx())if(SL[i]&&ITEMS[SL[i].id]&&(ITEMS[SL[i].id].arm||ITEMS[SL[i].id].pack))allIdx.push(i);
  const fltIdx=allIdx.filter(i=>{const it=ITEMS[SL[i].id];return wearBagFilter==='all'?true:wearBagFilter==='cloth'?it.layer==='cloth':it.layer!=='cloth'});
  const bagHd=bpEl('div','ch2','Wearable in bag <span>'+allIdx.length+' items · click an item then Wear, or click its slot above</span>');
  c.appendChild(bagHd);
@@ -52156,13 +52161,13 @@ ITEMS.research={n:'Research Table',i:'🔬',max:3,dv:'research',d:'Place it near
 const RCOST={pipe:20,sheet:20,ammo_hp:30,cctv:50,revolver:60,spring:75,semi_body:75,explosives:75,targeting_computer:75,ammo_ap:75,ammo_inc:75,pistol:75,shotgun:75,smg_body:125,pump:125,smg:150,thompson:150,c4:150,rocket:100,turret:100,snap:40,sar:200,rifle:200,ak:300,launcher:300,chainsaw:150,jackhammer:150};
 ITEMS.leather={n:'Leather',i:'🟫',max:200,d:'Cured animal hide from deer and wolves. Used to craft Respawn Beds, clothing, and gear.'};
 ITEMS.crude={n:'Crude Oil',i:'🛢',max:500,d:'Raw black petroleum pumped by a Pump Jack or found in oil and red barrels. Refine it in a Small Oil Refinery (1 Crude Oil → 3 Low Grade Fuel).'};
-ITEMS.explosives={n:'Explosives',i:'🧨',max:100,d:'High-explosive military compound. Craft at a Workbench from Gunpowder, Sulfur, Low Grade Fuel, and Metal, or loot from Elite Crates.'};
+ITEMS.explosives={n:'Explosives',i:'🧨',max:100,d:'High-explosive military compound. Craft at a Workbench from Gunpowder, Smelted Sulphur, Low Grade Fuel, and Metal, or loot from Elite Crates.'};
 ITEMS.targeting_computer={n:'Targeting Computer',i:'💻',max:20,d:'Ruggedized ballistic targeting computer. Found in Military/Elite Crates or crafted at a Workbench. Used for Auto Turrets or recycled for Tech Trash & Circuits.'};
 ITEMS.cctv={n:'Targeting Camera',i:'📹',max:20,d:'Optical CCTV targeting camera with IR lens. Found in crates and barrels or crafted at a Workbench. Used for Auto Turrets or recycled for Circuits & Gears.'};
 ITEMS.bed={n:'Respawn Bed',i:'🛏',max:1,use:'Place',d:'Sturdy wooden bed with mattress, blanket & pillow. Sets your respawn point (only one bed can be placed at a time — placing a new one replaces the old one) and wakes you with 85 HP and high stamina.',fx:()=>placeBed()};
 REC.push(
  {out:'bed',q:1,need:{wood:35,cloth:12,sewing_kit:2,tarp:1,leather:2}},
- {out:'explosives',q:1,need:{powder:8,sulfur:4,fuel:2,metal:4}},
+ {out:'explosives',q:1,need:{powder:8,sulfur_s:4,fuel:2,metal:4}},
  {out:'targeting_computer',q:1,need:{tech:1,circuit:2,metal:12}},
  {out:'cctv',q:1,need:{circuit:1,gears:1,metal:8}}
 );
@@ -52193,16 +52198,16 @@ ITEMS.barricade={n:'Wood Barricade',i:'🪵',max:6,dv:'barricade',d:'A 2.6 m pla
 ITEMS.meat={n:'Raw Meat',i:'🥩',max:20,use:'Eat',d:'Restores 18 food. Cook it for more. Eating lets stamina come back.',fx:()=>{S.hunger=Math.min(100,S.hunger+18);S.energy=Math.min(100,S.energy+10)}};
 ITEMS.cooked={n:'Cooked Meat',i:'🍖',max:20,use:'Eat',d:'Restores 40 food and a chunk of stamina. Cook near a fire.',fx:()=>{S.hunger=Math.min(100,S.hunger+40);S.energy=Math.min(100,S.energy+28)}};
 REC.push({out:'cooked',q:1,need:{meat:1},fire:1});
-ITEMS.sulfur={n:'Sulfur',i:'🟡',max:400,d:'Yellow stone in the rocks. Every charge starts here.'};
-ITEMS.charcoal={n:'Charcoal',i:'⬛',max:400,d:'Burn wood at a fire, then grind it with sulfur.'};
-ITEMS.powder={n:'Gunpowder',i:'💥',max:300,d:'Sulfur and charcoal. Pack it into the charges the night crew carries.'};
+ITEMS.sulfur={n:'Sulfur',i:'🟡',max:400,d:'Raw yellow stone from the rocks. Smelt it in a furnace into Smelted Sulphur.'};
+ITEMS.charcoal={n:'Charcoal',i:'⬛',max:400,d:'Left over when a furnace burns wood. Mix with smelted sulphur for gunpowder.'};
+ITEMS.sulfur_s={n:'Smelted Sulphur',i:'🟨',max:400,d:'Raw sulfur smelted in a furnace. Grind it with charcoal into gunpowder.'};
+ITEMS.powder={n:'Gunpowder',i:'💥',max:300,d:'Smelted sulphur and charcoal. Pack it into the charges the night crew carries.'};
 ITEMS.beancan={n:'Beancan Grenade',i:'💣',max:10,nade:'beancan',use:'Throw',d:'Throw it. Short fuse, small blast. A close hit opens a wood wall. Prowlers throw these.',fx:()=>tossHeld('beancan')};
 ITEMS.satchel={n:'Satchel Charge',i:'🎒',max:6,nade:'satchel',use:'Throw',d:'Sticks to a wall in reach, otherwise throw it. Breaks wood and buckles stone. The crew plants the same satchel.',fx:()=>tossHeld('satchel')};
 ITEMS.c4={n:'Timed Charge',i:'🧨',max:4,nade:'c4',plant:1,use:'Set',d:'Sticks to a wall, or the ground if you have no wall. Five seconds. Breaks metal. If a raider brought one, you can craft one.',fx:()=>plantHeld('c4')};
 ITEMS.rocket={n:'Rocket',i:'🚀',max:12,d:'Direct ammunition for the rocket launcher. Wide blast on impact.'};
 ITEMS.launcher={n:'Rocket Launcher',i:'🚀',max:1,d:'Fires rockets. The loudest tool on a raid night, and it is craftable.'};
-REC.push({out:'charcoal',q:3,need:{wood:2},fire:1});
-REC.push({out:'powder',q:5,need:{sulfur:2,charcoal:1}});
+REC.push({out:'powder',q:5,need:{sulfur_s:2,charcoal:2}});
 REC.push({out:'beancan',q:1,need:{powder:6,metal:5,rope:1}});
 REC.push({out:'satchel',q:1,need:{powder:12,propane:1,rope:2,cloth:4}});
 REC.push({out:'c4',q:1,need:{explosives:2,fuse:1,circuit:1,cloth:4}});
@@ -52637,9 +52642,10 @@ function addOut(sl,id,n){let left=n;const mx=ITEMS[id].max;for(let i=3;i<6&&left
 function hasOutRoom(sl,id,n){let r=0;const mx=ITEMS[id].max;for(let i=3;i<6;i++){if(!sl[i])r+=mx;else if(sl[i].id===id)r+=mx-sl[i].n}return r>=n}
 function furnaces(dt){for(const d of devs){if(!isInd(d.t)||d._gone)continue;const sl=d.sl,fast=!!d.npc;
  if(d.t==='furnace'){
-  const oi=sl.findIndex((s,i)=>i<3&&s&&s.id==='ore'),room=hasOutRoom(sl,'metal',1);
-  if(d.burn<=0&&oi>=0&&room){const fi=sl.findIndex((s,i)=>i<3&&s&&s.id==='fuel');if(fi>=0){if(--sl[fi].n<=0)sl[fi]=null;d.burn=fast?54:30}else{const wi=sl.findIndex((s,i)=>i<3&&s&&s.id==='wood');if(wi>=0){if(--sl[wi].n<=0)sl[wi]=null;d.burn=fast?18:10}}}
-  if(d.burn>0){d.burn-=dt;if(oi>=0&&room){d.prog+=dt;const step=fast?.22:4;let guard=0;while(d.prog>=step&&guard++<6){d.prog-=step;const oi2=sl.findIndex((s,i)=>i<3&&s&&s.id==='ore');if(oi2<0||!hasOutRoom(sl,'metal',1)){d.prog=0;break}if(--sl[oi2].n<=0)sl[oi2]=null;addOut(sl,'metal',1)}}}else d.prog=0;
+  // smelts ore -> metal and raw sulfur -> smelted sulphur; every log burned leaves a lump of charcoal (burnwood)
+  const SMO={ore:'metal',sulfur:'sulfur_s'},isS=q=>q&&SMO[q.id],oi=sl.findIndex((q,i)=>i<3&&isS(q)),room=oi>=0&&hasOutRoom(sl,SMO[sl[oi].id],1),wi=sl.findIndex((q,i)=>i<3&&q&&q.id==='wood'),fi=sl.findIndex((q,i)=>i<3&&q&&q.id==='fuel'),cRoom=hasOutRoom(sl,'charcoal',1);
+  if(d.burn<=0&&(room||(wi>=0&&cRoom))){if(fi>=0&&room){if(--sl[fi].n<=0)sl[fi]=null;d.burn=fast?54:30}else if(wi>=0){if(--sl[wi].n<=0)sl[wi]=null;d.burn=fast?18:10;if(cRoom)addOut(sl,'charcoal',1)}}
+  if(d.burn>0){d.burn-=dt;if(room){d.prog+=dt;const step=fast?.22:4;let guard=0;while(d.prog>=step&&guard++<6){d.prog-=step;const oi2=sl.findIndex((q,i)=>i<3&&isS(q));if(oi2<0){d.prog=0;break}const out=SMO[sl[oi2].id];if(!hasOutRoom(sl,out,1)){d.prog=0;break}if(--sl[oi2].n<=0)sl[oi2]=null;addOut(sl,out,1)}}}else d.prog=0;
   if(d.l)d.l.intensity=d.burn>0?1.6+Math.random()*.5:0;const gl=d.m.userData.glow;if(gl)gl.material.color.set(d.burn>0?0xff8a2a:0x331a0a);
  }else if(d.t==='refinery'){
   const ci=sl.findIndex((s,i)=>i<3&&s&&s.id==='crude'),room=hasOutRoom(sl,'fuel',3);
@@ -53510,8 +53516,8 @@ function gatherNode(n,kinds,flt){let farm=null,fd=1e9,b=null,bd=1e9;const list=r
 function takeNode(n,o){const y=o.userData.yield;if(y){for(const k in y)n.inv[k]=(n.inv[k]||0)+Math.max(1,Math.round(y[k]*.4))}else if(o.userData.k==='tree')n.inv.wood=(n.inv.wood||0)+8;else if(o.userData.k==='junk'||o.userData.k==='barrel'){const L=o.userData.k==='barrel'?barrelLoot(o.userData.kind):loot();if(o.userData.k==='junk'&&Math.random()<.35)L.circuit=(L.circuit||0)+1;if(o.userData.k==='barrel'&&o.userData.kind==='red'&&!L.fuel)L.fuel=1+(Math.random()*2|0);for(const k in L)if(L[k])n.inv[k]=(n.inv[k]||0)+L[k]}else if(o.userData.k==='ore'){n.inv.ore=(n.inv.ore||0)+6;n.inv.stone=(n.inv.stone||0)+2}else if(o.userData.k==='sulfur')n.inv.sulfur=(n.inv.sulfur||0)+4;else{n.inv.stone=(n.inv.stone||0)+4;n.inv.ore=(n.inv.ore||0)+3}o.userData.uses=0;remove(o);const rn=RN[RN.length-1];if(rn&&rn.o===o)rn.timer*=2.2}
 function slotSum(sl,a,b,id){let n=0;for(let i=a;i<b;i++)if(sl[i]&&sl[i].id===id)n+=sl[i].n;return n}
 function furnacePut(f,id,n){const idx=id==='wood'||id==='fuel'?[2]:[0,1];let left=n;for(const i of idx){if(left<=0)break;const s=f.sl[i];if(s&&s.id===id){const a=Math.min(ITEMS[id].max-s.n,left);s.n+=a;left-=a}else if(!s){const a=Math.min(ITEMS[id].max,left);f.sl[i]={id,n:a};left-=a}}return n-left}
-function furnacePull(f){let g=0;for(let i=3;i<6;i++){const s=f.sl[i];if(s&&s.id==='metal'&&s.n>0){g+=s.n;f.sl[i]=null}}return g}
-function stockFurnace(n){rigStock(n);const f=n.devs&&n.devs.furnace;if(!f||f._gone)return;const q=slotSum(f.sl,0,3,'ore');if((n.inv.ore||0)>4&&q<12)n.inv.ore-=furnacePut(f,'ore',Math.min((n.inv.ore||0)-2,12-q));if(slotSum(f.sl,0,3,'wood')<2&&f.burn<=0&&(n.inv.wood||0)>4)n.inv.wood-=furnacePut(f,'wood',Math.min(2,(n.inv.wood||0)-2))}
+function furnacePull(f,n){let g=0;for(let i=3;i<6;i++){const s=f.sl[i];if(s&&s.id==='metal'&&s.n>0){g+=s.n;f.sl[i]=null}else if(n&&s&&(s.id==='charcoal'||s.id==='sulfur_s')){n.inv[s.id]=(n.inv[s.id]||0)+s.n;f.sl[i]=null}}return g}
+function stockFurnace(n){rigStock(n);const f=n.devs&&n.devs.furnace;if(!f||f._gone)return;if((n.inv.sulfur||0)>3&&slotSum(f.sl,0,3,'sulfur')<6)n.inv.sulfur-=furnacePut(f,'sulfur',Math.min(n.inv.sulfur,6));{const g=furnacePull(f,n);if(g)n.inv.metal=(n.inv.metal||0)+g}const q=slotSum(f.sl,0,3,'ore');if((n.inv.ore||0)>4&&q<12)n.inv.ore-=furnacePut(f,'ore',Math.min((n.inv.ore||0)-2,12-q));if(slotSum(f.sl,0,3,'wood')<2&&f.burn<=0&&(n.inv.wood||0)>4)n.inv.wood-=furnacePut(f,'wood',Math.min(2,(n.inv.wood||0)-2))}
 function ahead(n,id){let t=0;const lim=Math.min(n.bp.length,(n.i||0)+8);for(let i=n.i||0;i<lim;i++){const st=n.bp[i];if(!st||st[0]==='wire')continue;const rec=REC.find(r=>r.out===st[0]);if(rec&&rec.need[id])t+=rec.need[id]}return t}
 // ===== SETTLER RIGS: every settler owns a Pump Jack + Quarry and lives off them (only wood comes from trees) =====
 const RIG_RES={stone:'quarry',ore:'quarry',sulfur:'quarry',gears:'quarry',circuit:'quarry',fuel:'pump'};
@@ -53527,7 +53533,7 @@ function rigWork(n,res,dt){const d=rigOf(n,RIG_RES[res]);if(!d)return false;
 function work(n,res,dt,short){
  if(RIG_RES[res]&&rigWork(n,res,dt))return;
  if(res==='metal'){const f=n.devs.furnace;if(!f||f._gone)return work(n,'circuit',dt,1);const near=Math.hypot(f.x-n.x,f.z-n.z)<3.2;if(!near){go(n,f.x+1.5,f.z+1.2,3.6,dt);return}
-  const got=furnacePull(f);if(got)n.inv.metal=(n.inv.metal||0)+got;if((n.inv.metal||0)>=short)return;
+  const got=furnacePull(f,n);if(got)n.inv.metal=(n.inv.metal||0)+got;if((n.inv.metal||0)>=short)return;
   const queued=slotSum(f.sl,0,3,'ore'),out=slotSum(f.sl,3,6,'metal'),have=(n.inv.metal||0)+out,woodIn=slotSum(f.sl,0,3,'wood');
   if((n.inv.ore||0)<1&&queued<1)return work(n,'ore',dt,Math.max(4,short));
   if((n.inv.wood||0)<1&&woodIn<1&&f.burn<=0)return work(n,'wood',dt,1);
@@ -54256,7 +54262,7 @@ function snapshot(customName){
  return{
   v:1,slotId,name:claimName,ts:nowTs,meta,gather:GATHER,diff:DIFFK,
   bp:[...BPK],as:ammoSel,S:{...S},t,days,pace,yaw,pitch,p:{x:P.x,y:P.y,z:P.z},
-  slots,eq:{head:EQ.head,chest:EQ.chest,legs:EQ.legs,feet:EQ.feet},cl:{head:CL.head,chest:CL.chest,legs:CL.legs,feet:CL.feet},rt:{...RT},
+  slots,pack:PACK,packSlots:Array.from({length:12},(_,k)=>serSlot(SL[PX+k])),eq:{head:EQ.head,chest:EQ.chest,legs:EQ.legs,feet:EQ.feet},cl:{head:CL.head,chest:CL.chest,legs:CL.legs,feet:CL.feet},rt:{...RT},
   claim:CLAIM?{x:CLAIM.x,z:CLAIM.z,kind:CLAIM.kind}:null,blog:BLOG,
   raidWarned,raidSpawned,rs:{...RAIDSZ},wx:{k:wx,t:wxT},
   mk:MK.map(m=>({x:Math.round(m.x*10)/10,z:Math.round(m.z*10)/10,n:m.n,c:m.c})),
@@ -54277,7 +54283,7 @@ function applySave(s){if(!s||s.v!==1||!s.p)return false;
  t=s.t??t;days=s.days||0;if(PACES.includes(s.pace))setPace(s.pace);
  yaw=s.yaw||0;pitch=s.pitch||0;P.x=LP.x=s.p.x;P.z=LP.z=s.p.z;P.y=s.p.y;
  if(Array.isArray(s.slots))for(let i=0;i<30;i++){const x=s.slots[i];SL[i]=x?{...x,mods:x.mods&&typeof x.mods==='object'?(Array.isArray(x.mods)?[...x.mods]:{...x.mods}):undefined,att:x.att?{...x.att}:undefined}:null}
- if(s.eq){EQ.head=s.eq.head||0;EQ.chest=s.eq.chest||0;EQ.legs=s.eq.legs||0;EQ.feet=s.eq.feet||0}if(s.cl){CL.head=s.cl.head||0;CL.chest=s.cl.chest||0;CL.legs=s.cl.legs||0;CL.feet=s.cl.feet||0}else{CL.head=CL.chest=CL.legs=CL.feet=0}
+ PACK=s.pack&&ITEMS[s.pack]?s.pack:0;for(let k=0;k<12;k++){const x=s.packSlots&&s.packSlots[k];SL[PX+k]=x?{...x}:null}if(s.eq){EQ.head=s.eq.head||0;EQ.chest=s.eq.chest||0;EQ.legs=s.eq.legs||0;EQ.feet=s.eq.feet||0}if(s.cl){CL.head=s.cl.head||0;CL.chest=s.cl.chest||0;CL.legs=s.cl.legs||0;CL.feet=s.cl.feet||0}else{CL.head=CL.chest=CL.legs=CL.feet=0}
  if(s.rt)Object.assign(RT,s.rt);raidWarned=s.raidWarned??-1;raidSpawned=s.raidSpawned??-1;
  if(s.rs)Object.assign(RAIDSZ,s.rs);if(s.wx&&WXNAME[s.wx.k]){wx=s.wx.k;wxT=s.wx.t||70}
  if(s.claim)placeClaimAt(s.claim.x,s.claim.z,true,s.claim.kind);
@@ -55184,15 +55190,15 @@ function shovePathOffMons(path){if(!path||path.length<2)return path;for(let pass
 let SEGS=[],roadGrid=new Map(),Hg=H;const RCELL=24;
 function onPad(x,z){for(const m of MONS)if(Math.hypot(m.x-x,m.z-z)<(m.r||12)-3.5)return true;const cx=Math.round(x/C),cz=Math.round(z/C);for(let i=-3;i<=3;i++)for(let j=-3;j<=3;j++){if(!FD.has(key(cx+i,cz+j)))continue;if(Math.hypot(x-(cx+i)*C,z-(cz+j)*C)<8)return true}return false}
 function roadSpec(kind){return kind==='trail'?{half:1.68,edge:.75,lift:.055,sh:0xb08958,mid:0x3e2c1c}:{half:4.15,edge:.92,lift:.065,sh:0xe4d4a6,mid:0x4a3824}}
-function smoothStations(path){const pts=resamplePath(path,3.0);for(let pass=0;pass<3;pass++){const c=pts.map(p=>({x:p.x,z:p.z}));for(let i=1;i<pts.length-1;i++){const p=pts[i];if(p._bridgeEnd||p._onBridge||p._bridgeLock||p._ring||pts[i-1]._onBridge||pts[i+1]._onBridge)continue;p.x=(c[i-1].x+c[i].x*2+c[i+1].x)/4;p.z=(c[i-1].z+c[i].z*2+c[i+1].z)/4}}if(pts.length<2)return [];const raw=pts.map(p=>{const by=p._bridgeEnd?(p._u<0?p._bridgeEnd.yA:p._bridgeEnd.yB):null;const hy=by!=null?by:Math.max(.38,H(p.x,p.z));return Object.assign({},p,{y:hy,raw:hy})});let ys=raw.map(p=>p.y);for(let pass=0;pass<4;pass++){const n=ys.slice();for(let i=1;i<ys.length-1;i++){if(raw[i]._bridgeEnd)continue;n[i]=(ys[i-1]+ys[i]*2+ys[i+1])/4}ys=n}for(let i=0;i<ys.length;i++){if(raw[i]._bridgeEnd)ys[i]=raw[i].y;else ys[i]=Math.max(raw[i].y-1.15,Math.min(raw[i].y+1.15,ys[i]))}return raw.map((p,i)=>Object.assign({},p,{y:ys[i],raw:p.raw}))}
+function smoothStations(path){const pts=resamplePath(path,3.0);for(let pass=0;pass<12;pass++){const c=pts.map(p=>({x:p.x,z:p.z}));for(let i=1;i<pts.length-1;i++){const p=pts[i];if(p._bridgeEnd||p._onBridge||p._bridgeLock||p._ring||pts[i-1]._onBridge||pts[i+1]._onBridge)continue;p.x=(c[i-1].x+c[i].x*2+c[i+1].x)/4;p.z=(c[i-1].z+c[i].z*2+c[i+1].z)/4}}if(pts.length<2)return [];const raw=pts.map(p=>{const by=p._bridgeEnd?(p._u<0?p._bridgeEnd.yA:p._bridgeEnd.yB):null;const hy=by!=null?by:Math.max(.38,H(p.x,p.z));return Object.assign({},p,{y:hy,raw:hy})});let ys=raw.map(p=>p.y);for(let pass=0;pass<4;pass++){const n=ys.slice();for(let i=1;i<ys.length-1;i++){if(raw[i]._bridgeEnd)continue;n[i]=(ys[i-1]+ys[i]*2+ys[i+1])/4}ys=n}for(let i=0;i<ys.length;i++){if(raw[i]._bridgeEnd)ys[i]=raw[i].y;else ys[i]=Math.max(raw[i].y-1.15,Math.min(raw[i].y+1.15,ys[i]))}return raw.map((p,i)=>Object.assign({},p,{y:ys[i],raw:p.raw}))}
 function splitRuns(pts){const runs=[],flush=()=>{if(cur.length>1)runs.push(cur);cur=[]};let cur=[];for(const p of pts){if(p._onBridge||onPad(p.x,p.z)){flush();continue}if(!p._bridgeEnd&&!p._bridgeLock&&(p.raw<.32||Hraw(p.x,p.z)<.18)){flush();continue}if(cur.length&&Math.hypot(p.x-cur[cur.length-1].x,p.z-cur[cur.length-1].z)>18){flush();cur=[p];continue}cur.push(p)}flush();return runs}
 function segHit(s,x,z){const dx=s.bx-s.ax,dz=s.bz-s.az;let u=((x-s.ax)*dx+(z-s.az)*dz)/(s.l2||1);if(u<0)u=0;else if(u>1)u=1;const px=s.ax+dx*u,pz=s.az+dz*u,ox=x-px,oz=z-pz;return{dist:Math.hypot(ox,oz),y:s.y0+(s.y1-s.y0)*u,px,pz,nx:-s.dz,nz:s.dx,side:(ox*-s.dz+oz*s.dx)>=0?1:-1,half:s.half,edge:s.edge,lift:s.lift,ri:s.ri,rid:s.rid,seg:s,u}}
 function indexSeg(s){SEGS.push(s);const pad=s.half+s.edge+20,x0=Math.floor((Math.min(s.ax,s.bx)-pad)/RCELL),x1=Math.floor((Math.max(s.ax,s.bx)+pad)/RCELL),z0=Math.floor((Math.min(s.az,s.bz)-pad)/RCELL),z1=Math.floor((Math.max(s.az,s.bz)+pad)/RCELL);for(let i=x0;i<=x1;i++)for(let j=z0;j<=z1;j++){const k=i+','+j;let b=roadGrid.get(k);if(!b){b=[];roadGrid.set(k,b)}b.push(s)}}
 function visitRoads(x,z,fn){const b=roadGrid.get((Math.floor(x/RCELL))+','+(Math.floor(z/RCELL)));if(!b)return;for(let n=0;n<b.length;n++)fn(segHit(b[n],x,z))}
 // walkable road height matching the road mesh: deck across the carriageway + kerb, then easing onto the ground over the shoulder
 // (the old version held deck height out to the ditch and blended 2.5m further, so actors beside roads floated up to ~0.7m)
-function roadAt(x,z){let top=null;visitRoads(x,z,h=>{const inner=h.half+.3,span=h.edge+.6;if(h.dist>inner+span)return;const sg=h.seg;let fe=1;if(sg&&(sg.fa||sg.fb)){const c=sg.c0+sg.len*h.u,sm=t=>t<=0?0:t>=1?1:t*t*(3-2*t);if(sg.fa)fe=Math.min(fe,sm(c/6));if(sg.fb)fe=Math.min(fe,sm((sg.tot-c)/6))}if(fe<=0)return;const deck0=h.y+h.lift,deck=fe<1?Hg(x,z)+(deck0-Hg(x,z))*fe:deck0;let y=deck;if(h.dist>inner){const g=Hg(x,z),t=(h.dist-inner)/span,s=t*t*(3-2*t);y=Math.max(g,deck*(1-s)+g*s)}if(top==null||y>top)top=y});return top}
-function rebuildRoads(runs){SEGS=[];roadGrid=new Map();for(const run of runs){const spec=run.spec;let c0=0;for(let i=1;i<run.pts.length;i++){const a=run.pts[i-1],b=run.pts[i],dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz);if(l<.25)continue;indexSeg({ax:a.x,az:a.z,bx:b.x,bz:b.z,y0:a.y,y1:b.y,dx:dx/l,dz:dz/l,l2:l*l,half:spec.half,edge:spec.edge,lift:spec.lift+run.ri*.0006,ri:run.ri,rid:run.rid,c0,len:l});c0+=l}run.tot=c0}}
+function roadAt(x,z){let top=null;visitRoads(x,z,h=>{const inner=h.half+.3,span=h.edge+.6;if(h.dist>inner+span)return;const sg=h.seg;let fe=1;if(sg&&(sg.fa||sg.fb)){const c=sg.c0+sg.len*h.u,sm=t=>t<=0?0:t>=1?1:t*t*(3-2*t);if(sg.fa)fe=Math.min(fe,sm(c/6));if(sg.fb)fe=Math.min(fe,sm((sg.tot-c)/6))}let bw=0;if(sg){const c=sg.c0+sg.len*h.u,sm2=t=>t<=0?0:t>=1?1:t*t*(3-2*t);if(sg.ba)bw=Math.max(bw,1-sm2(c/7));if(sg.bb)bw=Math.max(bw,1-sm2(((sg.tot||0)-c)/7))}if(fe<=0)return;const g0=Hg(x,z),deck0=(h.y+h.lift)*bw+(g0+h.lift+.04)*(1-bw),deck=fe<1?Hg(x,z)+(deck0-Hg(x,z))*fe:deck0;let y=deck;if(h.dist>inner){const g=Hg(x,z),t=(h.dist-inner)/span,s=t*t*(3-2*t);y=Math.max(g,deck*(1-s)+g*s)}if(top==null||y>top)top=y});return top}
+function rebuildRoads(runs){SEGS=[];roadGrid=new Map();for(const run of runs){const spec=run.spec;let c0=0;for(let i=1;i<run.pts.length;i++){const a=run.pts[i-1],b=run.pts[i],dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz);if(l<.25)continue;indexSeg({ax:a.x,az:a.z,bx:b.x,bz:b.z,y0:a.y,y1:b.y,dx:dx/l,dz:dz/l,l2:l*l,half:spec.half,edge:spec.edge,lift:spec.lift+run.ri*.0006,ri:run.ri,rid:run.rid,c0,len:l,ba:run.pts[0]._bridgeEnd?1:0,bb:run.pts[run.pts.length-1]._bridgeEnd?1:0,run});c0+=l}run.tot=c0}for(const sg of SEGS)sg.tot=sg.run.tot}
 function gradeTerrain(){if(!terrMesh)return;const pos=terrMesh.geometry.attributes.position,col=terrMesh.geometry.attributes.color,W=TN+1,dirt=new T.Color(0xc6a56e),tmp=new T.Color();
  for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i),ix=Math.round((x/TS+.5)*TN),iy=Math.round((.5-z/TS)*TN);if(ix<0||iy<0||ix>TN||iy>TN)continue;const gi=iy*W+ix,y0=HG[gi];if(y0<.35||onPad(x,z)||inRiver(x,z,3.2)||inPond(x,z))continue;let bestS=0,bestY=y0;visitRoads(x,z,h=>{const inner=Math.max(h.half+1.1,9.5),outer=inner+7.5;if(h.dist>=outer)return;let s=1;if(h.dist>inner){const t=(h.dist-inner)/(outer-inner);s=1-t*t*(3-2*t)}if(s>bestS){bestS=s;bestY=h.y}});if(bestS<.04)continue;const cap=bestS>.97?3.4:1.9,dy=Math.max(-cap,Math.min(cap,bestY-y0)),ny=Math.max(.42,y0+dy*bestS);HG[gi]=ny;pos.setY(i,ny);if(bestS>.18){tmp.setRGB(col.getX(i),col.getY(i),col.getZ(i));tmp.lerp(dirt,Math.min(.58,bestS*.52));col.setXYZ(i,tmp.r,tmp.g,tmp.b)}}
  pos.needsUpdate=true;col.needsUpdate=true;terrMesh.geometry.computeVertexNormals();terrMesh.geometry.computeBoundingSphere()}
@@ -55281,10 +55287,12 @@ function buildRoadMeshPart(runs,trail){const pos=[],col=[],uv=[],idx=[],skirt=[]
     const lat=(prof[p][0]+(kIn?(p===3?.24:-.24)*k:0))*flare*wS;let yy=cut?L*.42:prof[p][1];if(bEnd&&bF<1)yy=yy*bF+L*.5*(1-bF);
     let vx=x+px*lat,vz=z+pz*lat;
     // embankment: where the road sits above the ground, slope the skirt out to meet it instead of dropping a vertical wall
-    if(!(bEnd&&bF<1)&&(p<=1||p>=13)){const drop=y+yy-Hg(vx,vz);if(drop>.25){const sg=lat<0?-1:1,ex=Math.min(drop*(p===0||p===14?1.35:.55),5.5);vx+=px*sg*ex;vz+=pz*sg*ex}}
+    if(bEnd&&bDist<10&&(p<=1||p>=13)){const drop=y+yy-Hg(vx,vz);if(drop>.25){const sg=lat<0?-1:1,ex=Math.min(drop*(p===0||p===14?1.35:.55),5.5);vx+=px*sg*ex;vz+=pz*sg*ex}}
     if(prevRow){const o=prevRow[q],d=(vx-o[0])*dx+(vz-o[1])*dz;if(d<.06){vx+=dx*(.06-d);vz+=dz*(.06-d)}}
     const gy=Hg(vx,vz);let vy=y+yy;
-    if(!(bEnd&&bF<1)){if(p===0||p===14)vy=Math.min(vy,gy-.38);else if(p===1||p===13)vy=Math.min(vy,gy-.05);else vy=Math.max(vy,gy+.035)}
+    {const top=(jb>0&&run.rid>jh.rid?.035*jb:0),dr=p===0||p===14?gy-.03:p===1||p===13?gy-.004:Math.max(gy+yy,gy+.05)+top,w=bEnd?bF:1;
+     if(w<1){if(p===0||p===14)vy=Math.min(vy,gy-.2);else if(p===1||p===13)vy=Math.min(vy,gy-.03);else vy=Math.max(vy,gy+.035)}
+     vy=vy*(1-w)+dr*w}
     if(fe<1){const gl=gy-.08;vy=gl+(vy-gl)*fe}
     row.push([vx,vz]);pos.push(vx,vy,vz);const c=cut?laneC:tint[p];col.push(c.r*jit,c.g*jit,c.b*jit);uv.push(cum[i]*uScale,cut?.44:(kIn?(p===3?.26:.74):vMap[p]));
     if(p<=1||p>=13)skirt.push(pos.length/3-1)}
@@ -55404,7 +55412,7 @@ function routePathAcrossRivers(path,kind,ri){
     const hk=riverHit(path[k].x,path[k].z);
     if(hk){
      const kl=hk.len||1,knx=-hk.dz/kl,knz=hk.dx/kl,safe=hk.w+8.5;
-     out.push({x:hk.px+knx*side*safe,z:hk.pz+knz*side*safe,_bridgeLock:1});
+     out.push({x:hk.px+knx*side*safe,z:hk.pz+knz*side*safe});
     }
    }
    i=j+1;continue;
@@ -55420,18 +55428,19 @@ function routePathAcrossRivers(path,kind,ri){
   if(br){
    const dir=((pExit.x-pEnter.x)*br.dx+(pExit.z-pEnter.z)*br.dz)>=0?1:-1;
    const dX=br.dx*dir,dZ=br.dz*dir,hs=br.halfSpan,uEnter=dir>0?-1:1,uExit=dir>0?1:-1;
-   if(out.length>1)out.pop();
+   const farBr=true;{const R=hs+11,ax=br.x-dX*R,az=br.z-dZ*R;out.pop();while(farBr&&out.length>1){const q=out[out.length-1],al=(q.x-br.x)*dX+(q.z-br.z)*dZ;if(al>-(R+6)||Math.hypot(q.x-ax,q.z-az)<26)out.pop();else break}}
    out.push(
-    {x:br.x-dX*(hs+11),z:br.z-dZ*(hs+11),_bridgeLock:1},
+    {x:br.x-dX*(hs+18),z:br.z-dZ*(hs+18)},{x:br.x-dX*(hs+11),z:br.z-dZ*(hs+11),_bridgeLock:1},
     {x:br.x-dX*(hs+4.5),z:br.z-dZ*(hs+4.5),_bridgeLock:1},
     {x:br.x-dX*(hs-.35),z:br.z-dZ*(hs-.35),_bridgeEnd:br,_u:uEnter,_bridgeLock:1},
     {x:br.x,z:br.z,_onBridge:br,_bridgeLock:1},
     {x:br.x+dX*(hs-.35),z:br.z+dZ*(hs-.35),_bridgeEnd:br,_u:uExit,_bridgeLock:1},
     {x:br.x+dX*(hs+4.5),z:br.z+dZ*(hs+4.5),_bridgeLock:1},
-    {x:br.x+dX*(hs+11),z:br.z+dZ*(hs+11),_bridgeLock:1}
+    {x:br.x+dX*(hs+11),z:br.z+dZ*(hs+11),_bridgeLock:1},{x:br.x+dX*(hs+18),z:br.z+dZ*(hs+18)}
    );
   }
   i=j+1;
+  if(br){const dir=((pExit.x-pEnter.x)*br.dx+(pExit.z-pEnter.z)*br.dz)>=0?1:-1,dX=br.dx*dir,dZ=br.dz*dir,R=br.halfSpan+11,bx2=br.x+dX*R,bz2=br.z+dZ*R;const lp=path[path.length-1];while(i<path.length-1){const q=path[i],al=(q.x-br.x)*dX+(q.z-br.z)*dZ;if(al<R+6||Math.hypot(q.x-bx2,q.z-bz2)<26)i++;else break}}
  }
  path.length=0;for(const p of out)path.push(p);
  return path;
@@ -56002,25 +56011,34 @@ function envFxTick(dt){
 }
 // Pre-place bridges where the planned (unrouted) road and settler-trail lines cross a river, before any road is paved.
 // routePathAcrossRivers() then snaps each road onto the existing bridge within 64m (it still builds one as a fallback).
+// Road network dedupe: a new route is trimmed wherever it runs within thr metres of roads already laid, and each surviving piece
+// is joined to the nearest point of the existing network (T-junction). Kills the side-by-side duplicate roads.
+function netNear(acc,x,z){let bd=1e9,bp=null;for(const L of acc)for(let i=1;i<L.length;i++){const a=L[i-1],b=L[i],dx=b.x-a.x,dz=b.z-a.z,l2=dx*dx+dz*dz||1;let u=((x-a.x)*dx+(z-a.z)*dz)/l2;u=u<0?0:u>1?1:u;const px=a.x+dx*u,pz=a.z+dz*u,d=Math.hypot(x-px,z-pz);if(d<bd){bd=d;bp={x:px,z:pz,d}}}return bp}
+function trimToNetwork(path,acc,thr,minLen,keep){const p=densePath(path.map(q=>({x:q.x,z:q.z})),4);if(!acc.length)return[p];const cl=[0];for(let i=1;i<p.length;i++)cl.push(cl[i-1]+Math.hypot(p[i].x-p[i-1].x,p[i].z-p[i-1].z));const T=cl[cl.length-1];keep=keep||0;const accNR=acc.filter(L=>!(L[0]&&L[0]._ring)),near=p.map((q,i)=>{const kz=cl[i]<keep||T-cl[i]<keep,h=netNear(kz?accNR:acc,q.x,q.z);return !!(h&&h.d<(kz?thr*.6:thr))});const out=[];let i=0;
+ while(i<p.length){if(near[i]){i++;continue}let j=i;while(j+1<p.length&&!near[j+1])j++;const seg=p.slice(i,j+1);let len=0;for(let k=1;k<seg.length;k++)len+=Math.hypot(seg[k].x-seg[k-1].x,seg[k].z-seg[k-1].z);
+  if(len>=minLen||i===0||j===p.length-1){if(i>0){const h=netNear(acc,seg[0].x,seg[0].z);seg.unshift({x:h.x,z:h.z})}if(j<p.length-1){const h=netNear(acc,seg[seg.length-1].x,seg[seg.length-1].z);seg.push({x:h.x,z:h.z})}out.push(seg)}i=j+1}return out}
 function riverCrossings(path){const d=path.map(p=>({x:p.x,z:p.z}));if(d.length<2||!RIVERS.length)return[];densePath(d,4.5);const out=[];let best=null,i0=-1;
  for(let i=0;i<d.length;i++){const h=riverHit(d[i].x,d[i].z),wet=h&&h.d<=h.w+5.2;if(wet){if(!best){best=h;i0=i}else if(h.d<best.d)best=h}else if(best){const a=d[Math.max(0,i0-1)],b=d[i],tl=best.len||1,nx=-best.dz/tl,nz=best.dx/tl,s0=(a.x-best.px)*nx+(a.z-best.pz)*nz,s1=(b.x-best.px)*nx+(b.z-best.pz)*nz;if(s0*s1<0||best.d<=1.8)out.push({h:best,rdx:b.x-a.x,rdz:b.z-a.z});best=null}}return out}
 function planBridges(plan){let ri=0;const lines=plan.map(q=>q[0]);
  const trailLines=[];for(const n of NP){const from=n.farm||n.lot||{x:n.x,z:n.z};let best=null,bd=1e9;for(const [p,k] of plan){if(p[0]&&p[0]._ring)continue;for(const q of p){const d=Math.hypot(q.x-from.x,q.z-from.z);if(d<bd){bd=d;best=q}}}if(best&&bd<=520&&bd>=8)trailLines.push(dryPath(from.x,from.z,best.x,best.z))}
  const all=plan.map(q=>[q[0],q[1]]).concat(trailLines.map(p=>[p,'trail']));
  for(const [p,kind] of all){const idx=ri++;if(p[0]&&p[0]._ring)continue;for(const c of riverCrossings(p)){const h=c.h;if(BRIDGES.some(b=>Math.hypot(b.x-h.px,b.z-h.pz)<64))continue;const tl=h.len||1,nx=-h.dz/tl,nz=h.dx/tl,rl=Math.hypot(c.rdx,c.rdz)||1,rdx=c.rdx/rl,rdz=c.rdz/rl,sg=(rdx*nx+rdz*nz)>=0?1:-1;let bx=nx*sg*.88+rdx*.12,bz=nz*sg*.88+rdz*.12;const bl=Math.hypot(bx,bz)||1;const trail=kind==='trail';addBridgeSpan(h.px,h.pz,bx/bl,bz/bl,h.w+5.4,trail?2.4:4.3,trail?'foot':(idx%3===0?'stone':'truss'))}}}
+let LAYACC=[];
 function layRoads(){digPonds();digRivers();const mains=[];if(MONS.length>=2){const pts=MONS.map(m=>({x:m.x,z:m.z,r:m.r}));const inn=[0],edges=[];while(inn.length<pts.length){let bd=1e9,bi=0,bj=-1;for(const i of inn)for(let j=0;j<pts.length;j++){if(inn.indexOf(j)>=0)continue;const d=Math.hypot(pts[i].x-pts[j].x,pts[i].z-pts[j].z);if(d<bd){bd=d;bi=i;bj=j}}if(bj<0)break;inn.push(bj);edges.push([bi,bj])}
  const has=(i,j)=>edges.some(e=>(e[0]===i&&e[1]===j)||(e[0]===j&&e[1]===i)),lens=edges.map(e=>Math.hypot(pts[e[0]].x-pts[e[1]].x,pts[e[0]].z-pts[e[1]].z)).sort((a,b)=>a-b),lim=(lens[lens.length>>1]||200)*1.35,cand=[];
  for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){const d=Math.hypot(pts[i].x-pts[j].x,pts[i].z-pts[j].z);if(d<lim&&!has(i,j))cand.push([d,i,j])}
  cand.sort((a,b)=>a[0]-b[0]);for(const c of cand.slice(0,3))edges.push([c[1],c[2]]);
  // Generation order: world -> rivers (digRivers above) -> bridges (planBridges) -> roads (pave routes onto the pre-placed bridges).
- const plan=[];for(const m of pts)plan.push([monRing(m),'road',0,0]);
- for(const e of edges){const A=monGate(pts[e[0]],pts[e[1]]),Bp=monGate(pts[e[1]],pts[e[0]]),path=dryPath(A.x,A.z,Bp.x,Bp.z);plan.push([path,'road',22,1])}
- let ni=0,nd=1e9;for(let i=0;i<pts.length;i++){const d=Math.hypot(pts[i].x-SP.x,pts[i].z-SP.z);if(d<nd){nd=d;ni=i}}const sdx=pts[ni].x-SP.x,sdz=pts[ni].z-SP.z,dlh=Math.hypot(sdx,sdz)||1,start={x:SP.x+sdx/dlh*18,z:SP.z+sdz/dlh*18},end=monGate(pts[ni],start),lane=dryPath(start.x,start.z,end.x,end.z);plan.push([lane,'lane',16,1]);
+ // roundabouts only where 3+ roads meet; other monuments get a direct road to their gate (the ring+spokes read as blocky)
+ const deg=pts.map((_,i)=>edges.filter(e=>e[0]===i||e[1]===i).length),gate=(m,t,i)=>{if(deg[i]>=3)return monGate(m,t);const a=Math.atan2(t.z-m.z,t.x-m.x),r=(m.r||14)+8;return{x:m.x+Math.cos(a)*r,z:m.z+Math.sin(a)*r}};
+ const plan=[],acc=[];for(let i=0;i<pts.length;i++)if(deg[i]>=3){const rg=monRing(pts[i]);plan.push([rg,'road',0,0]);acc.push(rg)}
+ for(const e of edges){const A=gate(pts[e[0]],pts[e[1]],e[0]),Bp=gate(pts[e[1]],pts[e[0]],e[1]);for(const seg of trimToNetwork(dryPath(A.x,A.z,Bp.x,Bp.z),acc,26,40,Math.min(34,Math.hypot(A.x-Bp.x,A.z-Bp.z)*.5))){plan.push([seg,'road',22,1]);acc.push(seg)}}
+ LAYACC=acc;
  planBridges(plan);
  for(const [p,k,post,main] of plan){pave(p,k);if(post)postsAlong(p,4.6,post);if(main)mains.push(p)}
 
  for(const path of mains){barrelsAlong(path);nodesAlong(path)}}
- for(const n of NP){const from=n.farm||n.lot||{x:n.x,z:n.z};let best=null,bd=1e9;for(const rd of ROADS){if(rd.kind==='trail')continue;for(let i=0;i<rd.pts.length;i+=1){const p=rd.pts[i];if(p._onBridge)continue;const d=Math.hypot(p.x-from.x,p.z-from.z);if(d<bd){bd=d;best=p}}}if(!best||bd>520||bd<8)continue;const path=dryPath(from.x,from.z,best.x,best.z);pave(path,'trail')}
+ for(const n of NP){const from=n.farm||n.lot||{x:n.x,z:n.z};let best=null,bd=1e9;for(const rd of ROADS){if(rd.kind==='trail')continue;for(let i=0;i<rd.pts.length;i+=1){const p=rd.pts[i];if(p._onBridge||p._bridgeLock||p._bridgeEnd||BRIDGES.some(b=>Math.hypot(b.x-p.x,b.z-p.z)<(b.halfSpan||10)+30))continue;const d=Math.hypot(p.x-from.x,p.z-from.z);if(d<bd){bd=d;best=p}}}if(!best||bd>520||bd<8)continue;const path=dryPath(from.x,from.z,best.x,best.z);pave(path,'trail')}
  const framed=paveSpawnRoad();clearRoads();buildBridges();seatRoads();scatterFormations(115);scatterKind(190,'tree',mkChopTree,10,1.15,10.2);scatterKind(65,'tree',mkSnag,16,1.15,9.5);if(framed)openSight(framed.hx,framed.hz);snapWorld();buildPropOcc();fillForest();fillLeaf();fillGrass(3200);fillShrubs(400);fillUndergrowth();initSnowSystem();initAmbientWildlife()}
 const gRoadPost=(()=>{const acc=newAcc(),box=new T.BoxGeometry(1,1,1),cyl=new T.CylinderGeometry(.105,.135,1.46,12),cap=new T.ConeGeometry(.14,.16,12),base=new T.CylinderGeometry(.24,.30,.28,12),ring=new T.CylinderGeometry(.12,.12,.14,12);
  bakeGeo(cyl,M4(0,0,0,0,0,0,1,1,1),0x483422,acc,0);
@@ -56037,8 +56055,8 @@ function openSight(tx,tz){const x0=P.x,z0=P.z,dx=tx-x0,dz=tz-z0,l2=dx*dx+dz*dz||
 function drape(ax,az,bx,bz){const dx=bx-ax,dz=bz-az,dist=Math.hypot(dx,dz)||1,n=Math.max(1,Math.ceil(dist/7)),px=-dz/dist,pz=dx/dist,pts=[];for(let i=0;i<=n;i++){const t=i/n;let x=ax+dx*t,z=az+dz*t;if(H(x,z)<.55&&!inRiver(x,z,4)){let bh=H(x,z),bx2=x,bz2=z;for(const s of[5,-5,10,-10]){const nx=x+px*s,nz=z+pz*s,nh=H(nx,nz);if(nh>bh){bh=nh;bx2=nx;bz2=nz}}if(bh>.42){x=bx2;z=bz2}}pts.push({x,z})}return pts}
 function paveSpawnRoad(){const home=NP.find(n=>n.close)||NP[0];if(!home)return null;const hx=home.lot?home.lot.x:home.hx,hz=home.lot?home.lot.z:home.hz;let dx=hx-P.x,dz=hz-P.z,len=Math.hypot(dx,dz)||1;dx/=len;dz/=len;let rx=-dz,rz=dx;const score=s=>{let n=0;for(let t=-1;t<=5;t++){const h=H(P.x+rx*s+dx*t*8,P.z+rz*s+dz*t*8);if(h>.8&&h<7.2)n++}return n};if(score(-12)>score(12)){rx=-rx;rz=-rz}const off=12.4,pass={x:hx+rx*off,z:hz+rz*off},ax=pass.x-dx*52,az=pass.z-dz*52,bx=pass.x+dx*40,bz=pass.z+dz*40,fore=drape(ax,az,bx,bz);
  let fullPath=fore;
- if(MONS.length){let best=null,bd=1e9;for(const m of MONS){const d=Math.hypot(m.x-bx,m.z-bz);if(d<bd){bd=d;best=m}}if(best&&bd>36){const end=monGate(best,{x:bx,z:bz}),leg=dryPath(bx,bz,end.x,end.z);fullPath=fore.slice(0,-1).concat(leg);for(let pass2=0;pass2<5;pass2++)for(let i=Math.max(1,fore.length-5);i<Math.min(fullPath.length-1,fore.length+4);i++){fullPath[i]={x:(fullPath[i-1].x+fullPath[i].x*2+fullPath[i+1].x)/4,z:(fullPath[i-1].z+fullPath[i].z*2+fullPath[i+1].z)/4}}}}
- pave(fullPath,'road');postsAlong(fullPath,4.6,14);barrelsAlong(fullPath,11,2);
+ if(MONS.length){let best=null,bd=1e9;for(const m of MONS){const d=Math.min(Math.hypot(m.x-bx,m.z-bz),Math.hypot(m.x-ax,m.z-az));if(d<bd){bd=d;best=m}}if(best&&Math.hypot(best.x-ax,best.z-az)<Math.hypot(best.x-bx,best.z-bz))fore.reverse();const ex=fore[fore.length-1];if(best&&bd>36){const end=monGate(best,ex),leg=dryPath(ex.x,ex.z,end.x,end.z);fullPath=fore.slice(0,-1).concat(leg);for(let pass2=0;pass2<5;pass2++)for(let i=Math.max(1,fore.length-5);i<Math.min(fullPath.length-1,fore.length+4);i++){fullPath[i]={x:(fullPath[i-1].x+fullPath[i].x*2+fullPath[i+1].x)/4,z:(fullPath[i-1].z+fullPath[i].z*2+fullPath[i+1].z)/4}}}}
+ {const accR=ROADS.filter(r=>r.kind!=='trail').map(r=>r.pts);const parts=trimToNetwork(fullPath,accR,26,30);for(const pp of parts){pave(pp,'road');postsAlong(pp,4.6,14);barrelsAlong(pp,11,2)}}
  const sx=pass.x-dx*28-rx*1.6,sz=pass.z-dz*28-rz*1.6,sy=H(sx,sz);if(sy>.6&&sy<7.6&&!inRiver(sx,sz,4)){P.x=LP.x=sx;P.z=LP.z=sz;P.y=sy+1.7}yaw=Math.atan2(-(pass.x*.4+hx*.6-P.x),-(pass.z*.4+hz*.6-P.z));pitch=-.36;home.told=1;for(let hi=0;hi<6;hi++){const ha=hi*1.047+.4,hr=5.5+(hi%2)*2.8,hpx=P.x+Math.cos(ha)*hr,hpz=P.z+Math.sin(ha)*hr,hpy=H(hpx,hpz);if(hpy>.8&&!nearAnyRoad(hpx,hpz)&&!inRiver(hpx,hpz,3)){const hp=mkHemp();hp.userData.k='hemp';plantProp(hp,hpx,hpy,hpz)}}
 say('A dirt road runs from your feet past that foundation. Follow the posts and the barrels out to the monuments.');msgT=8;return{hx,hz}}
 spawnSettlers();warmSettlers();__mark('settlers');layRoads();__mark('roads');
@@ -56133,8 +56151,8 @@ function driveCampRaider(e,dt){
  if(e.hp<(e.maxHp||95)*.42&&(e.meds||0)>0){e.meds--;e.hp=Math.min(e.maxHp||95,e.hp+Math.round((e.warlord?45:28)*DF.hp));e.crouchT=1.0}
  // Detect player approaching camp
  if(!ch('peace')&&!dead){
-  const sight=(e.tower?58:44)*DF.sight;
-  if(dp<26||(dp<sight&&turretSees({x:e.x,y:e.y,z:e.z},{x:P.x,y:P.y-1.7,z:P.z}))){
+  const sight=(e.tower?58:44)*.6*DF.sight;
+  if(dp<16*DF.sight||(dp<sight&&turretSees({x:e.x,y:e.y,z:e.z},{x:P.x,y:P.y-1.7,z:P.z}))){
    if((camp.alertT||0)<=0&&age>(camp.warnAt||0)){
     camp.warnAt=age+18;
     const alive=camp.raiders.filter(r=>r&&r.hp>0).length;
@@ -56314,7 +56332,7 @@ Object.assign(ITEMS,{
  ammo_hp:{n:'Hollow Point Rounds',i:'•',max:200,d:'+30% damage to flesh, but armor shrugs them off. Best on animals and unarmored raiders. Workbench. Press T to swap ammo.'},
  ammo_ap:{n:'Armor-Piercing Rounds',i:'•',max:200,d:'Ignore armor and heavy plating, and punch through to a second target. Slightly more damage. Workbench. Press T to swap ammo.'},
  ammo_inc:{n:'Incendiary Rounds',i:'•',max:200,d:'Set targets on fire. Less impact damage, but the burn ignores armor. Workbench. Press T to swap ammo.'}});
-REC.push({out:'ammo_hp',q:20,need:{ammo:20,metal:2,charcoal:2}},{out:'ammo_ap',q:20,need:{ammo:20,metal:8,powder:2,gears:1}},{out:'ammo_inc',q:20,need:{ammo:20,sulfur:6,fuel:1}});
+REC.push({out:'ammo_hp',q:20,need:{ammo:20,metal:2,charcoal:2}},{out:'ammo_ap',q:20,need:{ammo:20,metal:8,powder:2,gears:1}},{out:'ammo_inc',q:20,need:{ammo:20,sulfur_s:6,fuel:1}});
 const ammoBox=(body,lid,tip,stripe)=>{let c=null;return()=>{if(!c)c=buildAmmoBox(body,lid,tip,stripe);return c.clone()}};
 ITM.ammo_hp=ammoBox(0x4f5e36,0xe8e8e8,0xdddddd,0xffffff);ITM.ammo_ap=ammoBox(0x32425e,0x4a8ad9,0x22252a,0x4a8ad9);ITM.ammo_inc=ammoBox(0x5e3426,0xe0502a,0xff7a2a,0xff6a1a);
 $('ammo').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();cycleAmmo()});
@@ -56498,11 +56516,12 @@ Object.assign(ITM,{
  stone:bld(b=>{b.sph(.155,0,.10,0,0x828488,.76,12);b.sph(.115,.14,.075,.04,0x6e7074,.80,12);b.sph(.10,-.12,.07,.09,0x96989c,.78,12);b.sph(.075,.03,.15,-.06,0xa4a6aa,.72,10)}),
  fiber:bld(b=>{for(let i=0;i<6;i++)b.cyl(.016,.022,.38,8,(i-2.5)*.022,.09,(i%2)*.018,i%2?0x588a38:0x78a448,[0,0,1.5708+(i-3)*.05]);b.cyl(.048,.048,.045,10,0,.09,0,0xc9b037,[0,0,1.5708])}),
  berry:bld(b=>{
-  // Berry cluster: small glossy drupes on thin stalks off a woody stem, with flat serrated leaves
-  b.limb(0,.20,0,0,.05,0,.008,.006,0x4e3620,10);
-  const B=[[0,.06,0],[.045,.07,.02],[-.042,.07,.025],[.02,.065,-.04],[-.03,.068,-.035],[.012,.105,.012],[-.02,.10,-.008],[.035,.10,-.015]];
-  for(const [x,y,z] of B){b.limb(0,.13,0,x,y+.02,z,.003,.003,0x5a4020,8,false,false);b.sph(.024,x,y,z,0xb01a24,1,14);b.sph(.007,x+.008,y+.012,z+.012,0xf07a80,1,8);b.sph(.006,x,y+.022,z,0x3a5e24,1,8)}
-  for(let i=0;i<3;i++){const a=i*2.094+.4,c=i%2?0x3b6e28:0x4e8434;b.box(.09,.006,.045,Math.cos(a)*.06,.17,Math.sin(a)*.06,c,[0,-a,.25],.6);b.box(.07,.007,.004,Math.cos(a)*.06,.174,Math.sin(a)*.06,shade(c,.7),[0,-a,.25])}
+  // Handful of wild berries: a low mound of glossy drupes with tiny calyx crowns and two small leaves tucked under the pile
+  // (no tall stem or raised leaf plate, so nothing floats above the palm when it is held)
+  for(let i=0;i<2;i++){const a=i*2.6+.5,c=i?0x3b6e28:0x4e8434;b.box(.075,.005,.036,Math.cos(a)*.045,.012,Math.sin(a)*.045,c,[0,-a,.06],.6);b.box(.06,.006,.004,Math.cos(a)*.045,.0155,Math.sin(a)*.045,shade(c,.7),[0,-a,.06])}
+  const B=[[0,.03,0],[.04,.028,.018],[-.038,.028,.022],[.018,.027,-.036],[-.026,.028,-.032],[.006,.062,.008],[-.018,.058,-.012],[.026,.058,-.01],[.002,.088,-.002]];
+  for(const [x,y,z] of B){b.sph(.023,x,y,z,0xa8182a,1,14);b.sph(.007,x+.008,y+.011,z+.012,0xf07a80,1,8);b.sph(.0055,x,y+.021,z,0x3a5e24,1,8)}
+  b.limb(.002,.108,-.002,.006,.122,.004,.0025,.002,0x5a4020,8);
  }),
  bandage:bld(b=>{b.cyl(.072,.072,.15,16,0,.075,0,0xf2f0ea,[1.5708,0,0]);b.cyl(.026,.026,.16,12,0,.075,0,0xc8b894,[1.5708,0,0]);b.box(.09,.028,.008,0,.075,.076,0xc23b32);b.box(.028,.09,.008,0,.075,.076,0xc23b32);b.box(.15,.01,.11,.09,.008,.01,0xf2f0ea)}),
  campfire:bld(b=>{for(let i=0;i<5;i++){const a=i*1.256;b.cyl(.048,.055,.48,10,Math.cos(a)*.12,.07,Math.sin(a)*.12,i%2?0x5a3d28:0x48301e,[0,a,1.42])}for(let i=0;i<8;i++){const a=i*.785;b.sph(.055,Math.cos(a)*.24,.04,Math.sin(a)*.24,0x72706c,.75,10)}b.cone(.13,.38,12,0,.26,0,0xff8a20);b.cone(.075,.28,10,0,.30,0,0xffe066)}),
@@ -58553,7 +58572,7 @@ function pickupDropObject(o) {
 
   // Preserve durability, mag, ammo type & attachments if picking up a dropped tool/weapon
   if (u.dur !== undefined || u.mag !== undefined || u.mods !== undefined) {
-    const freeIdx = SL.slice(0, 30).findIndex(x => !x);
+    const freeIdx = (()=>{const j=bagIdx().find(i=>!SL[i]);return j===undefined?-1:j})();
     if (freeIdx >= 0 && ITEMS[id].max === 1) {
       SL[freeIdx] = {
         id,
@@ -59452,10 +59471,10 @@ function renderCheat(){const p=$('cheat');$('chb').textContent=chOpen?'Close':'C
   giv('Devices + tools',()=>{for(const k in DV)give(k,k==='lamp'?10:2,1);give('bed',1,1);give('wire',1,1);give('hatchet',1,1);give('pickaxe',1,1)},'Devices, doors, refinery, pump jack, quarry & bed added.'),
   giv('Guns + armor',()=>{for(const k of['pistol','revolver','shotgun','pump','smg','thompson','sar','rifle','ak','helmet','vest','legs','boots'])give(k,1,1);give('medkit',3,1);give('rations',5,1);give('ammo',200,1);for(const k of AMMO_IDS)if(k!=='ammo')give(k,60,1)},'Guns, armor and ammo added.'),
   giv('All Clothing + Armor (T1-T3)',()=>{for(const k in CLOTH_N)give(k,1,1);for(const k in ARM_N)give(k,1,1)},'All 3 tiers of Clothing and 3 tiers of Armor added.'),
-  giv('Explosives + Tech',()=>{give('sulfur',40,1);give('charcoal',30,1);give('powder',40,1);give('explosives',20,1);give('targeting_computer',5,1);give('cctv',5,1);give('beancan',6,1);give('satchel',4,1);give('c4',2,1);give('rocket',6,1);give('launcher',1,1)},'Explosives, targeting tech, charges & rockets added.'),
+  giv('Explosives + Tech',()=>{give('sulfur',40,1);give('sulfur_s',40,1);give('charcoal',30,1);give('powder',40,1);give('explosives',20,1);give('targeting_computer',5,1);give('cctv',5,1);give('beancan',6,1);give('satchel',4,1);give('c4',2,1);give('rocket',6,1);give('launcher',1,1)},'Explosives, targeting tech, charges & rockets added.'),
   giv('Elite loot',()=>{for(const[id,n]of lootTable(3))give(id,n)},'Elite loot added.'),
   giv('War-Chest loot',()=>{for(const[id,n]of crateLoot(4))give(id,n)},'Raider War-Chest loot added.'),
-  act('Clear bag',()=>{SL.fill(null,0,30);pick=null;render();say('Bag cleared.')}));
+  act('Clear bag',()=>{SL.fill(null,0,30);for(let k=PX;k<PX+12;k++)SL[k]=null;pick=null;render();say('Bag cleared.')}));
  sec('Teleport');g=grid();
  g.append(giv('Spawn',()=>{P.x=LP.x=SP.x;P.z=LP.z=SP.z},'Teleported to spawn.'),act('Next monument',()=>{if(!MONS.length)return say('No monuments.');const m=MONS[mi++%MONS.length];P.x=LP.x=m.x;P.z=LP.z=m.z+m.d*C/2+3;say('Teleported: '+m.n)}),act('Next raider camp',()=>{if(!RCAMPS.length)return say('No raider camps.');const m=RCAMPS[rci++%RCAMPS.length];P.x=LP.x=m.x;P.z=LP.z=m.z+m.d*C/2+4;P.y=Math.max(G(P.x,P.z),H(P.x,P.z))+1.7;yaw=Math.atan2(-(m.x-P.x),-(m.z-P.z));pitch=-.15;say('Teleported to '+m.n+' ('+m.raiders.filter(r=>r&&r.hp>0).length+' raiders).')}));
  g.appendChild(act('Next settler',()=>{const L=NP.filter(n=>n.hp>0);if(!L.length)return say('No settlers left.');const n=L[(window.__csi=(window.__csi||0)+1)%L.length];jumpSettler(n,NP.indexOf(n))}));
@@ -59639,7 +59658,7 @@ window.__bp.shapes=()=>{const o={};for(const t of things){if(!t.userData||t.user
 window.__bp.tiers=()=>{const o={};for(const r of PCS)if(r.owner==='npc'&&r.m&&r.m.parent){const k=r.t;o[k]=(o[k]||0)+1}return o};window.__bp.mapOpen=()=>mapOpen;window.__bp.tracers=()=>TRP.filter(q=>q.busy).length;window.__bp.lodStats=()=>{const s=[0,0,0];for(const o of things)o.traverse(x=>{if(x.isLOD){const i=x.levels.findIndex(l=>l.object.visible);if(i>=0)s[i]++}});return s};window.__bp.rich=()=>{for(const n of NP){n.inv.stone=9000;n.inv.wood=6500;n.inv.metal=1800;n.inv.gears=320;n.inv.circuit=120;n.inv.ore=80;n.inv.fuel=80}};
 window.__bp.needs=(o)=>{if(o){for(const k in o)if(k in S)S[k]=+o[k]}return{...S}};
 // Test hooks for tools, crates and drag-and-drop (tests/tools.mjs)
-window.__bp.inv={give:(id,n)=>give(id,n,1),slots:()=>SL.slice(0,30).map(q=>q&&{id:q.id,n:q.n,dur:q.dur}),box:()=>curBox&&{t:curBox.t,nm:curBox.nm,sl:curBox.sl.map(q=>q&&{id:q.id,n:q.n})},isOpen:()=>open,select:i=>{sel=i;render()},sel:()=>sel,fireHeld:()=>fireHeld,toolCd:()=>toolCd,drops:()=>DROPS.length,crates:()=>CR.map(o=>({x:o.position.x,y:o.position.y,z:o.position.z,tier:o.userData.tier,cd:o.userData.cd})),place:(x,z)=>{P.x=x;P.z=z},openNearestCrate:()=>{let b=null,bd=1e9;for(const o of CR){const d=Math.hypot(o.position.x-P.x,o.position.z-P.z);if(d<bd){bd=d;b=o}}if(b){b.userData.cd=0;openCrate(b)}return b?b.userData.tier:0},act:()=>act(),trig:d=>trigger(d),mCd:()=>mCd,energy:()=>S.energy,setSlot:(i,o)=>{SL[i]=o;render()},closePanel:()=>{if(open)togglePanel()},openPanel:()=>{if(!open)togglePanel()},tierYield:id=>{SL[0]={id,n:1,dur:ITEMS[id].dur};sel=0;return[ty('tree'),ty('stone'),ty('ore'),toolTier()]},say:()=>($('msg')||{}).textContent};
+window.__bp.inv={give:(id,n)=>give(id,n,1),slots:()=>PSL().map(q=>q&&{id:q.id,n:q.n,dur:q.dur}),box:()=>curBox&&{t:curBox.t,nm:curBox.nm,sl:curBox.sl.map(q=>q&&{id:q.id,n:q.n})},isOpen:()=>open,select:i=>{sel=i;render()},sel:()=>sel,fireHeld:()=>fireHeld,toolCd:()=>toolCd,drops:()=>DROPS.length,crates:()=>CR.map(o=>({x:o.position.x,y:o.position.y,z:o.position.z,tier:o.userData.tier,cd:o.userData.cd})),place:(x,z)=>{P.x=x;P.z=z},openNearestCrate:()=>{let b=null,bd=1e9;for(const o of CR){const d=Math.hypot(o.position.x-P.x,o.position.z-P.z);if(d<bd){bd=d;b=o}}if(b){b.userData.cd=0;openCrate(b)}return b?b.userData.tier:0},act:()=>act(),trig:d=>trigger(d),mCd:()=>mCd,energy:()=>S.energy,setSlot:(i,o)=>{SL[i]=o;render()},closePanel:()=>{if(open)togglePanel()},openPanel:()=>{if(!open)togglePanel()},tierYield:id=>{SL[0]={id,n:1,dur:ITEMS[id].dur};sel=0;return[ty('tree'),ty('stone'),ty('ore'),toolTier()]},say:()=>($('msg')||{}).textContent};
 window.__bp.prove=()=>{for(const n of NP){n.inv.stone=9000;n.inv.wood=6500;n.inv.metal=1800;n.inv.gears=320;n.inv.circuit=120;n.inv.ore=80;n.inv.fuel=80;n.fail=0}let guard=0;while(NP.some(n=>n.bp&&n.i<n.bp.length)&&guard++<8000){for(const n of NP){if(!n.bp||n.i>=n.bp.length||n.hp<=0)continue;const st=n.bp[n.i];if(st&&st[0]!=='wire'){const at=pieceAt(st);if(Math.hypot(at.sx-n.x,at.sz-n.z)>3.2){n.x=at.sx+1.4;n.z=at.sz+1.5;n.y=Math.max(H(n.x,n.z),0);n.m.position.set(n.x,n.y,n.z);n.pth=[]}}n.cd=0}npcTick(.25)}flushTerrain();for(const n of NP)if(n.bp&&n.i>=n.bp.length&&n.tc&&!n.home)finishYard(n);power(.1);
  return {guard,rows:NP.map(n=>{const plan=n.plan||{},tc=n.tc;let walls=0;if(tc){const seen=new Set();for(const c of ALLC){if(!c.piece||c.owner!=='npc'||!c.mesh||seen.has(c.mesh))continue;const cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2;if(Math.hypot(cx-tc.x,cz-tc.z)>28)continue;seen.add(c.mesh);walls++}}const need=plan.wallNeed!=null?plan.wallNeed:(plan.w&&plan.d?2*(plan.w+plan.d)*(plan.floors||1):0);const tur=devs.filter(d=>d.npc===n&&!d._gone&&d.t==='turret');let out=0;if(plan.w&&tc){const cx=Math.round(tc.x/C)-(plan.tx||0),cz=Math.round(tc.z/C)-(plan.tz||0),pads=[[cx-1,cz-1],[cx+plan.w,cz-1],[cx-1,cz+plan.d],[cx+plan.w,cz+plan.d]];out=tur.filter(t=>pads.some(p=>Math.round(t.x/C)===p[0]&&Math.round(t.z/C)===p[1])).length}const rm={};if(plan.rooms&&plan.rooms[0])for(const k in plan.rooms[0]){const r=plan.rooms[0][k];rm[r]=(rm[r]||0)+1}return{w:plan.w||0,d:plan.d||0,fl:plan.floors||0,walls,need,skip:n.skip||0,step:(n.i||0)+'/'+(n.bp?n.bp.length:0),home:!!n.home,wb:!!(n.devs.workbench&&!n.devs.workbench._gone),wind:!!(n.devs.wind&&!n.devs.wind._gone),fur:!!(n.devs.furnace&&!n.devs.furnace._gone),tur:tur.length,out,doors:devs.filter(d=>d.npc===n&&d.t==='door'&&!d._gone).length,furn:!!n.furn,rm}})}};
 window.__bp.raiderShowcase=(pose)=>{

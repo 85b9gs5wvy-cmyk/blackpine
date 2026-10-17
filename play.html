@@ -53308,7 +53308,7 @@ function mkMan(c,raider,V){V=V||{};const pk=a=>a[rnd()*a.length|0],val=(k,f)=>V[
   }else if((kk==='c4'||kk==='satchel'||kk==='beancan')&&ITM[kk]){
    mountHeld3P(tw,kk,false,true);
   }else{
-   const melId=pk(['club','machete','hatchet']);
+   const melId=(V.mel&&ITM[V.mel])?V.mel:pk(['club','machete','hatchet']);
    mountHeld3P(tw,melId,false,true);
   }
  }else{
@@ -53738,8 +53738,22 @@ function blueprint(cx,cz,plan,side){
   B.push(['wire','battery','switch']);
   B.push(['wire','switch','heater']);
   for(let i=0;i<4;i++)B.push(['wire','battery','turret'+i]);
+  for(const y of yardSteps(cx,cz,w,d,side))B.push(y);
   plan.wallNeed=0;for(const s of B)if(s[1]==='e'&&/wall|window|doorway/.test(String(s[0])))plan.wallNeed++;
   return B}
+// Compound yard as build steps (7x7 stone foundation ring, stone walls, gated doorway + door). Queued after the house.
+function yardSteps(cx,cz,w,d,side){
+ const minX=cx-2,maxX=cx+w+1,minZ=cz-2,maxZ=cz+d+1,gateX=cx+Math.floor(w/2),gateZ=cz+Math.floor(d/2),Y=[];
+ const edge=(ex,ez,dir,gate)=>{if(gate){Y.push(['stone_doorway','e',ex,ez,dir,0]);Y.push(['door','e',ex,ez,dir,0,'gate'])}else Y.push(['stone_wall','e',ex,ez,dir,0])};
+ for(let ix=minX;ix<=maxX;ix++)for(let iz=minZ;iz<=maxZ;iz++){
+  if(ix!==minX&&ix!==maxX&&iz!==minZ&&iz!==maxZ)continue;
+  Y.push(['stone_foundation','c',ix,iz,0]);
+  if(iz===minZ)edge(ix,minZ-1,'S',side==='N'&&ix===gateX);
+  if(iz===maxZ)edge(ix,maxZ,'S',side==='S'&&ix===gateX);
+  if(ix===minX)edge(minX-1,iz,'E',side==='W'&&iz===gateZ);
+  if(ix===maxX)edge(maxX,iz,'E',side==='E'&&iz===gateZ);
+ }
+ return Y}
 function pieceAt(st){const ty=st[1],sx=ty==='c'?st[2]*C:ty==='e'?(st[4]==='E'?(st[2]+.5)*C:st[2]*C):st[2],sz=ty==='c'?st[3]*C:ty==='e'?(st[4]==='E'?st[3]*C:(st[3]+.5)*C):st[3],L=ty==='c'?st[4]:ty==='e'?st[5]:0;return{ty,sx,sz,L}}
 function approachPoint(n,sx,sz){const lot=n.lot||{x:n.hx,z:n.hz};let dx=sx-lot.x,dz=sz-lot.z,len=Math.hypot(dx,dz);if(len<0.6){const f=n.farm||{x:lot.x+8,z:lot.z};dx=f.x-lot.x;dz=f.z-lot.z;len=Math.hypot(dx,dz)||1;return[lot.x+dx/len*2.3,lot.z+dz/len*2.3]}return[sx+dx/len*2.5,sz+dz/len*2.5]}
 function structState(st){
@@ -53781,7 +53795,7 @@ function commitStruct(n,st,s){
   if(s.mode==='e'){
     const a=FD.get(key(s.ex,s.ez)), b=FD.get(s.E?key(s.ex+1,s.ez):key(s.ex,s.ez+1));
     const y=Math.max(a?a.y:-99,b?b.y:-99)+FH*s.L;
-    if(s.it.dv==='door'){construct(s.it,{x:s.x-.6*Math.cos(s.rot),z:s.z+.6*Math.sin(s.rot),y,rot:s.rot,k:s.k,cx:s.x,cz:s.z},1); const dev=devs[devs.length-1]; dev.npc=n; n.devs.door=dev; return}
+    if(s.it.dv==='door'){construct(s.it,{x:s.x-.6*Math.cos(s.rot),z:s.z+.6*Math.sin(s.rot),y,rot:s.rot,k:s.k,cx:s.x,cz:s.z},1); const dev=devs[devs.length-1]; dev.npc=n; if(st[6]==='gate')n.devs.gate=dev;else n.devs.door=dev; return}
     construct(s.it,{x:s.x,y,z:s.z,k:s.k,rot:s.rot,p:s.p},1); return;
   }
   if(s.p==='foundation'){
@@ -53794,14 +53808,15 @@ function commitStruct(n,st,s){
   construct(s.it,{x:s.x,y,z:s.z,k:s.k,p:s.p,rot,dx,dz},1);
 }
 function placePiece(n,st,free){const id=st[0];if(id==='wire')return false;const it=ITEMS[id],rec=REC.find(r=>r.out===id);if(!it||!rec)return false;
+ const pl0=PCS.length,tagPcs=()=>{for(let q=pl0;q<PCS.length;q++)if(PCS[q].owner==='npc'&&!PCS[q].n)PCS[q].n=n};
  const built=structState(st);
- if(built){if(alreadyStruct(built))return true;if(!canStruct(built)||privWhy(built.x,built.z,n))return false;if(!free){for(const k in rec.need)if((n.inv[k]||0)<rec.need[k])return false;for(const k in rec.need)n.inv[k]-=rec.need[k]}commitStruct(n,st,built);if(blkAt(n,n.x,n.z)){const spot=clearRing(n,(n.farm&&n.farm.x)||n.x+3,(n.farm&&n.farm.z)||n.z);if(spot){n.x=spot[0];n.z=spot[1];n.y=Math.max(H(n.x,n.z),0);n.m.position.set(n.x,n.y,n.z);n.pth=[];n.pT=null}}return true}
+ if(built){if(alreadyStruct(built))return true;if(!canStruct(built)||privWhy(built.x,built.z,n))return false;if(!free){for(const k in rec.need)if((n.inv[k]||0)<rec.need[k])return false;for(const k in rec.need)n.inv[k]-=rec.need[k]}commitStruct(n,st,built);tagPcs();if(blkAt(n,n.x,n.z)){const spot=clearRing(n,(n.farm&&n.farm.x)||n.x+3,(n.farm&&n.farm.z)||n.z);if(spot){n.x=spot[0];n.z=spot[1];n.y=Math.max(H(n.x,n.z),0);n.m.position.set(n.x,n.y,n.z);n.pth=[];n.pT=null}}return true}
  const need=rec.need;if(!free){for(const k in need)if((n.inv[k]||0)<need[k])return false}
  const at=pieceAt(st),sy=yaw;yaw=at.ty==='c'&&st[5]!==undefined?st[5]:-Math.PI/2;NPCBUILD=1;let lv=at.L;if(at.ty==='d'){const fl=st[5]||0,fnd=FD.get(key(Math.round(at.sx/C),Math.round(at.sz/C)));lv=fnd?fnd.y+FH*fl+.25:0}
  const a=aim(it,at.sx,at.sz,lv);NPCBUILD=0;yaw=sy;
  if(at.ty==='d'&&it.dv!=='door'){const fl=+st[5]||0,fnd=FD.get(key(Math.round(at.sx/C),Math.round(at.sz/C)));a.y=(fnd?fnd.y:H(at.sx,at.sz))+FH*fl;a.x=at.sx;a.z=at.sz;a.ok=a.y>.25}
  if(!a.ok||(it.dv==='tc'&&tcCovering(a.x,a.z)&&(tcCovering(a.x,a.z).npc!==n))||privWhy(a.x,a.z,n))return false;
- if(!free)for(const k in need)n.inv[k]=(n.inv[k]||0)-need[k];construct(it,a,1);
+ if(!free)for(const k in need)n.inv[k]=(n.inv[k]||0)-need[k];construct(it,a,1);tagPcs();
  if(it.dv){const dev=devs[devs.length-1];dev.npc=n;n.devs[at.ty==='d'&&st[4]||id]=dev;if(dev.t==='tc'){n.tc=dev;dev.hp=dev.maxHp=200}if(dev.t==='battery')dev.ch=600}
  if(blkAt(n,n.x,n.z)){const spot=clearRing(n,(n.farm&&n.farm.x)||n.x+3,(n.farm&&n.farm.z)||n.z);if(spot){n.x=spot[0];n.z=spot[1];n.y=Math.max(H(n.x,n.z),0);n.m.position.set(n.x,n.y,n.z);n.pth=[];n.pT=null}}
  return true}
@@ -53882,60 +53897,14 @@ function finishYard(n){if(!n||n.home||!n.tc||n.tc._gone)return;n.home={x:n.tc.x,
  const door=devs.find(d=>d.npc===n&&d.t==='door'&&!d._gone);let x=n.tc.x,z=n.tc.z+14;if(door){const ox=door.x-n.tc.x,oz=door.z-n.tc.z,od=Math.hypot(ox,oz)||1;x=n.tc.x+ox/od*11;z=n.tc.z+oz/od*11}if(H(x,z)<.6){x=n.tc.x+12;z=n.tc.z}n.post={x,z};n.x=x;n.z=z;n.y=H(x,z);n.m.position.set(n.x,n.y,n.z);n.m.rotation.y=Math.atan2(n.tc.x-x,n.tc.z-z);
  const fx=x+2.4,fz=z+1.1;if(H(fx,fz)>.5){lightFire(fx,fz,1e7);const fr=fires[fires.length-1];if(fr)fr.keep=true}}
 function spawnRigs(n){
+ // Starter kit only: the refinery, pump jack and quarry come with the settler.
+ // The 7x7 stone yard (foundations, walls, gate) is NOT placed here; yardSteps() queues it so they build it after the house.
  const plan=n.plan;if(!plan||plan.cx==null)return;
  const cx=plan.cx,cz=plan.cz,w=plan.w,d=plan.d;
  const side=sideFromAng(n.farmAng||0);
- // Pre-generate a 7x7 Compound Wall Perimeter (2 cells out from the 3x3 building)
- const minX=cx-2,maxX=cx+w+1,minZ=cz-2,maxZ=cz+d+1;
- const gateX=cx+Math.floor(w/2),gateZ=cz+Math.floor(d/2);
+
  clearNodes((cx+(w-1)/2)*C,(cz+(d-1)/2)*C,(w+4)*C*.62);
-
- NPCBUILD=1;
- // 1. Lay foundation ring for the compound wall
- for(let ix=minX;ix<=maxX;ix++){
-  for(let iz=minZ;iz<=maxZ;iz++){
-   if(ix!==minX&&ix!==maxX&&iz!==minZ&&iz!==maxZ)continue;
-   const fk=key(ix,iz,0);
-   if(!FD.has(fk)){
-    const fa=aim(ITEMS.stone_foundation,ix*C,iz*C,0);
-    if(fa.ok){construct(ITEMS.stone_foundation,fa,1);const r=PCS[PCS.length-1];if(r)r.n=n}
-   }
-  }
- }
- // 2. Place Compound Walls + Gate (stone_wall + stone_doorway + metal_door)
- const prevDoor=n.devs.door;
- const buildCompoundEdge=(ex,ez,dir,isGate)=>{
-  const kind=isGate?'stone_doorway':'stone_wall';
-  const st=[kind,'e',ex,ez,dir,0],s=structState(st);
-  if(!s||!canStruct(s)||alreadyStruct(s))return;
-  commitStruct(n,st,s);
-  const r=PCS[PCS.length-1];if(r)r.n=n;
-  if(isGate){
-   // commitStruct only hangs a plain door on a doorway, so hang one and upgrade it to sheet metal
-   const dst=['door','e',ex,ez,dir,0],ds=structState(dst);
-   if(ds&&canStruct(ds)){
-    commitStruct(n,dst,ds);
-    const gateDev=devs[devs.length-1];
-    if(gateDev&&isDoor(gateDev.t)){
-     upgradeDoor(gateDev,'metal_door',true);
-     gateDev.npc=n;n.devs.gate=gateDev;
-    }
-   }
-  }
- };
- for(let ix=minX;ix<=maxX;ix++){
-  buildCompoundEdge(ix,minZ-1,'S',side==='N'&&ix===gateX);
-  buildCompoundEdge(ix,maxZ,'S',side==='S'&&ix===gateX);
- }
- for(let iz=minZ;iz<=maxZ;iz++){
-  buildCompoundEdge(minX-1,iz,'E',side==='W'&&iz===gateZ);
-  buildCompoundEdge(maxX,iz,'E',side==='E'&&iz===gateZ);
- }
- NPCBUILD=0;
- // the building's own door is placed later by the build queue; keep n.devs.door free for it
- if(prevDoor)n.devs.door=prevDoor;else delete n.devs.door;
-
- // 3. Start the base with an Oil Refinery, Mining Quarry, and Pump Jack inside the compound yard.
+ // Starter rigs: Oil Refinery, Mining Quarry and Pump Jack inside the future compound yard.
  // They sit on the middle yard cell of each non-gate side (the corner pads get wood foundations later).
  const midI=cx+((w-1)>>1),midJ=cz+((d-1)>>1);
  const cellOf={N:[midI,cz-1],S:[midI,cz+d],W:[cx-1,midJ],E:[cx+w,midJ]};
@@ -53963,6 +53932,7 @@ function mkSettler(sx,sz,c,opt){
   while(H(sx,sz)<1&&Math.hypot(sx,sz)>2){sx*=.9;sz*=.9}
   const n={x:sx,z:sz,y:H(sx,sz),hp:Math.round(90*DF.sHp),maxHp:Math.round(90*DF.sHp),aggro:0,healCd:0,inv:{wood:12,stone:10,ore:2,metal:4,gears:0,circuit:0,sulfur:0,fuel:6},devs:{},i:0,cd:0,fail:0,m:spawnMan(c,false),bp:[],hx:sx,hz:sz,k:'settler'};
   n.m.position.set(sx,n.y,sz);n.m.userData.k='settler';n.m.userData.a=n;things.push(n.m);
+  if(opt.raid){n.fac='raid';n.told=1}
   const tryPlan=p=>{
     for(let r=0;r<16&&!n.bp.length;r++)for(let k=0;k<8&&!n.bp.length;k++){
       const ang=k*.785+r*.31+hash(sx,sz+r), dist=r===0?0:12+r*15;
@@ -53984,7 +53954,30 @@ function mkSettler(sx,sz,c,opt){
   plantFarm(n);clearPlan(n.plan);
   const bonus=n.close?{wood:70,stone:24,ore:2}:{wood:50,stone:16,ore:1};
   n.inv.wood=(n.inv.wood||0)+bonus.wood;n.inv.stone=(n.inv.stone||0)+bonus.stone;n.inv.ore=(n.inv.ore||0)+bonus.ore;
-  spawnRigs(n);stockFurnace(n);NP.push(n);return true}
+  spawnRigs(n);stockFurnace(n);NP.push(n);if(opt.raid)raidInstant(n);return true}
+// ===== RAIDER BASES: the old fully pre-built compound, now a hostile faction (n.fac==='raid') =====
+// Same NPC code as settlers (rigs, bed respawn, weapon tiers, upgrades, hauling, combat), but the base is already standing,
+// they live off the land, and they fight settlers (and you) on contact. Existing raiders and camps are their allies.
+function raidInstant(n){
+ if(!n.bp||!n.bp.length)return;
+ let todo=n.bp.slice(n.i||0).filter(st=>st[0]!=='wire');
+ for(let pass=0;pass<3&&todo.length;pass++){const miss=[];for(const st of todo)if(!placePiece(n,st,true))miss.push(st);todo=miss}
+ for(const st of n.bp)if(st[0]==='wire'){const a=n.devs[st[1]],b=n.devs[st[2]];if(a&&b&&!wires.some(q=>(q.a===a&&q.b===b)||(q.a===b&&q.b===a)))addWire(a,b)}
+ n.i=n.bp.length;
+ const g=n.devs.gate;if(g&&!g._gone&&g.t==='door')upgradeDoor(g,'metal_door',true);
+ n.inv.wood+=60;n.inv.stone+=40;n.inv.metal+=20;n.inv.gears+=2;
+ if(!n.wp&&typeof setSettlerWeapon==='function'&&SWP[1]){const w=SWP[1][hash(Math.round(n.hx||0),1.7)>.5?1:0];setSettlerWeapon(n,Object.assign({t:1},w))}
+ finishYard(n);
+}
+function spawnRaidBases(){
+ const want=3;let made=0;
+ for(let i=0;made<want&&i<want*60;i++){
+  const x=(hash(i*3.31,7.7)*2-1)*(B-150),z=(hash(8.8,i*2.73)*2-1)*(B-150);
+  if(Math.hypot(x-SP.x,z-SP.z)<230)continue;
+  const site=drySite(x,z,230,1);if(!site)continue;
+  if(mkSettler(site[0],site[1],0x7a2a22,{raid:1}))made++;
+ }
+}
 function drySite(x,z,minD,loose){const md=minD==null?140:minD,mpad=loose?18:48,relief=loose?3.6:2.6,minH=loose?.85:1.15,maxH=loose?8.2:6.6;for(let r=0;r<10;r++)for(let k=0;k<8;k++){const a=k*.785+r*.17,d=r*18,nx=x+Math.cos(a)*d,nz=z+Math.sin(a)*d;if(Math.abs(nx)>B-90||Math.abs(nz)>B-90)continue;if(Math.hypot(nx-SP.x,nz-SP.z)<md)continue;if(MONS.some(m=>Math.hypot(m.x-nx,m.z-nz)<m.r+mpad))continue;if(NP.some(q=>Math.hypot((q.lot?q.lot.x:q.hx)-nx,(q.lot?q.lot.z:q.hz)-nz)<115))continue;if(typeof inRiver==='function'&&(inRiver(nx,nz,26)||inPond(nx,nz)))continue;const h=H(nx,nz);if(h<minH||h>maxH)continue;let lo=h,hi=h;for(const p of[[16,0],[-16,0],[0,16],[0,-16]]){const qh=H(nx+p[0],nz+p[1]);lo=Math.min(lo,qh);hi=Math.max(hi,qh)}if(hi-lo<relief&&lo>.85)return[nx,nz]}return null}
 function clearLook(tx,tz){let best=null,bs=1e9;for(let k=0;k<24;k++){const a=k*.262+0.35,x=tx+Math.cos(a)*17,z=tz+Math.sin(a)*17,h=H(x,z);if(h<1.2||h>6.4)continue;let block=0;for(const o of things){if(o.userData.k!=='tree'&&o.userData.k!=='rock')continue;const px=o.position.x,pz=o.position.z,dx=tx-x,dz=tz-z,l2=dx*dx+dz*dz||1;let u=((px-x)*dx+(pz-z)*dz)/l2;if(u<.06||u>.92)continue;if(Math.hypot(px-(x+dx*u),pz-(z+dz*u))<2.6)block++}const pen=block*12+Math.abs(h-2.4);if(pen<bs){bs=pen;best=[x,z,h,block]}}return best}
 function spawnSettlers(){const cols=[0x3b6ea5,0x4a8a52,0xa5823b,0x8a4a9a,0x3b8a8a,0x9a3b4a,0x6a6a3b,0x4a4a9a,0x9a6a3b,0x3b9a6a,0x6a3b9a,0x9a9a3b,0x3b6a9a,0x9a3b6a,0x5a8a3b,0x8a5a3b];const want=12;const bear=(x,z)=>Math.atan2(-(x-SP.x),-(z-SP.z));const ad=(a,b)=>{let d=Math.abs(a-b)%6.283185;if(d>3.141593)d=6.283185-d;return d};const fwd=(th,dist)=>[SP.x-Math.sin(th)*dist,SP.z-Math.cos(th)*dist];let nx=SP.x+68,nz=SP.z+12;if(MONS.length){let b=MONS[0],bd=1e9;for(const m of MONS){const d=Math.hypot(m.x-SP.x,m.z-SP.z);if(d<bd){bd=d;b=m}}const dx=b.x-SP.x,dz=b.z-SP.z,l=Math.hypot(dx,dz)||1;nx=SP.x+dx/l*70;nz=SP.z+dz/l*70}const keep=LOT_MIN;LOT_MIN=40;const cands=[];for(const s of [1.2,-1.2,1.75,-1.75,2.35,-2.35])cands.push(fwd(faceYaw+s,54));cands.push([nx,nz]);for(let k=0;k<12;k++)cands.push(fwd(faceYaw+.85+k*.42,48+(k%4)*11));const plantAt=need=>{for(const c of cands){const near=drySite(c[0],c[1],32,1);if(!near||Math.hypot(near[0]-SP.x,near[1]-SP.z)>100)continue;if(need&&ad(bear(near[0],near[1]),faceYaw)<.95)continue;if(mkSettler(near[0],near[1],cols[0],{close:1})){NP[NP.length-1].close=1;return true}}return false};if(!plantAt(true))plantAt(false);LOT_MIN=keep;for(let i=0;NP.length<want&&i<want*18;i++){const x=(hash(i*2.17,9.4)*2-1)*(B-150),z=(hash(4.4,i*3.11)*2-1)*(B-150),site=drySite(x,z,70,1);if(site)mkSettler(site[0],site[1],cols[NP.length%cols.length])}const home=NP.slice().sort((a,b)=>Math.hypot((a.lot?a.lot.x:a.x)-SP.x,(a.lot?a.lot.z:a.z)-SP.z)-Math.hypot((b.lot?b.lot.x:b.x)-SP.x,(b.lot?b.lot.z:b.z)-SP.z))[0];if(home&&home.lot){const ax=(home.lot.x+home.x)*.5,az=(home.lot.z+home.z)*.5;const spot=clearLook(ax,az);if(spot){P.x=LP.x=spot[0];P.z=LP.z=spot[1];P.y=spot[2]+1.7}yaw=Math.atan2(-(ax-P.x),-(az-P.z));pitch=-.32;if(Math.hypot(home.lot.x-P.x,home.lot.z-P.z)<140){say('Down the road a settler put a cupboard down and is building the camp out from it. A cupboard room, a workshop, a loot room and a bedroom upstairs still have to go up.');msgT=8}}}
@@ -53999,7 +53992,7 @@ function haulLoad(n){return (n.inv.wood||0)+(n.inv.stone||0)+(n.inv.ore||0)+(n.i
 function pickJob(n){
   n.trips=(n.trips||0)+1;
   const home=n.home||n.lot||{x:n.hx,z:n.hz};
-  const safeMons=MONS.filter(q=>!q.raiderCamp);
+  const safeMons=MONS.filter(q=>!q.raiderCamp&&(settlerArmed(n)||!ROG.some(r=>r.hp>0&&r.mon===q)));
   if(hash(n.seed+n.trips,(age*2)|0)<.4&&safeMons.length){
     const m=safeMons[((n.seed+n.trips)%safeMons.length+safeMons.length)%safeMons.length], ang=hash(m.x+n.trips,m.z)*6.283, rad=Math.max(5,(m.r||12)*.62);
     return {k:'mon',m,x:m.x+Math.cos(ang)*rad,z:m.z+Math.sin(ang)*rad,t:age+70};
@@ -54015,11 +54008,11 @@ function pickJob(n){
 function senseMon(n){
   if(n.job&&n.job.k==='mon')return;
   let best=null,bd=62;
-  for(const m of MONS){if(m.raiderCamp)continue;const d=Math.hypot(m.x-n.x,m.z-n.z);if(d<bd&&d>7){bd=d;best=m}}
+  for(const m of MONS){if(m.raiderCamp||(!settlerArmed(n)&&ROG.some(r=>r.hp>0&&r.mon===m)))continue;const d=Math.hypot(m.x-n.x,m.z-n.z);if(d<bd&&d>7){bd=d;best=m}}
   if(!best||hash(n.x+age,n.seed)<.62)return;
   const ang=hash(best.x,n.seed)*6.28, rad=Math.max(5,(best.r||12)*.6);
   n.job={k:'mon',m:best,x:best.x+Math.cos(ang)*rad,z:best.z+Math.sin(ang)*rad,t:age+55};
-  if(Math.hypot(P.x-n.x,P.z-n.z)<46)say('A settler recognizes '+best.n+' and heads over.');
+  if(!n.fac&&Math.hypot(P.x-n.x,P.z-n.z)<46)say('A settler recognizes '+best.n+' and heads over.');
 }
 function settlerLoot(n,m){
   let best=null,bd=3.1;
@@ -54077,8 +54070,8 @@ function upgradeWork(n,dt){
  if(n.hp<=0)return false;
  if(repairWork(n,dt))return true;
  // Upgrade wooden camp door to Sheet Metal Door once metal/gears are available
- const door=n.devs&&n.devs.door;
- if(door&&!door._gone&&door.t==='door'&&(n.inv.metal||0)>=45&&(n.inv.gears||0)>=1){
+ const door=[n.devs&&n.devs.door,n.devs&&n.devs.gate].find(d=>d&&!d._gone&&d.t==='door');
+ if(door&&(n.inv.metal||0)>=45&&(n.inv.gears||0)>=1){
   if(Math.hypot(door.x-n.x,door.z-n.z)>4.5){go(n,door.x,door.z,3.4,dt);return true}
   if(n.cd>0)return true;n.cd=.5;n.sw=.45;n.inv.metal-=45;n.inv.gears-=1;upgradeDoor(door,'metal_door',true);return true}
  if(!(n.upAt>age)){n.upAt=age+12;const q=[];for(const r of PCS){if(r.n===n&&r.m&&r.m.parent&&TORD.indexOf(r.t)<2)q.push(r)}q.sort((a,b)=>TORD.indexOf(a.t)-TORD.indexOf(b.t)||(UPO[a.p]||0)-(UPO[b.p]||0));n.upQ=q}
@@ -54105,7 +54098,7 @@ function wantTier(){return Math.max(1,Math.min(5-daysToRaid(),Math.min(5,raidNo(
 function campGunTier(){return 3}
 function settlerArmed(n){return !!n&&(n.wt||0)>=campGunTier()}
 function campPad(){return Math.ceil(58*DF.sight)+10}
-function campDanger(n,x,z){try{if(!n||n.k!=='settler'||(n.wt||0)>=campGunTier())return null;const hm=n.home||n.lot||{x:n.hx,z:n.hz};if(Math.hypot(n.x-hm.x,n.z-hm.z)<26&&Math.hypot(x-hm.x,z-hm.z)<30)return null;const pad=campPad();for(const c of RCAMPS){if(!c.raiders||!c.raiders.some(r=>r&&r.hp>0))continue;if(Math.hypot(x-c.x,z-c.z)<c.r+pad)return c}}catch(e){}return null}
+function campDanger(n,x,z){try{if(!n||n.k!=='settler'||n.fac==='raid'||(n.wt||0)>=campGunTier())return null;const hm=n.home||n.lot||{x:n.hx,z:n.hz};if(Math.hypot(n.x-hm.x,n.z-hm.z)<26&&Math.hypot(x-hm.x,z-hm.z)<30)return null;const pad=campPad();for(const c of RCAMPS){if(!c.raiders||!c.raiders.some(r=>r&&r.hp>0))continue;if(Math.hypot(x-c.x,z-c.z)<c.r+pad)return c}}catch(e){}return null}
 function setSettlerWeapon(n,w){n.wp=w;n.wt=w.t;const tw=n.m&&n.m.userData&&n.m.userData.tw;if(!tw)return;mountHeld3P(tw,w.id,!!w.rng,false)}
 function weaponWork(n,dt){
  if(n.hp<=0)return false;
@@ -54140,7 +54133,7 @@ function npcAI(n,dt){const st=n.bp[n.i];if(!st){nextWork(n,dt);return}
  else if(++n.fail>8){n.fail=0;const tries=(st._try=(st._try||0)+1);if(tries<=4)n.bp.push(st);else n.skip=(n.skip||0)+1;n.i++}}
 function tickSettler(n,dt){if(!n||n.hp<=0)return;n.cd-=dt;n._mv=0;npcAI(n,dt);animMan(n,dt)}
 function warmSettlers(){
-  if(!NP.some(n=>n.close)&&NP.length){const n=NP.slice().sort((a,b)=>Math.hypot((a.lot?a.lot.x:a.x)-SP.x,(a.lot?a.lot.z:a.z)-SP.z)-Math.hypot((b.lot?b.lot.x:b.x)-SP.x,(b.lot?b.lot.z:b.z)-SP.z))[0];if(n)n.close=1}
+  if(!NP.some(n=>n.close)&&NP.length){const n=NP.filter(q=>!q.fac).sort((a,b)=>Math.hypot((a.lot?a.lot.x:a.x)-SP.x,(a.lot?a.lot.z:a.z)-SP.z)-Math.hypot((b.lot?b.lot.x:b.x)-SP.x,(b.lot?b.lot.z:b.z)-SP.z))[0];if(n)n.close=1}
   for(const n of NP){if(n.bp&&n.i>=n.bp.length&&!n.home&&n.tc)finishYard(n);stockFurnace(n)}
 }
 function landNear(minD,maxD,tries){for(let i=0;i<(tries||40);i++){const a=Math.random()*6.283,r=minD+Math.random()*(maxD-minD),x=P.x+Math.cos(a)*r,z=P.z+Math.sin(a)*r;if(Math.abs(x)<B&&Math.abs(z)<B&&H(x,z)>.8)return[x,z]}return null}
@@ -54165,10 +54158,11 @@ const TC_R=26,TUR_R=30;
 function tcCovering(x,z){let best=null,bd=TC_R;for(const d of devs){if(d.t!=='tc'||d._gone)continue;const q=Math.hypot(d.x-x,d.z-z);if(q<bd){bd=q;best=d}}return best}
 function privWhy(x,z,npc){const tc=tcCovering(x,z);if(!tc)return '';if(npc)return tc.npc===npc?'':'Building blocked.';if(tc.owner==='you')return '';return 'Building blocked. Their tool cupboard holds this ground.'}
 function playerTC(){let best=null,score=-1;for(const d of devs){if(d.t!=='tc'||d.owner!=='you'||d._gone)continue;let s=1;for(const c of ALLC)if(c.piece&&c.owner==='you'&&c.hp>0){const cx=(c.x0+c.x1)/2,cz=(c.z0+c.z1)/2;if(Math.hypot(cx-d.x,cz-d.z)<=TC_R)s++}if(s>score){score=s;best=d}}return best}
-function aggroSettler(n,sec){if(!n||n._dead||n.hp<=0)return;n.aggro=Math.max(n.aggro||0,sec);for(const o of NP)if(o!==n&&!o._dead&&o.hp>0&&Math.hypot(o.x-n.x,o.z-n.z)<24)o.aggro=Math.max(o.aggro||0,sec*.8)}
-function pokeBase(x,z){let b=null,bd=26;for(const n of NP){if(n._dead||n.hp<=0)continue;const q=Math.hypot(n.x-x,n.z-z);if(q<bd){bd=q;b=n}}if(!b)return;const was=b.aggro>0;aggroSettler(b,28);if(!was)say('The settlers turn on you.')}
+function aggroSettler(n,sec){if(!n||n._dead||n.hp<=0)return;n.aggro=Math.max(n.aggro||0,sec);for(const o of NP)if(o!==n&&!o._dead&&o.hp>0&&(o.fac||0)===(n.fac||0)&&Math.hypot(o.x-n.x,o.z-n.z)<24)o.aggro=Math.max(o.aggro||0,sec*.8)}
+function pokeBase(x,z){let b=null,bd=26;for(const n of NP){if(n._dead||n.hp<=0||n.fac==='raid')continue;const q=Math.hypot(n.x-x,n.z-z);if(q<bd){bd=q;b=n}}if(!b)return;const was=b.aggro>0;aggroSettler(b,28);if(!was)say('The settlers turn on you.')}
 function killSettler(n){
  if(!n||n._dead||n.respawnAt)return;
+ const who=n.fac==='raid'?'Raider':'Settler';if(n.fac==='raid'&&Math.hypot(P.x-n.x,P.z-n.z)<48){give('scrap',2+(Math.random()*4|0));if(Math.random()<.3)give('gears',1)}
  if(Math.hypot(P.x-n.x,P.z-n.z)<48){
   give('wood',4+(Math.random()*6|0));
   if(Math.random()<.45)give('stone',3);
@@ -54179,13 +54173,13 @@ function killSettler(n){
   n.hp=0;n.aggro=0;n.respawnAt=age+45;
   n.m.visible=false;
   const ti=things.indexOf(n.m);if(ti>=0)things.splice(ti,1);
-  if(Math.hypot(P.x-n.x,P.z-n.z)<48)say('Settler downed. They will respawn at their bed in 45s unless their TC is destroyed.');
+  if(Math.hypot(P.x-n.x,P.z-n.z)<48)say(who+' downed. They will respawn at their bed in 45s unless their TC is destroyed.');
   return;
  }
  n._dead=1;n.hp=-1;dropFoe(n);
  if(n.bed&&n.bed.m)scene.remove(n.bed.m);
  const i=NP.indexOf(n);if(i>=0)NP.splice(i,1);
- if(Math.hypot(P.x-n.x,P.z-n.z)<48)say('Settler eliminated permanently.');
+ if(Math.hypot(P.x-n.x,P.z-n.z)<48)say(who+' eliminated permanently.');
 }
 function gdtOf(dt){const fwd=ch('freeze')?0:(CH.on?CH.ts:1);return dt*fwd*(pace/REF_PACE)}
 function tcTake(d,id,n){let left=n;for(let i=0;i<d.sl.length&&left>0;i++){const s=d.sl[i];if(!s||s.id!==id)continue;const a=Math.min(s.n,left);s.n-=a;left-=a;if(s.n<=0)d.sl[i]=null}return n-left}
@@ -54396,6 +54390,80 @@ function gunSiege(e,dt,speed){const G=RGUN[e.gun];if(!G)return false;e.gcd=Math.
  if(Math.random()<acc)hurtP(G.dmg*(e.dmgK||1),'The raid');
  if(age>RGT){RGT=age+.08;if(dp<60)blip(e.gun==='shotgun'?95:(e.gun==='ak'||e.gun==='rifle')?140:190,.05,'square')}
  return true}
+// ===== MONUMENT ROGUES: melee & pistol/shotgun scavengers guarding the bigger monuments, hostile to EVERYONE =====
+const MELEE_IDS=['club','spear','knife','machete'],ROG=[];
+function rogueCount(mo){if(!mo||mo.raiderCamp||!mo.w||!mo.d)return 0;const a=mo.w*mo.d;return a>=36?3:a>=20?2:0}
+function spawnRogue(mo,i){
+ const mel=MELEE_IDS[(i+((Math.abs(mo.x+mo.z))|0))%MELEE_IDS.length];
+ const isMel=i%2===1,gun=isMel?null:(i%4===2?'shotgun':'pistol'),G=gun?RGUN[gun]:null,R=Math.max(mo.w,mo.d)*C/2+2.5;
+ let x=0,z=0,ok=false;
+ for(let t=0;t<10&&!ok;t++){const a=hash(mo.x+i*5.1+t*1.7,mo.z)*6.283;x=mo.x+Math.cos(a)*R;z=mo.z+Math.sin(a)*R;ok=H(x,z)>.7}
+ if(!ok)return null;
+ const maxHp=Math.round((gun?44:38)*DF.hp),ar={h:false,v:false,l:false};
+ const e={k:'raider',rogue:1,mon:mo,role:'assault',x,z,y:H(x,z),homeX:mo.x,homeZ:mo.z,hp:maxHp,maxHp,meds:0,heavy:false,cheat:true,siege:false,idx:EN.length+i,pth:[],side:1,strafeDir:i%2?1:-1,kit:'melee',mel,nades:0,ordCd:1,back:0,gun,mag:G?G.mag:0,ammo:G?G.mag*4:0,gcd:.6+Math.random(),rl:0,patW:Math.random()*3,accK:.68*DF.acc,dmgK:.72*DF.dmg,armr:ar,armorK:1,m:spawnMan(0x3a3a5a,true,{heavy:false,kit:'melee',gun,mel,arm:ar})};
+ e.m.userData.k='raider';e.m.userData.a=e;e.m.position.set(e.x,e.y,e.z);things.push(e.m);EN.push(e);ROG.push(e);return e}
+function spawnRogues(){for(const mo of MONS){mo.rogueN=rogueCount(mo);for(let i=0;i<mo.rogueN;i++)spawnRogue(mo,i)}}
+function rogueRespawn(dt,pc){
+ for(let i=ROG.length-1;i>=0;i--)if(ROG[i].hp<=0)ROG.splice(i,1);
+ if(pc)return;
+ for(const mo of MONS){if(!mo.rogueN)continue;let live=0;for(const r of ROG)if(r.mon===mo)live++;
+  if(live>=mo.rogueN){mo.rogueT=null;continue}
+  mo.rogueT=(mo.rogueT==null?420:mo.rogueT)-dt;
+  if(mo.rogueT<=0&&Math.hypot(P.x-mo.x,P.z-mo.z)>110){mo.rogueT=null;spawnRogue(mo,live+((age*7)|0))}}}
+// nearest thing a rogue wants dead: you, any settler/raider-base member, any non-rogue raider
+function rogueTarget(e){
+ const G=e.gun&&RGUN[e.gun];let best=null,bd=G?Math.min(G.range*.92,28):22;
+ const test=o=>{const d=Math.hypot(o.x-e.x,o.z-e.z);if(d<bd&&turretSees(e,o)){bd=d;best=o}};
+ for(const n of NP){if(n._dead||n.hp<=0||n.respawnAt)continue;test(n)}
+ for(const r of EN){if(r===e||r.rogue||r.hp<=0)continue;test(r)}
+ if(!ch('peace')&&!dead)test({x:P.x,y:P.y-1.7,z:P.z,_ply:1,hp:999});
+ return best}
+function rogueNear(e){const G=e.gun&&RGUN[e.gun];let best=null,bd=G?Math.min(G.range,26):16;for(const r of ROG){if(r.hp<=0)continue;const d=Math.hypot(r.x-e.x,r.z-e.z);if(d<bd&&turretSees(e,r)){bd=d;best=r}}return best}
+function rogueFire(e,dt,t){
+ const G=e.gun&&RGUN[e.gun],M=(e.mel&&ITEMS[e.mel]&&ITEMS[e.mel].mel)||{dmg:18,cd:.55,reach:2.2},reach=Math.max(1.85,(M.reach||2.2)*.78);
+ const dx=t.x-e.x,dz=t.z-e.z,d=Math.hypot(dx,dz)||1;
+ e.gcd=Math.max(0,(e.gcd||0)-dt);
+ if(!G||d<=reach){
+  if(!e.tower&&d>reach){go(e,t.x,t.z,2.55,dt);e.m.rotation.y=Math.atan2(dx,dz);return}
+  e._mv=0;e.m.rotation.y=Math.atan2(dx,dz);
+  if(d<=reach+.35&&e.gcd<=0){
+   e.gcd=(M.cd||.55)*1.15;e.sw=.45;
+   const dm=Math.round((M.dmg||18)*.48)*(e.dmgK||1);
+   if(t._ply)hurtP(dm,e.rogue?'A monument rogue':'The raid');
+   else if(t.k==='settler'){t.hp-=dm;underFire(t,e.x,e.z,e.y);if(t.hp<=0)killSettler(t)}
+   else{t.hp-=dm*foeMit(t.heavy?.75:1,t.armorK||1);underFire(t,e.x,e.z,e.y);t.back=Math.max(t.back||0,.2)}
+   if(Math.hypot(P.x-e.x,P.z-e.z)<45)blip(185,.05,'sawtooth');
+  }
+  return;
+ }
+ if(e.rl>0){e.rl-=dt;if(e.rl<=0){e.ammo=Math.max(e.ammo||0,G.mag);const k=Math.min(G.mag,e.ammo);e.mag=k;e.ammo-=k}}else if(e.mag<=0)e.rl=2.2;
+ e._mv=0;e.aimT=.35;
+ if(!e.tower)tacticalMove(e,t.x,t.z,d,G.range*(e.gun==='shotgun'||e.gun==='pump'?.4:.5),2.25,dt);
+ e.m.rotation.y=Math.atan2(dx,dz);
+ if(e.rl>0||e.mag<=0||e.gcd>0)return;
+ e.gcd=G.rate*(1.25+Math.random()*.45);e.mag--;e.armUp=.22;
+ const oy=e.y+1.4,ty=t._ply?P.y-.35:(t.y||0)+1.1,L=Math.hypot(d,ty-oy)||1;
+ tracer(e.x,oy,e.z,dx/L,(ty-oy)/L,dz/L,L,e.m.rotation.y);
+ if(Math.random()<Math.max(.1,G.acc*(1-d/(G.range*1.2)))*(e.accK||1)){
+  const dm=G.dmg*(e.dmgK||1);
+  if(t._ply)hurtP(dm,e.rogue?'A rogue gunman':'The raid');
+  else if(t.k==='settler'){t.hp-=dm;underFire(t,e.x,e.z,e.y);if(t.hp<=0)killSettler(t)}
+  else{t.hp-=dm*foeMit(t.heavy?.75:1,t.armorK||1);underFire(t,e.x,e.z,e.y);t.back=Math.max(t.back||0,.2)}}
+ if(age>RGT){RGT=age+.08;if(Math.hypot(P.x-e.x,P.z-e.z)<60)blip(e.gun==='shotgun'?95:190,.05,'square')}}
+function driveRogue(e,dt){
+ const dp=Math.hypot(P.x-e.x,P.z-e.z);
+ if(e.m)e.m.visible=dp<185;
+ if(dp>185)return;
+ e._mv=0;
+ if(e.hp<e.maxHp*.4&&(e.meds||0)>0){e.meds--;e.hp=Math.min(e.maxHp,e.hp+Math.round(30*DF.hp));e.crouchT=1}
+ const mo=e.mon,R=Math.max(mo.w,mo.d)*C/2+2.5,far=Math.hypot(e.x-mo.x,e.z-mo.z)>R+24;
+ const t=far?null:rogueTarget(e);
+ if(t){e.patP=null;rogueFire(e,dt,t);animMan(e,dt);return}
+ if(far&&!e.patP){const a=Math.atan2(e.z-mo.z,e.x-mo.x);e.patP=[mo.x+Math.cos(a)*R,mo.z+Math.sin(a)*R]}
+ if(!e.patP){if((e.patW-=dt)<=0){e.patIdx=(e.patIdx||0)+1;const a=e.patIdx*1.3+hash(e.idx,e.patIdx)*.7;e.patP=[mo.x+Math.cos(a)*R,mo.z+Math.sin(a)*R]}}
+ else if(Math.hypot(e.patP[0]-e.x,e.patP[1]-e.z)<1.7){e.patP=null;e.patW=2+Math.random()*3}
+ else go(e,e.patP[0],e.patP[1],1.9,dt);
+ animMan(e,dt)}
 function raidTurret(e){let b=null,bd=70;for(const d of devs){if(d.t!=='turret'||d._gone||d.hp<=0)continue;const q=Math.hypot(d.x-e.x,d.z-e.z);if(q<bd){bd=q;b=d}}return b}
 function raidHitTurret(d,dm){d.hp-=dm;wbPoke(d);if(d.hp<=0){killDev(d);say(d.owner==='you'?'A turret of yours was destroyed.':'A settler turret was destroyed.')}}
 function raidTurretAct(e,dt,speed,d){const G=RGUN[e.gun],dx=d.x-e.x,dz=d.z-e.z,q=Math.hypot(dx,dz)||1;e.gcd=Math.max(0,(e.gcd||0)-dt);
@@ -54405,7 +54473,7 @@ function raidTurretAct(e,dt,speed,d){const G=RGUN[e.gun],dx=d.x-e.x,dz=d.z-e.z,q
   return true}
  if(q<2.2){raidHitTurret(d,(e.heavy?22:15)*dt);if(!(e.sw>0))e.sw=.45;return true}
  go(e,d.x,d.z,speed*1.1,dt);return true}
-function raidFoe(e,dp){let b=null,bd=dp>45?75:Math.min(75,dp);for(const n of NP){if(n._dead||n.hp<=0)continue;const q=Math.hypot(n.x-e.x,n.z-e.z);if(q<bd){bd=q;b=n}}return b}
+function raidFoe(e,dp){let b=null,bd=dp>45?75:Math.min(75,dp);for(const n of NP){if(n._dead||n.hp<=0||n.fac==='raid')continue;const q=Math.hypot(n.x-e.x,n.z-e.z);if(q<bd){bd=q;b=n}}return b}
 function raidSettler(e,dt,speed,n){const G=RGUN[e.gun],dx=n.x-e.x,dz=n.z-e.z,d=Math.hypot(dx,dz)||1;e.gcd=Math.max(0,(e.gcd||0)-dt);
  if(G){if(e.rl>0){e.rl-=dt;if(e.rl<=0){const k=Math.min(G.mag,e.ammo);e.mag=k;e.ammo-=k}}else if(e.mag<=0&&e.ammo>0)e.rl=2.2}
  const dmgS=dm=>{n.hp-=dm;underFire(n,e.x,e.z,e.y);if(n.hp<=0){killSettler(n);say('Raiders killed a settler.')}else if(age>(n._rs||0)){n._rs=age+8;say('Raiders are attacking a settler!')}};
@@ -54414,10 +54482,10 @@ function raidSettler(e,dt,speed,n){const G=RGUN[e.gun],dx=n.x-e.x,dz=n.z-e.z,d=M
   return true}
  if(d<1.7){dmgS((e.heavy?11:8)*dt*1.3);if(!(e.sw>0))e.sw=.45;return true}
  go(e,n.x,n.z,speed*1.1,dt);return true}
-function spawnSiege(idx){const sT=NP.filter(n=>n.hp>0&&!n._dead&&Math.hypot(n.x-P.x,n.z-P.z)<170),g3=idx%3,sn=sT.length&&((idx*7)%10)<DF.sTgt?sT[idx%sT.length]:null,anch=sn?{x:sn.x,z:sn.z}:g3===0?{x:P.x,z:P.z}:(siegeAnchor.live?{x:P.x,z:P.z}:siegeAnchor);const q=ringSpawn(anch.x,anch.z,sn?42:36,sn?64:58);if(!q)return null;const N=raidNo(),NT=Math.max(1,N+DF.tier),T=raidTier(NT),heavy=Math.random()<Math.min(.85,(.15+.06*NT)*DF.heavy)+RT.heat*.05;const kit=kitFor(idx,true,heavy);
+function spawnSiege(idx){const sT=NP.filter(n=>n.hp>0&&!n._dead&&n.fac!=='raid'&&Math.hypot(n.x-P.x,n.z-P.z)<170),g3=idx%3,sn=sT.length&&((idx*7)%10)<DF.sTgt?sT[idx%sT.length]:null,anch=sn?{x:sn.x,z:sn.z}:g3===0?{x:P.x,z:P.z}:(siegeAnchor.live?{x:P.x,z:P.z}:siegeAnchor);const q=ringSpawn(anch.x,anch.z,sn?42:36,sn?64:58);if(!q)return null;const N=raidNo(),NT=Math.max(1,N+DF.tier),T=raidTier(NT),heavy=Math.random()<Math.min(.85,(.15+.06*NT)*DF.heavy)+RT.heat*.05;const kit=kitFor(idx,true,heavy);
  const gun=T.guns[(Math.random()*T.guns.length)|0],G=RGUN[gun],ar={h:heavy||Math.random()<T.h,v:heavy||Math.random()<T.v,l:heavy||Math.random()<T.l},hpK=Math.min(1.8,1+DF.grow*(N-1)),maxHp=Math.round(((heavy?84:56)+RT.heat*5)*hpK*DF.hp);
- const role=kit.kit!=='melee'&&kit.nades>0?'breacher':gun==='rifle'?'marksman':idx%2===1?'flanker':'assault';
- const e={k:'raider',role,x:q[0],z:q[1],y:H(q[0],q[1]),hp:maxHp,maxHp,meds:heavy?2:1,heavy,cheat:true,siege:true,idx,pth:[],side:1,strafeDir:idx%2?1:-1,kit:kit.kit,nades:kit.nades,ordCd:.6+Math.random()*1.4,back:0,gun,mag:G.mag,ammo:G.mag*(2+N),gcd:.5+Math.random(),rl:0,accK:Math.min(1.7,(.8+.08*NT)*DF.acc),dmgK:(1+.07*(NT-1))*DF.dmg,armr:ar,armorK:(ar.h?.88:1)*(ar.v?.72:1)*(ar.l?.9:1),m:spawnMan(0x6e2218,true,{heavy,kit:kit.kit,gun,arm:ar})};e.m.userData.k='raider';e.m.userData.a=e;e.m.position.set(e.x,e.y,e.z);things.push(e.m);EN.push(e);return e}
+ const role=kit.kit!=='melee'&&kit.nades>0?'breacher':gun==='rifle'?'marksman':idx%2===1?'flanker':'assault',mel=MELEE_IDS[idx%MELEE_IDS.length];
+ const e={k:'raider',role,x:q[0],z:q[1],y:H(q[0],q[1]),hp:maxHp,maxHp,meds:heavy?2:1,heavy,cheat:true,siege:true,idx,pth:[],side:1,strafeDir:idx%2?1:-1,kit:kit.kit,mel,nades:kit.nades,ordCd:.6+Math.random()*1.4,back:0,gun,mag:G.mag,ammo:G.mag*(2+N),gcd:.5+Math.random(),rl:0,accK:Math.min(1.7,(.8+.08*NT)*DF.acc),dmgK:(1+.07*(NT-1))*DF.dmg,armr:ar,armorK:(ar.h?.88:1)*(ar.v?.72:1)*(ar.l?.9:1),m:spawnMan(0x6e2218,true,{heavy,kit:kit.kit,gun,mel,arm:ar})};e.m.userData.k='raider';e.m.userData.a=e;e.m.position.set(e.x,e.y,e.z);things.push(e.m);EN.push(e);return e}
 function launchRaid(){if(ch('peace'))return say('Peace is on.');raidSawDark=false;raidWarned=days;siegeAnchor=raidAnchor();const n=raidCount();let made=0;for(let i=0;i<n;i++)if(spawnSiege(i))made++;if(!made){say('Nowhere dry to land a raid.');return}raidPhase='active';raidSpawned=days;say('Raid crew incoming. '+made+' on the ridge.');blip(68,.5,'square')}
 function skipToRaid(){window.__bpSnap=1;const dayNum=days+1;if(dayNum%5!==0)days+=5-dayNum%5;else days+=5;t=.84;raidPhase='calm';raidSawDark=false;raidWarned=-1;raidSpawned=-1;say('Evening before a raid night. Day '+(days+1)+'. Tap the clock to speed the day, or start the crew now.')}
 let claimName=(opts&&opts.claimName)||'Blackpine Ridge',slotId=(opts&&opts.slotId)||('slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6));
@@ -54486,17 +54554,20 @@ function placeBed(){const x=P.x-Math.sin(yaw)*1.8,z=P.z-Math.cos(yaw)*1.8;if(H(x
 function wake(){if(!dead)return;dead=false;demise='';$('over').style.display='none';hurtFx=0;const isBed=CLAIM&&CLAIM.kind==='bed';S.health=isBed?85:48;S.hunger=isBed?68:42;S.thirst=isBed?68:48;S.energy=isBed?85:56;S.warmth=isBed?80:62;const x=CLAIM?CLAIM.x+1.2:SP.x,z=CLAIM?CLAIM.z+1.2:SP.z;P.x=LP.x=x;P.z=LP.z=z;P.y=Math.max(G(x,z),H(x,z),-2)+1.7;RT.heat=Math.max(0,RT.heat-.8);say(isBed?'You wake well-rested in your Respawn Bed.':CLAIM?'You wake at the bedroll.':'You wake where you first stood.');ensureStarter();persist()}
 
 function spawnRaider(cheat){let q=null;for(let i=0;i<24&&!q;i++){const t=cheat?landNear(18,30):landNear(50,100);if(t&&(cheat||raidGround(t[0],t[1])))q=t}if(!q)return;
- const heavy=Math.random()<.3,kit=kitFor(0,false,heavy),hasGun=Math.random()<(.38+Math.min(.42,RT.heat*.1)+DF.tier*.06),gun=hasGun?(heavy?'shotgun':Math.random()<.5?'pistol':'revolver'):null,G=gun?RGUN[gun]:null,maxHp=Math.round((heavy?75:55)*DF.hp);
- const e={k:'raider',role:hasGun?'flanker':'assault',x:q[0],z:q[1],y:H(q[0],q[1]),hp:maxHp,maxHp,meds:1,heavy,cheat:!!cheat,siege:false,idx:EN.length,pth:[],side:1,strafeDir:Math.random()<.5?1:-1,kit:kit.kit,nades:kit.nades,ordCd:1,back:0,gun,mag:G?G.mag:0,ammo:G?G.mag*2:0,gcd:.6,rl:0,accK:.88*DF.acc,dmgK:DF.dmg,m:spawnMan(0x8a2222,true,{heavy,kit:kit.kit,gun})};
+ const heavy=Math.random()<.3,kit=kitFor(0,false,heavy),hasGun=Math.random()<(.38+Math.min(.42,RT.heat*.1)+DF.tier*.06),gun=hasGun?(heavy?'shotgun':Math.random()<.5?'pistol':'revolver'):null,G=gun?RGUN[gun]:null,mel=MELEE_IDS[EN.length%MELEE_IDS.length],maxHp=Math.round((heavy?75:55)*DF.hp);
+ const e={k:'raider',role:hasGun?'flanker':'assault',x:q[0],z:q[1],y:H(q[0],q[1]),hp:maxHp,maxHp,meds:1,heavy,cheat:!!cheat,siege:false,idx:EN.length,pth:[],side:1,strafeDir:Math.random()<.5?1:-1,kit:kit.kit,mel,nades:kit.nades,ordCd:1,back:0,gun,mag:G?G.mag:0,ammo:G?G.mag*2:0,gcd:.6,rl:0,accK:.88*DF.acc,dmgK:DF.dmg,m:spawnMan(0x8a2222,true,{heavy,kit:kit.kit,gun,mel})};
  e.m.userData.k='raider';e.m.userData.a=e;e.m.position.set(e.x,e.y,e.z);things.push(e.m);EN.push(e)}
 function raidTick(dt){const pc=ch('peace');const raidDay=(days+1)%5===0;
  if(!pc&&raidDay&&raidWarned!==days&&t>.7&&t<.95&&dl()>.22){raidWarned=days;raidPhase='warning';const floor=Math.min(4,RT.build*.045+RT.scavenge*.03+RT.blood*.02);if(RT.heat<floor)RT.heat=floor;const tc=playerTC();say('Raid wave '+raidNo()+'. Heat '+heatStars()+'. About '+raidCount()+' are coming for '+(tc?'the tool cupboard.':CLAIM?'the bedroll.':'you.')+'.');blip(92,.35,'sawtooth');setTimeout(()=>blip(64,.45,'square'),260)}
  if(!pc&&raidDay&&raidSpawned!==days&&dl()<.2&&age>=raidTryAt){siegeAnchor=raidAnchor();const n=raidCount();let made=0;for(let i=0;i<n;i++)if(spawnSiege(i))made++;if(made){raidSpawned=days;raidPhase='active';raidSawDark=false;say('They are coming through the trees. '+made+' of them.');blip(58,.55,'square')}else{raidTryAt=age+12;if(raidPhase!=='active')raidPhase='warning';say('The crew is circling. No dry ground close enough yet.')}}
  if(raidPhase==='active'&&dl()<.3)raidSawDark=true;if(raidPhase==='active'&&raidSawDark&&dl()>.45){raidPhase='retreat';raidSawDark=false;say('Dawn. The crew falls back.');for(const q of EN)if(q.siege&&q.hp>0)q.flee=1}
  if((raidPhase==='active'||raidPhase==='retreat')&&raidSpawned===days&&!EN.some(e=>e.siege&&e.hp>0)){const broke=raidPhase==='active';raidPhase='calm';if(broke){RT.blood+=.4;say('The raid is broken.')}}
- if(!pc&&!raidDay&&dl()<.3&&EN.filter(e=>!e.siege&&!e.camp).length<DF.nightMax&&(rt-=dt)<=0){rt=DF.night;spawnRaider(false)}
+ if(!pc&&!raidDay&&dl()<.3&&EN.filter(e=>!e.siege&&!e.camp&&!e.rogue).length<DF.nightMax&&(rt-=dt)<=0){rt=DF.night;spawnRaider(false)}
  campTick(dt,pc);
- for(let i=EN.length-1;i>=0;i--){const e=EN[i];if(pc&&e.hp>0)e.hp=-99;else if(!e.siege&&!e.camp&&dl()>.55&&!e.cheat&&e.hp>0)e.hp=-99;if(e.hp<=0){dropFoe(e);EN.splice(i,1);if(e.hp>-50){const rem=e.camp?e.camp.raiders.filter(q=>q&&q!==e&&q.hp>0).length:0;say(e.warlord?'Raider Warlord eliminated!':e.camp?('Camp raider eliminated ('+rem+' left at '+e.camp.n+').'):e.siege?'Siege raider down.':'Raider eliminated.');lootRaider(e);RT.blood+=e.warlord?2.5:e.camp?1.4:1;bumpHeat(e.warlord?.25:.1)}continue}
+ rogueRespawn(dt,pc);
+ for(let i=EN.length-1;i>=0;i--){const e=EN[i];if(pc&&e.hp>0){e.hp=-99;e._despawn=1}else if(!e.siege&&!e.camp&&dl()>.55&&!e.cheat&&e.hp>0){e.hp=-99;e._despawn=1}if(e.hp<=0){dropFoe(e);EN.splice(i,1);if(!e._despawn&&e.hp!==-99){const rem=e.camp?e.camp.raiders.filter(q=>q&&q!==e&&q.hp>0).length:0;say(e.rogue?(e.gun?'Rogue gunman down.':'Monument rogue down.'):e.warlord?'Raider Warlord eliminated!':e.camp?('Camp raider eliminated ('+rem+' left at '+e.camp.n+').'):e.siege?'Siege raider down.':'Raider eliminated.');lootRaider(e);RT.blood+=e.warlord?2.5:e.camp?1.4:1;bumpHeat(e.warlord?.25:.1)}continue}
+  if(e.rogue){driveRogue(e,dt);continue}
+  if(ROG.length&&!e.flee){const rg=rogueNear(e);if(rg){rogueFire(e,dt,rg);animMan(e,dt);continue}}
   if(e.camp){driveCampRaider(e,dt);continue}
   if(e.siege){if(!e.flee&&Math.hypot(e.x-(siegeAnchor.live?P.x:siegeAnchor.x),e.z-(siegeAnchor.live?P.z:siegeAnchor.z))>420){e.hp=-99;continue}driveSiege(e,dt);continue}
   const d=Math.hypot(P.x-e.x,P.z-e.z);e._mv=0;if(d>160){e.hp=-99;continue}e.ordCd=Math.max(0,(e.ordCd||0)-dt);
@@ -54508,9 +54579,10 @@ function raidTick(dt){const pc=ch('peace');const raidDay=(days+1)%5===0;
 function turretSees(d,e){const x0=d.x,y0=d.y+1.2,z0=d.z,dx=e.x-x0,dy=(e.y||0)+1.15-y0,dz=e.z-z0,L=Math.hypot(dx,dy,dz);if(L<1.3)return true;
  const m=L-.35;return blockDist(x0,y0,z0,dx/L,dy/L,dz/L,m)>=m}
 function turrets(dt){for(const d of devs){if(d.t!=='turret'||d._gone)continue;d.cd=(d.cd||0)-dt;const g=d.m&&d.m.userData.gun;if(!g)continue;let b=null;
- if(d.pw>.45){if((d.seeT=(d.seeT||0)-dt)<=0){d.seeT=.26;d.foe=null;const foes=[];for(const e of EN)if(e.hp>0){if(d.owner==='you')foes.push(e);else{const tc=d.npc&&d.npc.tc;if(tc&&!tc._gone?Math.hypot(e.x-tc.x,e.z-tc.z)<TC_R+8:Math.hypot(e.x-d.x,e.z-d.z)<TUR_R)foes.push(e)}}for(const w of WV)if(w.hp>0)foes.push(w);
+ if(d.pw>.45){if((d.seeT=(d.seeT||0)-dt)<=0){d.seeT=.26;d.foe=null;const foes=[];for(const e of EN)if(e.hp>0){if(d.owner==='you')foes.push(e);else if(!(d.npc&&d.npc.fac==='raid')||e.rogue){const tc=d.npc&&d.npc.tc;if(tc&&!tc._gone?Math.hypot(e.x-tc.x,e.z-tc.z)<TC_R+8:Math.hypot(e.x-d.x,e.z-d.z)<TUR_R)foes.push(e)}}for(const w of WV)if(w.hp>0)foes.push(w);
+  if(d.owner!=='you'&&d.npc)for(const o of NP)if(o.hp>0&&!o._dead&&!o.respawnAt&&(o.fac||0)!==(d.npc.fac||0)&&Math.hypot(o.x-d.x,o.z-d.z)<TUR_R)foes.push(o);
   if(d.owner==='you'){for(const n of NP)if(n.hp>0&&n.aggro>0)foes.push(n)}
-  else if(!dead&&!ch('peace')&&NP.some(n=>n.hp>0&&n.aggro>0&&(Math.hypot(n.x-d.x,n.z-d.z)<26||(n.tc&&!n.tc._gone&&Math.hypot(n.tc.x-d.x,n.tc.z-d.z)<TC_R+6))))foes.push({x:P.x,z:P.z,y:P.y-1.1,hp:999,_ply:1,heavy:false,k:'you'});
+  else if(!dead&&!ch('peace')&&NP.some(n=>n.hp>0&&n.aggro>0&&(n.fac||0)===(d.npc&&d.npc.fac||0)&&(Math.hypot(n.x-d.x,n.z-d.z)<26||(n.tc&&!n.tc._gone&&Math.hypot(n.tc.x-d.x,n.tc.z-d.z)<TC_R+6))))foes.push({x:P.x,z:P.z,y:P.y-1.1,hp:999,_ply:1,heavy:false,k:'you'});
   const fk=q=>Math.hypot(q.x-d.x,q.z-d.z)-(q.k==='raider'?(q.role==='breacher'?16:10):0);foes.sort((a,c)=>fk(a)-fk(c));
   for(let i=0;i<foes.length&&i<8;i++){if(Math.hypot(foes[i].x-d.x,foes[i].z-d.z)>TUR_R)break;if(turretSees(d,foes[i])){d.foe=foes[i];break}}}
   const f=d.foe;if(f&&(f._ply||f.hp>0)&&Math.hypot(f.x-d.x,f.z-d.z)<TUR_R)b=f}
@@ -54641,16 +54713,18 @@ function npcTick(dt){for(const d of devs)if(d.ac&&age>d.ac&&!NP.some(n=>Math.hyp
   // Passive health regeneration when out of combat near camp
   if(n.hp<n.maxHp&&!(n.aggro>0))n.hp=Math.min(n.maxHp,n.hp+dt*.45);
   const fd=Math.hypot(n.x-P.x,n.z-P.z);if(!n.told&&fd<36){n.told=1;say(n.home?'That settler roams for ore and monuments. The turrets only shoot while the windmill keeps the battery up.':'A settler is still raising the camp.')}n.cd-=dt;n._mv=0;n._acc=(n._acc||0)+dt;let step=dt;const far=fd>190&&!(n.aggro>0);if(far){n.m.visible=false;if(n._acc<0.22)continue;step=n._acc;n._acc=0}else{n.m.visible=fd<240;n._acc=0}
+  if(n.fac==='raid'&&!ch('peace')&&!dead&&fd<52)n.aggro=Math.max(n.aggro||0,4);
   if(!ch('peace')&&n.aggro>0){n.aggro-=dt;if(fd>52)n.aggro=0;else{settlerCombat(n,P,true,step,fd);animMan(n,step);continue}}
-  if(!settlerArmed(n)){
+  if(n.fac!=='raid'&&!settlerArmed(n)){
    // Unarmed settlers run home from camp raiders and back out of any live camp's range
    const hm=n.home||n.lot||{x:n.hx,z:n.hz};let th=null,td=36;
-   for(const r of EN){if(r.hp<=0||!r.camp)continue;const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<td){td=q;th=r}}
+   for(const r of EN){if(r.hp<=0||!(r.camp||r.rogue))continue;const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<td){td=q;th=r}}
    const cd=th?null:campDanger(n,n.x,n.z);
    if(th&&Math.hypot(n.x-hm.x,n.z-hm.z)>6){n.job=null;go(n,hm.x+2.4,hm.z+3.2,4.3,step);animMan(n,step);continue}
    if(cd){n.job=null;n.pT=null;const dx=n.x-cd.x,dz=n.z-cd.z,l=Math.hypot(dx,dz)||1;stepTo(n,n.x+dx/l*14,n.z+dz/l*14,4,step);animMan(n,step);continue}}
   {const W=n.wp;let rr=null,rd=Math.max(18,W&&W.rng?W.rng:0);
-   for(const r of EN){if(r.k!=='raider'||r.hp<=0||(r.camp&&!settlerArmed(n)&&Math.hypot(r.x-n.x,r.z-n.z)>8))continue;const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<rd){rd=q;rr=r}}
+   for(const r of EN){if((n.fac==='raid'&&!r.rogue)||r.k!=='raider'||r.hp<=0||((r.camp||r.rogue)&&!settlerArmed(n)&&Math.hypot(r.x-n.x,r.z-n.z)>8))continue;const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<rd){rd=q;rr=r}}
+   for(const o of NP){if(o===n||o._dead||o.hp<=0||o.respawnAt||(o.fac||0)===(n.fac||0))continue;const q=Math.hypot(o.x-n.x,o.z-n.z);if(q<rd){rd=q;rr=o}}
    if(!rr){for(const w of WV){if(w.hp<=0)continue;const q=Math.hypot(w.x-n.x,w.z-n.z);if(q<Math.min(rd,20)){rd=q;rr=w}}}
    if(rr){settlerCombat(n,rr,false,step,fd);animMan(n,step);continue}}
   npcAI(n,step);animMan(n,step)}}
@@ -55235,9 +55309,9 @@ function raiderCitadel(){
    {role:'breacher',heavy:1,x:1.8,z:5.6,gun:'thompson',kit:'satchel',nades:2,pts:[[1.8,5.6],[5.2,4.2],[5.2,0],[1.8,2.5]]},
    {role:'assault',heavy:1,x:0,z:7.8,gun:'ak',kit:'beancan',nades:2,pts:[[0,7.8],[-3.5,7.2],[0,3.8],[3.5,7.2]]},
    {role:'flanker',heavy:0,x:-4.8,z:1.5,gun:'sar',kit:'beancan',nades:1,pts:[[-4.8,1.5],[-6.2,6.2],[0,6.2],[-4.8,-1.5]]},
-   {role:'flanker',heavy:0,x:4.8,z:1.5,gun:'smg',kit:'beancan',nades:1,pts:[[4.8,1.5],[6.2,6.2],[0,6.2],[4.8,-1.5]]},
-   {role:'assault',heavy:1,x:-2.6,z:1.8,gun:'thompson',kit:'beancan',nades:2,pts:[[-2.6,1.8],[2.6,1.8],[2.6,5.2],[-2.6,5.2]]},
-   {role:'assault',heavy:0,x:2.6,z:1.8,gun:'sar',kit:'melee',nades:0,pts:[[2.6,1.8],[-2.6,1.8],[0,8.2],[4.2,4.5]]}
+   {role:'flanker',heavy:0,x:4.8,z:1.5,gun:null,mel:'machete',kit:'melee',nades:0,pts:[[4.8,1.5],[6.2,6.2],[0,6.2],[4.8,-1.5]]},
+   {role:'assault',heavy:1,x:-2.6,z:1.8,gun:'thompson',mel:'knife',kit:'beancan',nades:2,pts:[[-2.6,1.8],[2.6,1.8],[2.6,5.2],[-2.6,5.2]]},
+   {role:'assault',heavy:0,x:2.6,z:1.8,gun:null,mel:'spear',kit:'melee',nades:0,pts:[[2.6,1.8],[-2.6,1.8],[0,8.2],[4.2,4.5]]}
   );
  });
 }
@@ -55282,8 +55356,8 @@ function raiderArmory(){
    {role:'breacher',heavy:1,x:-1.4,z:4.8,gun:'thompson',kit:'beancan',nades:2,pts:[[-1.4,4.8],[1.8,5.2],[1.8,0],[-1.4,1.2]]},
    {role:'assault',heavy:1,x:0,z:6.4,gun:'ak',kit:'beancan',nades:2,pts:[[0,6.4],[-3.6,5.8],[3.6,5.8],[0,2.8]]},
    {role:'flanker',heavy:0,x:6.2,z:0,gun:'sar',kit:'beancan',nades:1,pts:[[6.2,0],[6.2,4.8],[1.2,4.8],[1.8,-3.2]]},
-   {role:'assault',heavy:0,x:-5.2,z:5.4,gun:'smg',kit:'melee',nades:0,pts:[[-5.2,5.4],[0,5.8],[1.2,-.8],[-2.8,-.8]]},
-   {role:'flanker',heavy:1,x:2.2,z:-3.8,gun:'thompson',kit:'beancan',nades:1,pts:[[2.2,-3.8],[5.4,2.2],[0,4.2],[-1.2,-3.8]]}
+   {role:'assault',heavy:0,x:-5.2,z:5.4,gun:null,mel:'machete',kit:'melee',nades:0,pts:[[-5.2,5.4],[0,5.8],[1.2,-.8],[-2.8,-.8]]},
+   {role:'flanker',heavy:0,x:2.2,z:-3.8,gun:null,mel:'club',kit:'melee',nades:0,pts:[[2.2,-3.8],[5.4,2.2],[0,4.2],[-1.2,-3.8]]}
   );
  });
 }
@@ -55321,9 +55395,9 @@ function raiderStockade(){
    {role:'warlord',warlord:1,x:-1.8,z:-3.2,gun:'ak',kit:'beancan',nades:2,pts:[[-1.8,-3.2],[-1.8,1.2],[1.8,1.2],[0,3.6]]},
    {role:'marksman',tower:1,x:4.8,z:-4.6,postY:2.85,gun:'sar',kit:'melee',nades:0},
    {role:'breacher',heavy:1,x:0,z:5.2,gun:'pump',kit:'satchel',nades:2,pts:[[0,5.2],[-3.2,4.2],[3.2,4.2],[0,1.8]]},
-   {role:'assault',heavy:1,x:2.2,z:.4,gun:'thompson',kit:'beancan',nades:2,pts:[[2.2,.4],[4.2,3.8],[-2.8,3.8],[-2.2,-.4]]},
-   {role:'flanker',heavy:0,x:-3.4,z:3.2,gun:'smg',kit:'beancan',nades:1,pts:[[-3.4,3.2],[0,6.2],[3.4,3.2],[0,-.6]]},
-   {role:'assault',heavy:0,x:1.6,z:3.8,gun:'revolver',kit:'melee',nades:0,pts:[[1.6,3.8],[-1.6,3.8],[0,6.4],[3.6,-.4]]}
+   {role:'assault',heavy:0,x:2.2,z:.4,gun:null,mel:'machete',kit:'melee',nades:0,pts:[[2.2,.4],[4.2,3.8],[-2.8,3.8],[-2.2,-.4]]},
+   {role:'flanker',heavy:0,x:-3.4,z:3.2,gun:null,mel:'spear',kit:'melee',nades:0,pts:[[-3.4,3.2],[0,6.2],[3.4,3.2],[0,-.6]]},
+   {role:'assault',heavy:0,x:1.6,z:3.8,gun:'revolver',mel:'knife',kit:'melee',nades:0,pts:[[1.6,3.8],[-1.6,3.8],[0,6.4],[3.6,-.4]]}
   );
  });
 }
@@ -56250,7 +56324,7 @@ function paveSpawnRoad(){const home=NP.find(n=>n.close)||NP[0];if(!home)return n
  {const accR=ROADS.filter(r=>r.kind!=='trail').map(r=>r.pts);const parts=trimToNetwork(fullPath,accR,26,30);for(const pp of parts){pave(pp,'road');postsAlong(pp,4.6,14);barrelsAlong(pp,11,2)}}
  const sx=pass.x-dx*28-rx*1.6,sz=pass.z-dz*28-rz*1.6,sy=H(sx,sz);if(sy>.6&&sy<7.6&&!inRiver(sx,sz,4)){P.x=LP.x=sx;P.z=LP.z=sz;P.y=sy+1.7}yaw=Math.atan2(-(pass.x*.4+hx*.6-P.x),-(pass.z*.4+hz*.6-P.z));pitch=-.36;home.told=1;for(let hi=0;hi<6;hi++){const ha=hi*1.047+.4,hr=5.5+(hi%2)*2.8,hpx=P.x+Math.cos(ha)*hr,hpz=P.z+Math.sin(ha)*hr,hpy=H(hpx,hpz);if(hpy>.8&&!nearAnyRoad(hpx,hpz)&&!inRiver(hpx,hpz,3)){const hp=mkHemp();hp.userData.k='hemp';plantProp(hp,hpx,hpy,hpz)}}
 say('A dirt road runs from your feet past that foundation. Follow the posts and the barrels out to the monuments.');msgT=8;return{hx,hz}}
-spawnSettlers();warmSettlers();__mark('settlers');layRoads();__mark('roads');
+spawnSettlers();spawnRaidBases();spawnRogues();warmSettlers();__mark('settlers');layRoads();__mark('roads');
 function spawnCampGarrison(camp){
  if(!camp||!camp.spawns)return 0;
  camp.raiders=(camp.raiders||[]).filter(r=>r&&r.hp>0);
@@ -56265,21 +56339,22 @@ function spawnCampGarrison(camp){
   const sp=list[i],wx=camp.x+sp.x,wz=camp.z+sp.z;
   const wy=sp.tower?(camp.y+(sp.postY||3.0)):Math.max(G(wx,wz,camp.y+1.2),camp.y);
   const warlord=!!sp.warlord,heavy=warlord||!!sp.heavy;
-  const gun=sp.gun||'ak',GS=RGUN[gun]||RGUN.ak;
-  const ar={h:true,v:heavy||Math.random()<.85,l:heavy||Math.random()<.75};
-  const maxHp=Math.round((warlord?150:heavy?100:75)*DF.hp);
+  const mel=sp.mel||MELEE_IDS[(i+((Math.abs(camp.x+camp.z))|0))%MELEE_IDS.length];
+  const gun=sp.gun===null?null:(sp.gun||(i===list.length-1&&!warlord&&!sp.tower?null:'ak')),GS=gun?(RGUN[gun]||RGUN.ak):null;
+  const ar={h:warlord||heavy,v:warlord||(heavy&&Math.random()<.45),l:warlord};
+  const maxHp=Math.round((warlord?105:heavy?68:48)*DF.hp);
   const col=warlord?0x4a0e0e:heavy?0x6e1d18:0x8a2222;
-  const m=spawnMan(col,true,{heavy,warlord,kit:sp.kit||'melee',gun,arm:ar});
+  const m=spawnMan(col,true,{heavy,warlord,kit:sp.kit||'melee',gun,mel,arm:ar});
   const pts=(sp.pts||[[sp.x,sp.z]]).map(p=>[camp.x+p[0],camp.z+p[1]]);
   const e={
    k:'raider',role:sp.role||'assault',warlord,tower:!!sp.tower,camp,
    x:wx,z:wz,y:wy,homeX:wx,homeZ:wz,postY:wy,
-   hp:maxHp,maxHp,meds:warlord?3:heavy?2:1,heavy,cheat:true,siege:false,
+   hp:maxHp,maxHp,meds:warlord?1:0,heavy,cheat:true,siege:false,
    idx:EN.length,pth:[],side:1,strafeDir:i%2?1:-1,
-   kit:sp.kit||'melee',nades:sp.nades||0,ordCd:.8+Math.random(),back:0,
-   gun,mag:GS.mag,ammo:GS.mag*(warlord?8:5),gcd:.4+Math.random()*.5,rl:0,
-   accK:(warlord?1.28:sp.tower?1.22:1.08)*DF.acc,dmgK:(warlord?1.25:1.08)*DF.dmg,
-   armr:ar,armorK:(ar.h?.86:1)*(ar.v?.72:1)*(ar.l?.88:1),
+   kit:sp.kit||'melee',mel,nades:sp.nades||0,ordCd:.8+Math.random(),back:0,
+   gun,mag:GS?GS.mag:0,ammo:GS?GS.mag*(warlord?6:4):0,gcd:.5+Math.random()*.5,rl:0,
+   accK:(warlord?1.0:sp.tower?.95:.8)*DF.acc,dmgK:(warlord?1.0:.82)*DF.dmg,
+   armr:ar,armorK:(ar.h?.9:1)*(ar.v?.82:1)*(ar.l?.92:1),
    patrolPts:pts,patrolIdx:0,patrolWait:i*.6,baseYaw:Math.atan2(-sp.x,-sp.z),
    m
   };
@@ -56314,7 +56389,7 @@ function campTowerShoot(e,dt){
 }
 function raidDmgSettler(n,dm){if(!n||n._dead||n.hp<=0)return;n.hp-=dm;{let b=null,bd=75;for(const r of EN)if(r.hp>0){const q=Math.hypot(r.x-n.x,r.z-n.z);if(q<bd){bd=q;b=r}}if(b)underFire(n,b.x,b.z,b.y)}if(n.hp<=0){killSettler(n);say('Raiders killed a settler.')}else if(age>(n._rs||0)){n._rs=age+8;say('Raiders are attacking a settler!')}}
 // Camp raiders spot settlers near the camp, call the garrison in on them, and towers snipe them
-function campSettlerFoe(e){const c=e.camp;if(!c)return null;let b=null,bd=(e.tower?58:44)*DF.sight;for(const n of NP){if(n._dead||n.hp<=0)continue;const q=Math.hypot(n.x-e.x,n.z-e.z);if(q<bd&&turretSees(e,n)){bd=q;b=n}}
+function campSettlerFoe(e){const c=e.camp;if(!c)return null;let b=null,bd=(e.tower?58:44)*DF.sight;for(const n of NP){if(n._dead||n.hp<=0||n.fac==='raid')continue;const q=Math.hypot(n.x-e.x,n.z-e.z);if(q<bd&&turretSees(e,n)){bd=q;b=n}}
  if(b){c.sFoe=b;c.sT=9}else if(!e.tower&&c.sT>0&&c.sFoe&&!c.sFoe._dead&&c.sFoe.hp>0&&Math.hypot(c.sFoe.x-c.x,c.sFoe.z-c.z)<c.r+60)b=c.sFoe;
  return b}
 function campTowerShootAt(e,dt,n){const G=RGUN[e.gun];if(!G)return false;e.gcd=Math.max(0,(e.gcd||0)-dt);
@@ -56330,7 +56405,7 @@ function campTowerShootAt(e,dt,n){const G=RGUN[e.gun];if(!G)return false;e.gcd=M
  return true}
 // A few ground raiders leave the camp on a timer and march on the nearest settler
 function campSortie(c){const live=c.raiders.filter(r=>r&&r.hp>0&&!r.tower&&!r.warlord&&!r.hunt&&r.hp>(r.maxHp||95)*.5);if(live.length<4||(c.alertT||0)>0)return;
- let tgt=null,bd=340;for(const n of NP){if(n._dead||n.hp<=0)continue;const q=Math.hypot(n.x-c.x,n.z-c.z);if(q<bd){bd=q;tgt=n}}if(!tgt)return;
+ let tgt=null,bd=340;for(const n of NP){if(n._dead||n.hp<=0||n.fac==='raid')continue;const q=Math.hypot(n.x-c.x,n.z-c.z);if(q<bd){bd=q;tgt=n}}if(!tgt)return;
  const k=Math.min(DF.party,live.length-2);for(let i=0;i<k;i++){const r=live[i];r.hunt=tgt;r.huntT=95}
  if(Math.hypot(P.x-c.x,P.z-c.z)<320)say('Raiders from '+c.n+' are marching on a settler outpost.')}
 function driveCampRaider(e,dt){
@@ -59612,10 +59687,19 @@ const plab2=o=>o.userData.a&&gunOf()?'Shoot '+o.userData.k:plabel(o);
 function lootRaider(e){
  if(Math.hypot(P.x-e.x,P.z-e.z)>55)return;
  const r=Math.random,pk=a=>a[r()*a.length|0];
+ if(e.rogue){
+  give('scrap',4+(r()*6|0));
+  if(e.mel)give(e.mel,1);
+  if(e.gun){if(r()<.6)give(e.gun,1);give('ammo',8+(r()*12|0))}
+  give(pk(['blade','rope','sheet','pipe','spring','gears']),1);
+  if(r()<.5)give(pk(['bandage','medkit','rations']),1);
+  return;
+ }
  if(e.warlord){
   give('scrap',28+(r()*22|0));
   give('metal',25+(r()*25|0));
   if(e.gun)give(e.gun,1);
+  if(e.mel)give(e.mel,1);
   give('ammo',40+(r()*35|0));
   give(pk(['ammo_ap','ammo_inc','ammo_hp']),16+(r()*16|0));
   give('medkit',1+(r()<.6?1:0));
@@ -59627,16 +59711,17 @@ function lootRaider(e){
  }
  if(e.camp){
   give('scrap',8+(r()*12|0));
+  if(e.mel&&(!e.gun||r()<.45))give(e.mel,1);
   if(e.gun&&r()<.75)give(e.gun,1);
-  give('ammo',14+(r()*20|0));
-  if(r()<.45)give(AMMO_IDS[1+(r()*3|0)],8+(r()*10|0));
+  if(e.gun)give('ammo',14+(r()*20|0));
+  if(e.gun&&r()<.45)give(AMMO_IDS[1+(r()*3|0)],8+(r()*10|0));
   give(pk(['blade','rope','sheet','propane','sewing_kit','tarp','fuse','gears','pipe','spring','road_sign','semi_body']),1+(r()<.4?1:0));
   if(r()<.55)give(pk(['medkit','bandage','rations']),1);
   if(e.armr){for(const[f,id]of[['h','helmet'],['v','vest'],['l','legs']])if(e.armr[f]&&r()<.48)give(id,1)}
   if(e.kit&&e.kit!=='melee'&&r()<.65)give(e.kit==='rocket'?'rocket':e.kit,1);
   return;
  }
- if(r()<.7)give('scrap',1+(r()*4|0));if(e.gun){if(r()<.55)give(e.gun,1);const am=(e.ammo||0)+(e.mag||0);if(am>0)give('ammo',Math.max(2,Math.min(40,Math.round(am*.5))))}if(e.armr){for(const[f,id]of[['h','helmet'],['v','vest'],['l','legs']])if(e.armr[f]&&r()<.4)give(id,1)}give('ammo',2+(r()*6|0));if(r()<.2)give(AMMO_IDS[1+(r()*3|0)],3+(r()*8|0));if(e.heavy&&r()<.6)give('metal',3+(r()*4|0));if(r()<.5)give('powder',1+(r()*3|0));if(e.kit&&e.kit!=='melee'&&e.kit!=='rocket'&&r()<.6)give(e.kit,1);if(e.kit==='rocket'){give('rocket',1);if(r()<.2)give('launcher',1)}}
+ if(r()<.7)give('scrap',1+(r()*4|0));if(e.mel&&(!e.gun||r()<.4))give(e.mel,1);if(e.gun){if(r()<.55)give(e.gun,1);const am=(e.ammo||0)+(e.mag||0);if(am>0)give('ammo',Math.max(2,Math.min(40,Math.round(am*.5))))}if(e.armr){for(const[f,id]of[['h','helmet'],['v','vest'],['l','legs']])if(e.armr[f]&&r()<.4)give(id,1)}give('ammo',2+(r()*6|0));if(r()<.2)give(AMMO_IDS[1+(r()*3|0)],3+(r()*8|0));if(e.heavy&&r()<.6)give('metal',3+(r()*4|0));if(r()<.5)give('powder',1+(r()*3|0));if(e.kit&&e.kit!=='melee'&&e.kit!=='rocket'&&r()<.6)give(e.kit,1);if(e.kit==='rocket'){give('rocket',1);if(r()<.2)give('launcher',1)}}
 // ===== CHEAT MENU =====
 function jumpSettler(n,i){if(!n||n.hp<=0)return say('That settler is gone.');const face=(n.tc&&!n.tc._gone)?n.tc:(n.lot||{x:n.hx,z:n.hz});let x,z;if(n.post){x=n.post.x;z=n.post.z}else{const dx=n.x-face.x,dz=n.z-face.z,d=Math.hypot(dx,dz)||1;x=n.x+dx/d*3.4;z=n.z+dz/d*3.4}P.x=LP.x=x;P.z=LP.z=z;P.y=Math.max(H(x,z),0)+1.7;yaw=Math.atan2(-(face.x-x),-(face.z-z));pitch=-.22;const step=n.bp&&n.bp.length?(n.i+'/'+n.bp.length):'0';const piece=n.bp&&n.bp[n.i]?String(n.bp[n.i][0]).replace(/^stone_/,'').replace(/_/g,' '):'';say('Settler '+(i+1)+' — '+(n.home?'holding the camp.':piece?('farming '+piece+' ('+step+').'):'working the field ('+step+').'))}
 function landFix(){if(H(P.x,P.z)<-1.2){P.x=LP.x=SP.x;P.z=LP.z=SP.z}}
@@ -59686,7 +59771,7 @@ MRD.width=MRD.height=MRS;{const g=MRD.getContext('2d'),k=MRS/(2*B),ix=x=>(x+B)*k
  for(const m of MONS){const x=ix(m.x),y=iy(m.z);g.fillStyle=m.raiderCamp?'#d92626':'#e6d36a';g.strokeStyle='#2a2112';g.lineWidth=1.5;g.fillRect(x-4,y-4,8,8);g.strokeRect(x-4,y-4,8,8)}}
 let mmT=0;
 function minimap(){const n=performance.now();if(n-mmT<120)return;mmT=n;mx.fillStyle='#0b3b57';mx.fillRect(0,0,100,100);{const sw=WIN/(2*B)*MS;mx.drawImage(MBG,(P.x/(2*B)+.5)*MS-sw/2,(P.z/(2*B)+.5)*MS-sw/2,sw,sw,0,0,100,100);{const sr=WIN/(2*B)*MRS;mx.drawImage(MRD,(P.x/(2*B)+.5)*MRS-sr/2,(P.z/(2*B)+.5)*MRS-sr/2,sr,sr,0,0,100,100)}}const p=(x,z)=>[(x-P.x)/WIN*100+50,(z-P.z)/WIN*100+50],dot=(x,z,c,r)=>{const q=p(x,z);mx.fillStyle=c;mx.beginPath();mx.arc(q[0],q[1],r,0,6.283);mx.fill()};
- for(const q of MONS)dot(q.x,q.z,q.raiderCamp?'#ff2828':'#f0e040',q.raiderCamp?4.0:3.2);for(const q of fires)dot(q.x,q.z,'#ffb030',2);for(const q of NP)dot(q.x,q.z,q.aggro>0?'#ff5530':'#4aa0ff',2.5);for(const q of EN)dot(q.x,q.z,'#ff3030',2.5);for(const q of WV)dot(q.x,q.z,'#ff9a30',2);for(const d of devs)if(d.t==='tc'&&!d._gone)dot(d.x,d.z,d.owner==='you'?'#e6c340':'#c4552a',d.owner==='you'?3.3:2.1);if(CLAIM)dot(CLAIM.x,CLAIM.z,'#ffffff',3.4);
+ for(const q of MONS)dot(q.x,q.z,q.raiderCamp?'#ff2828':'#f0e040',q.raiderCamp?4.0:3.2);for(const q of fires)dot(q.x,q.z,'#ffb030',2);for(const q of NP)dot(q.x,q.z,q.fac==='raid'?'#ff2828':q.aggro>0?'#ff5530':'#4aa0ff',2.5);for(const q of EN)dot(q.x,q.z,q.rogue?'#c050ff':'#ff3030',2.5);for(const q of WV)dot(q.x,q.z,'#ff9a30',2);for(const d of devs)if(d.t==='tc'&&!d._gone)dot(d.x,d.z,d.owner==='you'?'#e6c340':'#c4552a',d.owner==='you'?3.3:2.1);if(CLAIM)dot(CLAIM.x,CLAIM.z,'#ffffff',3.4);
  for(const m of MK){const q=p(m.x,m.z);mx.fillStyle=m.c;mx.strokeStyle='#fff';mx.lineWidth=1.2;mx.beginPath();mx.arc(Math.max(4,Math.min(96,q[0])),Math.max(4,Math.min(96,q[1])),3,0,6.283);mx.fill();mx.stroke()}
  const q=p(P.x,P.z);mx.save();mx.translate(q[0],q[1]);mx.rotate(-yaw);mx.fillStyle='#fff';mx.beginPath();mx.moveTo(0,-5);mx.lineTo(3.5,4);mx.lineTo(-3.5,4);mx.closePath();mx.fill();mx.restore()}
 
@@ -59728,8 +59813,8 @@ function drawFull(){const cw=fmC.clientWidth,ch=fmC.clientHeight;if(!cw||!ch)ret
   else{g.fillStyle='#e8c53c';g.strokeStyle='#2a2112';g.lineWidth=2;g.beginPath();g.moveTo(x,y-mr-1);g.lineTo(x+mr+1,y);g.lineTo(x,y+mr+1);g.lineTo(x-mr-1,y);g.closePath();g.fill();g.stroke();lab(String(m.n||''),x,y-mr-6,'#fff')}}
  for(const q of fires)dot(q.x,q.z,'#ffb030',3);
  for(const d of devs)if(d.t==='tc'&&!d._gone)dot(d.x,d.z,d.owner==='you'?'#e6c340':'#c4552a',d.owner==='you'?5.5:4.5);
- for(const q of NP)dot(q.x,q.z,q.aggro>0?'#ff5530':'#4aa0ff',3.5);
- for(const q of EN)dot(q.x,q.z,'#ff3030',3.5);for(const q of WV)dot(q.x,q.z,'#ff9a30',3);
+ for(const q of NP)dot(q.x,q.z,q.fac==='raid'?'#ff2828':q.aggro>0?'#ff5530':'#4aa0ff',3.5);
+ for(const q of EN)dot(q.x,q.z,q.rogue?'#c050ff':'#ff3030',3.5);for(const q of WV)dot(q.x,q.z,'#ff9a30',3);
  if(CLAIM)dot(CLAIM.x,CLAIM.z,'#ffffff',4.5);
  MK.forEach((m,i)=>{const x=X(m.x),y=Y(m.z),sel=i===fmSel,z=sel?14:12;g.save();g.translate(x,y);if(sel){g.shadowColor='#fff';g.shadowBlur=14}g.beginPath();g.arc(0,-z*1.5,z*.68,Math.PI*.82,Math.PI*.18);g.lineTo(0,0);g.closePath();g.fillStyle=m.c;g.fill();g.shadowBlur=0;g.strokeStyle='#fff';g.lineWidth=2;g.stroke();g.fillStyle='#fff';g.beginPath();g.arc(0,-z*1.5,z*.26,0,6.283);g.fill();g.restore();
   if(fmZ>=1.25||sel){const dm=Math.round(Math.hypot(m.x-P.x,m.z-P.z));lab(m.n+' · '+dm+' m',x,y-z*2.4,'#fff')}});
@@ -59843,7 +59928,7 @@ ensureStarter();render();persist(opts&&opts.saveData?'load':'auto');
 const wakeBtn=$('wake');if(wakeBtn)wakeBtn.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();wake();if(ev.pointerType==='mouse')lookLock(true)});
 root.addEventListener('pointerdown',()=>{try{if(actx&&actx.state==='suspended')actx.resume()}catch(e){}},{passive:true});
 window.__controlsTest={getYaw:()=>yaw,getSpeed:()=>lastMv,getPos:()=>({x:P.x,z:P.z,yaw}),setKeys(codes){for(const k of Object.keys(keys))keys[k]=0;const map={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ShiftLeft:'shift',ShiftRight:'shift',ArrowUp:'arrowup',ArrowDown:'arrowdown',ArrowLeft:'arrowleft',ArrowRight:'arrowright'};for(const c of codes||[]){const k=map[c];if(k)keys[k]=1}}};
-window.__bp={snap:()=>{cullT=0;nearT=0;update(.016);ren.render(scene,cam);return cv.toDataURL('image/png')},meleePose:(id,p,didHit)=>{SL[0]={id,n:1,dur:100};sel=0;adsHeld=false;adsLerp=0;vmId=null;syncVM();drawT=0;render();const isMel=!!(ITEMS[id]&&ITEMS[id].mel);if(isMel){mSt=ITEMS[id].mel.st;mD=.48;mT=mD*(1-p)+.016;swingHit=didHit?1:0;swing=0}else{startSwing(null,!!didHit,.42);swing=swingD*(1-p)+.016;mT=0}bobVM(.001,0);ren.render(scene,cam);return{id,p,pos:[+vmP.position.x.toFixed(3),+vmP.position.y.toFixed(3),+vmP.position.z.toFixed(3)],rot:[+vmP.rotation.x.toFixed(3),+vmP.rotation.y.toFixed(3),+vmP.rotation.z.toFixed(3)]}},shootPose:(id,att,ap,ads)=>{while(FXP.length){const o=FXP.pop();scene.remove(o.m)}const m=att&&typeof att==="object"?{sight:att.sight||null,barrel:att.barrel||null,under:att.under||null}:{sight:null,barrel:null,under:null};SL[0]={id,n:1,dur:ITEMS[id].dur||200,mag:(ITEMS[id].gun&&ITEMS[id].gun.mag)||6,at:"ammo",mods:m,att:att||{}};sel=0;adsHeld=!!ads;adsLerp=ads?1:0;drawT=0;reloadT=0;fireCd=0;vmId=null;syncVM();give("ammo",60,1);fire();if(ap!=null&&actD>0){const targetElapsed=actD*ap;let el=0;while(el<targetElapsed-.0001){const step=Math.min(.01,targetElapsed-el);flashT=Math.max(0,flashT-step);gunPose(step);fxTick(step);el+=step}}const U=(vmM&&vmM.userData)||{},act=U.act,rH=vmP&&vmP.userData&&vmP.userData.rH,lH=vmP&&vmP.userData&&vmP.userData.lH,fl=U.fl;return{id,actT:+actT.toFixed(3),actD:+actD.toFixed(3),trigF:rH&&rH.userData.trigF?+rH.userData.trigF.rotation.x.toFixed(3):null,flashVis:!!(fl&&fl.visible),fx:FXP.length,barrelHeat:+barrelHeat.toFixed(3),actX:act?+act.position.x.toFixed(4):null,actRotX:act?+act.rotation.x.toFixed(3):null,rHandPos:rH?[+rH.position.x.toFixed(3),+rH.position.y.toFixed(3),+rH.position.z.toFixed(3)]:null,lHandPos:lH?[+lH.position.x.toFixed(3),+lH.position.y.toFixed(3),+lH.position.z.toFixed(3)]:null}},setAds:on=>{adsHeld=!!on;adsLerp=on?1:0;if(on)drawT=0;return adsLerp},mount:id=>{const g=gunOf();return g?mountAttachment(g,id,true):false},bp:()=>[...BPK],scrap:()=>cnt('scrap'),research:id=>doResearch(id),launch:()=>launchRaid(),skip:()=>skipToRaid(),phase:()=>raidPhase,heat:()=>RT.heat,rating:()=>rate100(),raiders:()=>EN.filter(e=>e.hp>0).length,barricades:()=>devs.filter(d=>d.t==='barricade'&&!d._gone).map(d=>({x:+d.x.toFixed(1),z:+d.z.toFixed(1),owner:d.owner,hp:d.hp})),tick:(n,dt)=>{for(let i=0;i<(n||1);i++)update(dt||.05)},foes:()=>EN.filter(e=>e.hp>0).map((e,i)=>({i,x:+e.x.toFixed(1),z:+e.z.toFixed(1),siege:!!e.siege,tower:!!e.tower,camp:!!e.camp,gun:e.gun||null,walls:e.walls,hold:e.cvHold>age?+(e.cvHold-age).toFixed(1):0,hp:Math.round(e.hp)})),hitFoe:(i,dmg)=>{const e=EN.filter(r=>r.hp>0)[i];if(!e)return null;shoot(e,dmg||1);return{fireT:+(e.fireT-age).toFixed(1),walls:e.walls}},zap:dmg=>{let b=null,bd=1e9;for(const e of EN){if(e.hp<=0||!e.gun)continue;const q=Math.hypot(e.x-P.x,e.z-P.z);if(q<bd){bd=q;b=e}}if(!b)return null;shoot(b,dmg||1);return{d:+bd.toFixed(1),walls:b.walls,hold:+(b.cvHold-age).toFixed(1)}},siege:()=>EN.filter(e=>e.siege&&e.hp>0).length,near:()=>{const a=EN.filter(e=>e.hp>0).map(e=>Math.hypot(e.x-P.x,e.z-P.z));return a.length?Math.min(...a):-1},pos:()=>({x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),g:+G(P.x,P.z).toFixed(2)}),place:(x,z,fl)=>{P.x=LP.x=x;P.z=LP.z=z;const f=FD.get(key(Math.round(x/C),Math.round(z/C)));const ft=fl==null?undefined:(f?f.y:0)+FH*(+fl||0)+1;P.y=Math.max(G(x,z,ft),-2.9)+1.7;return {x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),gy:+G(x,z,ft).toFixed(2)}},wx:()=>wx,fog:()=>scene.fog.density,sky:()=>({wx,fog:+scene.fog.density.toFixed(4),rain:rainFx.p.visible,snow:snowFx.p.visible,snowGround:+snowAmt.toFixed(3)}),setWx:(k)=>{if(!WXNAME[k])return false;wx=k;wxT=120;if(k==='snow'){snowAmt=Math.max(snowAmt,.55);applySnowCover(snowAmt)}return true},give:(id,n)=>!!give(id,n||1,1),count:(id)=>cnt(id),ords:()=>ORDS.length,blasts:()=>blastN,kits:()=>EN.filter(e=>e.hp>0).map(e=>(e.kit||'melee')+':'+(e.nades||0)),pace:()=>pace,time:()=>({t,days,pace,hr:t*24}),vitals:()=>({...S,warmthBonus:clothWarmth(),armorPct:Math.round(armorRed()*100),cl:{...CL},eq:{...EQ}}),setPace:(v)=>{setPace(v);return pace},face:(x,z,p)=>{yaw=Math.atan2(-(x-P.x),-(z-P.z));pitch=p==null?-.12:+p},beasts:()=>DE.concat(WV).filter(a=>a.hp>0).map(a=>({k:a.k,x:+a.x.toFixed(1),z:+a.z.toFixed(1),d:+Math.hypot(a.x-P.x,a.z-P.z).toFixed(1)})).sort((a,b)=>a.d-b.d).slice(0,4),seal:()=>{const cx=Math.round(P.x/C),cz=Math.round(P.z/C),x=cx*C,z=cz*C,y=Math.max(H(x,z),1),fk=key(cx,cz);if(!FD.has(fk))construct(ITEMS.wood_foundation,{x,y,z,k:fk,p:'foundation',rot:0});const wk=key(cx,cz,'S');if(!WL.has(wk))construct(ITEMS.wood_wall,{x,z:z+C/2,y,k:wk,rot:0,p:'wall'});const c=ALLC.find(q=>q.wk===wk&&q.piece);return c?{hp:c.hp,x:(c.x0+c.x1)/2,z:(c.z0+c.z1)/2,y:(c.y||y)+1.3}:null},boom:(kind,x,y,z)=>{boom({kind:kind||'satchel',x,y,z,owner:'you',mesh:null});return{blasts:blastN,hp:ALLC.filter(c=>c.piece).map(c=>Math.round(c.hp))}},throwCan:()=>{const i=SL.findIndex(s=>s&&s.id==='beancan');if(i<0)return false;sel=i;return !!useSlot(i)},rocket:()=>{const i=SL.findIndex(s=>s&&s.id==='launcher');if(i>=0)sel=i;const info={throwCd,dead,rockets:cnt('rocket'),slot:SL[sel]&&SL[sel].id};fireRocketPlayer();info.after=cnt('rocket');info.ords=ORDS.length;info.throwCd2=throwCd;info.msg=($('msg')&&$('msg').textContent)||'';return info},health:()=>S.health,yards:()=>NP.map(n=>{const mine=d=>d.npc===n&&!d._gone,ts=devs.filter(d=>mine(d)&&d.t==='turret'),ws=wires.filter(w=>w.a.npc===n&&w.b.npc===n);return{ok:!!(n.tc&&!n.tc._gone&&n.devs.furnace&&n.devs.battery&&n.devs.wind&&n.devs.solar&&n.devs.switch&&ts.length===4&&ws.length>=8&&(n.floors||1)>=3),deck:n.devs.turret0&&n.tc?+(n.devs.turret0.y-n.tc.y).toFixed(2):0,floors:n.floors||1,skip:n.skip||0,hp:Math.round(n.hp),aggro:+(n.aggro||0).toFixed(1),step:n.i+'/'+n.bp.length,skip:n.skip||0,tur:ts.length,pw:ts.map(t=>+t.pw.toFixed(2)),wires:ws.length,bat:n.devs.battery?Math.round(n.devs.battery.ch):0,wind:n.devs.wind?+n.devs.wind.out.toFixed(1):0,x:n.tc?+n.tc.x.toFixed(1):+n.x.toFixed(1),z:n.tc?+n.tc.z.toFixed(1):+n.z.toFixed(1)}}),goto:(i)=>{const n=NP[i||0];if(!n||n.hp<=0)return null;jumpSettler(n,i||0);return{i:i||0,x:+P.x.toFixed(1),z:+P.z.toFixed(1),step:n.i,len:(n.bp&&n.bp.length)||0,home:!!n.home}},smack:()=>{const n=NP.find(x=>x.hp>0&&x.tc);if(!n)return null;const before=n.hp;hit(n.m);return{before,hp:Math.round(n.hp),aggro:+n.aggro.toFixed(1),angry:NP.filter(o=>o.aggro>0).length,k:n.m.userData.k}},tryPlace:(id,x,z)=>{const it=ITEMS[id];if(!it)return 'bad';const a=aim(it,x,z,0);if(!a.ok)return a.why||'no';if(it.dv==='tc'&&tcCovering(a.x,a.z))return 'overlap';if(privWhy(a.x,a.z,null))return 'blocked';construct(it,a,0);return 'ok'},anchor:()=>{const a=raidAnchor();return{x:+a.x.toFixed(1),z:+a.z.toFixed(1),tc:!!(a.tc&&!a.tc._gone),live:!!a.live,hp:a.tc?Math.round(a.tc.hp):0}},soak:()=>{const t=playerTC();if(t)t.sl=Array(12).fill(null);const seen=new Set();let hp0=0,n=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen.has(c.mesh))continue;seen.add(c.mesh);c.born=0;hp0+=c.hp;n++}upkeepTick(600);const seen2=new Set();let hp1=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen2.has(c.mesh))continue;seen2.add(c.mesh);hp1+=c.hp}return{pieces:n,before:Math.round(hp0),after:Math.round(hp1),paid:!!(t&&t.paid),short:(t&&t.short)||''}},world:()=>{const c=k=>things.filter(o=>o.userData.k===k).length;const kinds={};let off=0;for(const o of things)if(o.userData.k==='barrel'){const q=o.userData.kind||'?';kinds[q]=(kinds[q]||0)+1;let by=false;visitRoads(o.position.x,o.position.z,h=>{if(h.dist<h.half+h.edge+3.4)by=true});if(!by)off++}const treeKinds={};for(const o of things)if(o.userData.k==='tree'){const tk=o.userData.tk||'pine';treeKinds[tk]=(treeKinds[tk]||0)+1}return{roads:ROADS.length,rivers:RIVERS.length,bridges:BRIDGES.map(b=>({x:+b.x.toFixed(1),z:+b.z.toFixed(1),dx:+b.dx.toFixed(3),dz:+b.dz.toFixed(3),style:b.style,deckY:+b.deckY.toFixed(2),span:+(b.halfSpan*2).toFixed(1)})),barrels:c('barrel'),offRoad:off,ponds:PONDS.map(q=>({x:+q.x.toFixed(1),z:+q.z.toFixed(1),r:+q.r.toFixed(1),y:+H(q.x,q.z).toFixed(2)})),kinds,treeKinds,sulfur:c('sulfur'),ore:c('ore'),junk:c('junk'),rocks:c('rock'),trees:c('tree'),mons:MONS.length,snowGround:+snowAmt.toFixed(3)}},mons:()=>MONS.map(m=>({n:m.n,x:+m.x.toFixed(1),z:+m.z.toFixed(1),raiderCamp:!!m.raiderCamp})),raiderCamps:()=>RCAMPS.map(c=>({n:c.n,kind:c.campKind,x:+c.x.toFixed(1),z:+c.z.toFixed(1),y:+c.y.toFixed(2),r:+c.r.toFixed(1),targetCount:c.targetCount,alive:c.raiders.filter(r=>r&&r.hp>0).length,roles:c.raiders.filter(r=>r&&r.hp>0).map(r=>r.role+(r.warlord?'*':'')+(r.tower?'^':'')+':'+r.gun),cleared:!!c.cleared,respawnT:+(c.respawnT||0).toFixed(1),warChests:CR.filter(o=>o.userData.tier===4&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length,eliteCrates:CR.filter(o=>o.userData.tier===3&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length})),barrels:()=>{const o={};for(const t of things){if(t.userData.k!=='barrel')continue;const k=t.userData.kind||'?';const a=o[k]=o[k]||[];if(a.length<3)a.push({x:+t.position.x.toFixed(1),z:+t.position.z.toFixed(1),y:+t.position.y.toFixed(2),g:+H(t.position.x,t.position.z).toFixed(2)})}return o},climb:(i)=>{const list=NP.filter(n=>n.tc&&!n.tc._gone),n=list[i||0];if(!n)return null;const y0=n.tc.y,t=n.devs.turret0,h=n.devs.heater,w=n.devs.wind;const cell=(d)=>d&&{x:+d.x.toFixed(2),z:+d.z.toFixed(2),y:+d.y.toFixed(2),cx:Math.round(d.x/C),cz:Math.round(d.z/C),fy:FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y,rf0:RF.has(key(Math.round(d.x/C),Math.round(d.z/C))),rf1:RF.has(key(Math.round(d.x/C),Math.round(d.z/C),1)),g:G(d.x,d.z,(FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y||0)+8)};return{base:+y0.toFixed(2),mid:+G(n.tc.x,n.tc.z+3,y0+4).toFixed(2),deck:+G(n.tc.x+3,n.tc.z,y0+8).toFixed(2),tur:cell(t),heat:cell(h),wind:cell(w),step:n.bp.filter(s=>s[0]==='turret'||s[0]==='heater'||s[0]==='wind').slice(0,4)}},sim:(steps)=>{const N=steps||500;for(let i=0;i<N;i++){npcTick(.05);furnaces(.05)}return NP.map(q=>({i:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home,skip:q.skip||0,w:q.inv.wood||0,s:q.inv.stone||0,m:q.inv.metal||0,o:q.inv.ore||0,g:q.inv.gears||0,c:q.inv.circuit||0}))},smelt:()=>NP.map((n,i)=>{const f=n.devs&&n.devs.furnace;if(!f||f._gone)return{i,step:n.i,close:!!n.close,no:1};return{i,step:n.i,close:!!n.close,burn:+(f.burn||0).toFixed(1),sl:f.sl.map(s=>s?s.id[0]+s.n:0)}}),farms:()=>NP.map((q,i)=>{const nodes=things.filter(o=>o.userData&&o.userData.farm===q),kinds={};for(const o of nodes)kinds[o.userData.k]=(kinds[o.userData.k]||0)+1;let near=1e9;for(const o of NP)if(o!==q)near=Math.min(near,Math.hypot((q.lot?q.lot.x:q.x)-(o.lot?o.lot.x:o.x),(q.lot?q.lot.z:q.z)-(o.lot?o.lot.z:o.z)));return{i,nodes:nodes.length,kinds,near:+(near>1e8?0:near).toFixed(0),spawn:+Math.hypot((q.lot?q.lot.x:q.x)-SP.x,(q.lot?q.lot.z:q.z)-SP.z).toFixed(0),step:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home}}),inv:()=>SL.slice(0,42).map(s=>s?s.id+':'+s.n+(s.mag!=null?'/m'+s.mag:''):null),click:(i)=>{clickSlot(i);return SL[i]?SL[i].id:null},openLast:()=>{const d=[...devs].reverse().find(q=>q&&!q._gone&&(isBox(q.t)||isInd(q.t)||q.t==='tc'));if(!d)return null;P.x=LP.x=d.x+1.5;P.z=LP.z=d.z+1.2;P.y=Math.max(G(d.x,d.z),0)+1.7;curBox=d;open=true;tab='bag';pick=null;render();return{t:d.t,owner:d.owner,sl:d.sl.map(s=>s?s.id+':'+s.n:null)}},takeAll:()=>{xferAll('take');pick=null;render();return true},storeBag:()=>{xferAll('store');pick=null;render();return true}};window.__bp.road=()=>{let posts=0,best=null,bd=1e9,lane=[];for(const p of POSTS){if(p.skip)continue;posts++;const d=Math.hypot(p.x-P.x,p.z-P.z);if(d<bd){bd=d;best=p}}for(const o of things){const k=o.userData&&o.userData.k;if(k!=='tree'&&k!=='rock'&&k!=='bush'&&k!=='junk'&&k!=='barrel'&&k!=='ore'&&k!=='sulfur')continue;let hit=null;visitRoads(o.position.x,o.position.z,h=>{if(!hit||h.dist<hit.dist)hit=h});if(hit&&hit.dist<hit.half+hit.edge-.15)lane.push(k+(o.userData.farm?'*':''))}return{posts,segs:SEGS.length,lane,h:+H(P.x,P.z).toFixed(3),feet:+(P.y-1.7).toFixed(3),post:best?{x:+best.x.toFixed(2),z:+best.z.toFixed(2),d:+bd.toFixed(2)}:null}};
+window.__bp={snap:()=>{cullT=0;nearT=0;update(.016);ren.render(scene,cam);return cv.toDataURL('image/png')},meleePose:(id,p,didHit)=>{SL[0]={id,n:1,dur:100};sel=0;adsHeld=false;adsLerp=0;vmId=null;syncVM();drawT=0;render();const isMel=!!(ITEMS[id]&&ITEMS[id].mel);if(isMel){mSt=ITEMS[id].mel.st;mD=.48;mT=mD*(1-p)+.016;swingHit=didHit?1:0;swing=0}else{startSwing(null,!!didHit,.42);swing=swingD*(1-p)+.016;mT=0}bobVM(.001,0);ren.render(scene,cam);return{id,p,pos:[+vmP.position.x.toFixed(3),+vmP.position.y.toFixed(3),+vmP.position.z.toFixed(3)],rot:[+vmP.rotation.x.toFixed(3),+vmP.rotation.y.toFixed(3),+vmP.rotation.z.toFixed(3)]}},shootPose:(id,att,ap,ads)=>{while(FXP.length){const o=FXP.pop();scene.remove(o.m)}const m=att&&typeof att==="object"?{sight:att.sight||null,barrel:att.barrel||null,under:att.under||null}:{sight:null,barrel:null,under:null};SL[0]={id,n:1,dur:ITEMS[id].dur||200,mag:(ITEMS[id].gun&&ITEMS[id].gun.mag)||6,at:"ammo",mods:m,att:att||{}};sel=0;adsHeld=!!ads;adsLerp=ads?1:0;drawT=0;reloadT=0;fireCd=0;vmId=null;syncVM();give("ammo",60,1);fire();if(ap!=null&&actD>0){const targetElapsed=actD*ap;let el=0;while(el<targetElapsed-.0001){const step=Math.min(.01,targetElapsed-el);flashT=Math.max(0,flashT-step);gunPose(step);fxTick(step);el+=step}}const U=(vmM&&vmM.userData)||{},act=U.act,rH=vmP&&vmP.userData&&vmP.userData.rH,lH=vmP&&vmP.userData&&vmP.userData.lH,fl=U.fl;return{id,actT:+actT.toFixed(3),actD:+actD.toFixed(3),trigF:rH&&rH.userData.trigF?+rH.userData.trigF.rotation.x.toFixed(3):null,flashVis:!!(fl&&fl.visible),fx:FXP.length,barrelHeat:+barrelHeat.toFixed(3),actX:act?+act.position.x.toFixed(4):null,actRotX:act?+act.rotation.x.toFixed(3):null,rHandPos:rH?[+rH.position.x.toFixed(3),+rH.position.y.toFixed(3),+rH.position.z.toFixed(3)]:null,lHandPos:lH?[+lH.position.x.toFixed(3),+lH.position.y.toFixed(3),+lH.position.z.toFixed(3)]:null}},setAds:on=>{adsHeld=!!on;adsLerp=on?1:0;if(on)drawT=0;return adsLerp},mount:id=>{const g=gunOf();return g?mountAttachment(g,id,true):false},bp:()=>[...BPK],scrap:()=>cnt('scrap'),research:id=>doResearch(id),launch:()=>launchRaid(),skip:()=>skipToRaid(),phase:()=>raidPhase,heat:()=>RT.heat,rating:()=>rate100(),raiders:()=>EN.filter(e=>e.hp>0).length,barricades:()=>devs.filter(d=>d.t==='barricade'&&!d._gone).map(d=>({x:+d.x.toFixed(1),z:+d.z.toFixed(1),owner:d.owner,hp:d.hp})),tick:(n,dt)=>{for(let i=0;i<(n||1);i++)update(dt||.05)},foes:()=>EN.filter(e=>e.hp>0).map((e,i)=>({i,x:+e.x.toFixed(1),z:+e.z.toFixed(1),siege:!!e.siege,tower:!!e.tower,camp:!!e.camp,rogue:!!e.rogue,gun:e.gun||null,mel:e.mel||null,walls:e.walls,hold:e.cvHold>age?+(e.cvHold-age).toFixed(1):0,hp:Math.round(e.hp)})),hitFoe:(i,dmg)=>{const e=EN.filter(r=>r.hp>0)[i];if(!e)return null;shoot(e,dmg||1);return{fireT:+(e.fireT-age).toFixed(1),walls:e.walls}},zap:dmg=>{let b=null,bd=1e9;for(const e of EN){if(e.hp<=0||!e.gun)continue;const q=Math.hypot(e.x-P.x,e.z-P.z);if(q<bd){bd=q;b=e}}if(!b)return null;shoot(b,dmg||1);return{d:+bd.toFixed(1),walls:b.walls,hold:+(b.cvHold-age).toFixed(1)}},siege:()=>EN.filter(e=>e.siege&&e.hp>0).length,near:()=>{const a=EN.filter(e=>e.hp>0).map(e=>Math.hypot(e.x-P.x,e.z-P.z));return a.length?Math.min(...a):-1},pos:()=>({x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),g:+G(P.x,P.z).toFixed(2)}),place:(x,z,fl)=>{P.x=LP.x=x;P.z=LP.z=z;const f=FD.get(key(Math.round(x/C),Math.round(z/C)));const ft=fl==null?undefined:(f?f.y:0)+FH*(+fl||0)+1;P.y=Math.max(G(x,z,ft),-2.9)+1.7;return {x:+P.x.toFixed(2),y:+P.y.toFixed(2),z:+P.z.toFixed(2),gy:+G(x,z,ft).toFixed(2)}},wx:()=>wx,fog:()=>scene.fog.density,sky:()=>({wx,fog:+scene.fog.density.toFixed(4),rain:rainFx.p.visible,snow:snowFx.p.visible,snowGround:+snowAmt.toFixed(3)}),setWx:(k)=>{if(!WXNAME[k])return false;wx=k;wxT=120;if(k==='snow'){snowAmt=Math.max(snowAmt,.55);applySnowCover(snowAmt)}return true},give:(id,n)=>!!give(id,n||1,1),count:(id)=>cnt(id),ords:()=>ORDS.length,blasts:()=>blastN,kits:()=>EN.filter(e=>e.hp>0).map(e=>(e.kit||'melee')+':'+(e.nades||0)),pace:()=>pace,time:()=>({t,days,pace,hr:t*24}),vitals:()=>({...S,warmthBonus:clothWarmth(),armorPct:Math.round(armorRed()*100),cl:{...CL},eq:{...EQ}}),setPace:(v)=>{setPace(v);return pace},face:(x,z,p)=>{yaw=Math.atan2(-(x-P.x),-(z-P.z));pitch=p==null?-.12:+p},beasts:()=>DE.concat(WV).filter(a=>a.hp>0).map(a=>({k:a.k,x:+a.x.toFixed(1),z:+a.z.toFixed(1),d:+Math.hypot(a.x-P.x,a.z-P.z).toFixed(1)})).sort((a,b)=>a.d-b.d).slice(0,4),seal:()=>{const cx=Math.round(P.x/C),cz=Math.round(P.z/C),x=cx*C,z=cz*C,y=Math.max(H(x,z),1),fk=key(cx,cz);if(!FD.has(fk))construct(ITEMS.wood_foundation,{x,y,z,k:fk,p:'foundation',rot:0});const wk=key(cx,cz,'S');if(!WL.has(wk))construct(ITEMS.wood_wall,{x,z:z+C/2,y,k:wk,rot:0,p:'wall'});const c=ALLC.find(q=>q.wk===wk&&q.piece);return c?{hp:c.hp,x:(c.x0+c.x1)/2,z:(c.z0+c.z1)/2,y:(c.y||y)+1.3}:null},boom:(kind,x,y,z)=>{boom({kind:kind||'satchel',x,y,z,owner:'you',mesh:null});return{blasts:blastN,hp:ALLC.filter(c=>c.piece).map(c=>Math.round(c.hp))}},throwCan:()=>{const i=SL.findIndex(s=>s&&s.id==='beancan');if(i<0)return false;sel=i;return !!useSlot(i)},rocket:()=>{const i=SL.findIndex(s=>s&&s.id==='launcher');if(i>=0)sel=i;const info={throwCd,dead,rockets:cnt('rocket'),slot:SL[sel]&&SL[sel].id};fireRocketPlayer();info.after=cnt('rocket');info.ords=ORDS.length;info.throwCd2=throwCd;info.msg=($('msg')&&$('msg').textContent)||'';return info},health:()=>S.health,yards:()=>NP.map(n=>{const mine=d=>d.npc===n&&!d._gone,ts=devs.filter(d=>mine(d)&&d.t==='turret'),ws=wires.filter(w=>w.a.npc===n&&w.b.npc===n);return{ok:!!(n.tc&&!n.tc._gone&&n.devs.furnace&&n.devs.battery&&n.devs.wind&&n.devs.solar&&n.devs.switch&&ts.length===4&&ws.length>=8&&(n.floors||1)>=3),deck:n.devs.turret0&&n.tc?+(n.devs.turret0.y-n.tc.y).toFixed(2):0,floors:n.floors||1,skip:n.skip||0,hp:Math.round(n.hp),aggro:+(n.aggro||0).toFixed(1),step:n.i+'/'+n.bp.length,skip:n.skip||0,tur:ts.length,pw:ts.map(t=>+t.pw.toFixed(2)),wires:ws.length,bat:n.devs.battery?Math.round(n.devs.battery.ch):0,wind:n.devs.wind?+n.devs.wind.out.toFixed(1):0,x:n.tc?+n.tc.x.toFixed(1):+n.x.toFixed(1),z:n.tc?+n.tc.z.toFixed(1):+n.z.toFixed(1)}}),goto:(i)=>{const n=NP[i||0];if(!n||n.hp<=0)return null;jumpSettler(n,i||0);return{i:i||0,x:+P.x.toFixed(1),z:+P.z.toFixed(1),step:n.i,len:(n.bp&&n.bp.length)||0,home:!!n.home}},smack:()=>{const n=NP.find(x=>x.hp>0&&x.tc);if(!n)return null;const before=n.hp;hit(n.m);return{before,hp:Math.round(n.hp),aggro:+n.aggro.toFixed(1),angry:NP.filter(o=>o.aggro>0).length,k:n.m.userData.k}},tryPlace:(id,x,z)=>{const it=ITEMS[id];if(!it)return 'bad';const a=aim(it,x,z,0);if(!a.ok)return a.why||'no';if(it.dv==='tc'&&tcCovering(a.x,a.z))return 'overlap';if(privWhy(a.x,a.z,null))return 'blocked';construct(it,a,0);return 'ok'},anchor:()=>{const a=raidAnchor();return{x:+a.x.toFixed(1),z:+a.z.toFixed(1),tc:!!(a.tc&&!a.tc._gone),live:!!a.live,hp:a.tc?Math.round(a.tc.hp):0}},soak:()=>{const t=playerTC();if(t)t.sl=Array(12).fill(null);const seen=new Set();let hp0=0,n=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen.has(c.mesh))continue;seen.add(c.mesh);c.born=0;hp0+=c.hp;n++}upkeepTick(600);const seen2=new Set();let hp1=0;for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.mesh||seen2.has(c.mesh))continue;seen2.add(c.mesh);hp1+=c.hp}return{pieces:n,before:Math.round(hp0),after:Math.round(hp1),paid:!!(t&&t.paid),short:(t&&t.short)||''}},world:()=>{const c=k=>things.filter(o=>o.userData.k===k).length;const kinds={};let off=0;for(const o of things)if(o.userData.k==='barrel'){const q=o.userData.kind||'?';kinds[q]=(kinds[q]||0)+1;let by=false;visitRoads(o.position.x,o.position.z,h=>{if(h.dist<h.half+h.edge+3.4)by=true});if(!by)off++}const treeKinds={};for(const o of things)if(o.userData.k==='tree'){const tk=o.userData.tk||'pine';treeKinds[tk]=(treeKinds[tk]||0)+1}return{roads:ROADS.length,rivers:RIVERS.length,bridges:BRIDGES.map(b=>({x:+b.x.toFixed(1),z:+b.z.toFixed(1),dx:+b.dx.toFixed(3),dz:+b.dz.toFixed(3),style:b.style,deckY:+b.deckY.toFixed(2),span:+(b.halfSpan*2).toFixed(1)})),barrels:c('barrel'),offRoad:off,ponds:PONDS.map(q=>({x:+q.x.toFixed(1),z:+q.z.toFixed(1),r:+q.r.toFixed(1),y:+H(q.x,q.z).toFixed(2)})),kinds,treeKinds,sulfur:c('sulfur'),ore:c('ore'),junk:c('junk'),rocks:c('rock'),trees:c('tree'),mons:MONS.length,snowGround:+snowAmt.toFixed(3)}},mons:()=>MONS.map(m=>({n:m.n,x:+m.x.toFixed(1),z:+m.z.toFixed(1),raiderCamp:!!m.raiderCamp})),raiderCamps:()=>RCAMPS.map(c=>({n:c.n,kind:c.campKind,x:+c.x.toFixed(1),z:+c.z.toFixed(1),y:+c.y.toFixed(2),r:+c.r.toFixed(1),targetCount:c.targetCount,alive:c.raiders.filter(r=>r&&r.hp>0).length,roles:c.raiders.filter(r=>r&&r.hp>0).map(r=>r.role+(r.warlord?'*':'')+(r.tower?'^':'')+':'+(r.gun||r.mel||'melee')),cleared:!!c.cleared,respawnT:+(c.respawnT||0).toFixed(1),warChests:CR.filter(o=>o.userData.tier===4&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length,eliteCrates:CR.filter(o=>o.userData.tier===3&&Math.hypot(o.position.x-c.x,o.position.z-c.z)<c.r+4).length})),barrels:()=>{const o={};for(const t of things){if(t.userData.k!=='barrel')continue;const k=t.userData.kind||'?';const a=o[k]=o[k]||[];if(a.length<3)a.push({x:+t.position.x.toFixed(1),z:+t.position.z.toFixed(1),y:+t.position.y.toFixed(2),g:+H(t.position.x,t.position.z).toFixed(2)})}return o},climb:(i)=>{const list=NP.filter(n=>n.tc&&!n.tc._gone),n=list[i||0];if(!n)return null;const y0=n.tc.y,t=n.devs.turret0,h=n.devs.heater,w=n.devs.wind;const cell=(d)=>d&&{x:+d.x.toFixed(2),z:+d.z.toFixed(2),y:+d.y.toFixed(2),cx:Math.round(d.x/C),cz:Math.round(d.z/C),fy:FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y,rf0:RF.has(key(Math.round(d.x/C),Math.round(d.z/C))),rf1:RF.has(key(Math.round(d.x/C),Math.round(d.z/C),1)),g:G(d.x,d.z,(FD.get(key(Math.round(d.x/C),Math.round(d.z/C)))?.y||0)+8)};return{base:+y0.toFixed(2),mid:+G(n.tc.x,n.tc.z+3,y0+4).toFixed(2),deck:+G(n.tc.x+3,n.tc.z,y0+8).toFixed(2),tur:cell(t),heat:cell(h),wind:cell(w),step:n.bp.filter(s=>s[0]==='turret'||s[0]==='heater'||s[0]==='wind').slice(0,4)}},sim:(steps)=>{const N=steps||500;for(let i=0;i<N;i++){npcTick(.05);furnaces(.05)}return NP.map(q=>({i:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home,skip:q.skip||0,w:q.inv.wood||0,s:q.inv.stone||0,m:q.inv.metal||0,o:q.inv.ore||0,g:q.inv.gears||0,c:q.inv.circuit||0}))},smelt:()=>NP.map((n,i)=>{const f=n.devs&&n.devs.furnace;if(!f||f._gone)return{i,step:n.i,close:!!n.close,no:1};return{i,step:n.i,close:!!n.close,burn:+(f.burn||0).toFixed(1),sl:f.sl.map(s=>s?s.id[0]+s.n:0)}}),farms:()=>NP.map((q,i)=>{const nodes=things.filter(o=>o.userData&&o.userData.farm===q),kinds={};for(const o of nodes)kinds[o.userData.k]=(kinds[o.userData.k]||0)+1;let near=1e9;for(const o of NP)if(o!==q)near=Math.min(near,Math.hypot((q.lot?q.lot.x:q.x)-(o.lot?o.lot.x:o.x),(q.lot?q.lot.z:q.z)-(o.lot?o.lot.z:o.z)));return{i,nodes:nodes.length,kinds,near:+(near>1e8?0:near).toFixed(0),spawn:+Math.hypot((q.lot?q.lot.x:q.x)-SP.x,(q.lot?q.lot.z:q.z)-SP.z).toFixed(0),step:q.i,len:(q.bp&&q.bp.length)||0,home:!!q.home}}),inv:()=>SL.slice(0,42).map(s=>s?s.id+':'+s.n+(s.mag!=null?'/m'+s.mag:''):null),click:(i)=>{clickSlot(i);return SL[i]?SL[i].id:null},openLast:()=>{const d=[...devs].reverse().find(q=>q&&!q._gone&&(isBox(q.t)||isInd(q.t)||q.t==='tc'));if(!d)return null;P.x=LP.x=d.x+1.5;P.z=LP.z=d.z+1.2;P.y=Math.max(G(d.x,d.z),0)+1.7;curBox=d;open=true;tab='bag';pick=null;render();return{t:d.t,owner:d.owner,sl:d.sl.map(s=>s?s.id+':'+s.n:null)}},takeAll:()=>{xferAll('take');pick=null;render();return true},storeBag:()=>{xferAll('store');pick=null;render();return true}};window.__bp.road=()=>{let posts=0,best=null,bd=1e9,lane=[];for(const p of POSTS){if(p.skip)continue;posts++;const d=Math.hypot(p.x-P.x,p.z-P.z);if(d<bd){bd=d;best=p}}for(const o of things){const k=o.userData&&o.userData.k;if(k!=='tree'&&k!=='rock'&&k!=='bush'&&k!=='junk'&&k!=='barrel'&&k!=='ore'&&k!=='sulfur')continue;let hit=null;visitRoads(o.position.x,o.position.z,h=>{if(!hit||h.dist<hit.dist)hit=h});if(hit&&hit.dist<hit.half+hit.edge-.15)lane.push(k+(o.userData.farm?'*':''))}return{posts,segs:SEGS.length,lane,h:+H(P.x,P.z).toFixed(3),feet:+(P.y-1.7).toFixed(3),post:best?{x:+best.x.toFixed(2),z:+best.z.toFixed(2),d:+bd.toFixed(2)}:null}};
 window.__bp.qa=()=>{const segD=(m)=>{let best=1e9;for(const s of SEGS){const dx=s.bx-s.ax,dz=s.bz-s.az;let u=((m.x-s.ax)*dx+(m.z-s.az)*dz)/(s.l2||1);if(u<0)u=0;else if(u>1)u=1;const d=Math.hypot(m.x-(s.ax+dx*u),m.z-(s.az+dz*u));if(d<best)best=d}return best};const mons=MONS.map(m=>{const best=segD(m),half=5.1;return{n:m.n,r:+m.r.toFixed(1),best:+best.toFixed(1),edge:+(best-half).toFixed(1),on:best<m.r-4}});const bases=NP.map(n=>{const plan=n.plan||{},tur=devs.filter(d=>d.npc===n&&!d._gone&&d.t==='turret');let out=0;if(plan.w&&n.tc){const cx=Math.round(n.tc.x/C)-(plan.tx||0),cz=Math.round(n.tc.z/C)-(plan.tz||0),pads=[[cx-1,cz-1],[cx+plan.w,cz-1],[cx-1,cz+plan.d],[cx+plan.w,cz+plan.d]];out=tur.filter(t=>pads.some(p=>Math.round(t.x/C)===p[0]&&Math.round(t.z/C)===p[1])&&FD.has(key(Math.round(t.x/C),Math.round(t.z/C)))).length}return{w:plan.w||0,d:plan.d||0,fl:plan.floors||n.floors||0,tc:!!(n.tc&&!n.tc._gone),wb:!!(n.devs.workbench&&!n.devs.workbench._gone),fur:!!(n.devs.furnace&&!n.devs.furnace._gone),wind:!!(n.devs.wind&&!n.devs.wind._gone),bat:!!(n.devs.battery&&!n.devs.battery._gone),tur:tur.length,out,pw:tur.map(t=>+t.pw.toFixed(2)),wW:n.devs.wind?+n.devs.wind.out.toFixed(1):0,ch:n.devs.battery?Math.round(n.devs.battery.ch):0,wires:wires.filter(w=>w.a.npc===n||w.b.npc===n).length,job:n.job?n.job.k:null,away:+Math.hypot(n.x-(n.home?n.home.x:n.hx),n.z-(n.home?n.home.z:n.hz)).toFixed(1),step:(n.i||0)+'/'+(n.bp?n.bp.length:0),home:!!n.home,skip:n.skip||0}});const c=k=>things.filter(o=>o.userData.k===k).length;return{np:NP.length,forest:FOREST,trees:c('tree'),rocks:c('rock'),ore:c('ore'),sulfur:c('sulfur'),junk:c('junk'),mons,onRoad:mons.filter(m=>m.on).length,bases,calls:ren.info.render.calls,times:window.__times}};
 window.__bp.shapes=()=>{const o={};for(const t of things){if(!t.userData||t.userData.k!=='barrel')continue;const k=t.userData.variant||'drum';o[k]=(o[k]||0)+1}return o};
 window.__bp.tiers=()=>{const o={};for(const r of PCS)if(r.owner==='npc'&&r.m&&r.m.parent){const k=r.t;o[k]=(o[k]||0)+1}return o};window.__bp.mapOpen=()=>mapOpen;window.__bp.tracers=()=>TRP.filter(q=>q.busy).length;window.__bp.lodStats=()=>{const s=[0,0,0];for(const o of things)o.traverse(x=>{if(x.isLOD){const i=x.levels.findIndex(l=>l.object.visible);if(i>=0)s[i]++}});return s};window.__bp.rich=()=>{for(const n of NP){n.inv.stone=9000;n.inv.wood=6500;n.inv.metal=1800;n.inv.gears=320;n.inv.circuit=120;n.inv.ore=80;n.inv.fuel=80}};

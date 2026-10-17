@@ -52607,7 +52607,7 @@ const NOHIT=function(){};
 // alpha-weighted (cut-out pixels no longer average in as black) and an empty cell falls back to the whole-map mean.
 function mapIsSRGB(map){return (T.sRGBEncoding!==undefined&&map.encoding===T.sRGBEncoding)||(T.SRGBColorSpace!==undefined&&map.colorSpace===T.SRGBColorSpace)}
 const TEXF=new WeakMap();
-function texGrid(map){if(!map)return null;if(TEXF.has(map))return TEXF.get(map);let g=null;try{const im=map.image;if(im&&im.width){let cx=im.getContext?im.getContext('2d'):null;if(!cx&&typeof document!=='undefined'){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;cx=c.getContext('2d'/* === JESSICA PERF START: willReadFrequently === */,{willReadFrequently:true}/* === JESSICA PERF END === */);cx.drawImage(im,0,0)}
+function texGrid(map){if(!map)return null;if(TEXF.has(map))return TEXF.get(map);let g=null;try{const im=map.image;if(im&&im.width){let cx=im.getContext?im.getContext('2d'):null;if(!cx&&typeof document!=='undefined'){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;cx=c.getContext('2d');cx.drawImage(im,0,0)}
  if(cx){const W=im.width,H=im.height,d=cx.getImageData(0,0,W,H).data,srgb=mapIsSRGB(map);g=new Float32Array(8*8*3);const lin=v=>{v/=255;return srgb?(v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)):v};
   let R=0,G=0,Bt=0,A=0;const emp=[];
   for(let gy=0;gy<8;gy++)for(let gx=0;gx<8;gx++){let r=0,gg=0,b=0,n=0;for(let y=(gy*H/8)|0;y<((gy+1)*H/8)|0;y+=2)for(let x=(gx*W/8)|0;x<((gx+1)*W/8)|0;x+=2){const i=(y*W+x)*4,a=d[i+3]/255;if(a<.3)continue;r+=lin(d[i])*a;gg+=lin(d[i+1])*a;b+=lin(d[i+2])*a;n+=a}
@@ -52665,7 +52665,7 @@ function instBuild(e){const m=e.m;const mk=l=>{const g=cachedGeo(m.geometry,m.ma
 function instUpdate(e,px,pz){const D=CFG.inst[e.kind],d1=LOWF?0:D[0]*D[0],d2=D[1]*D[1],keep=LOWF&&e.c.fol?Math.ceil(e.n*.3):e.n;
  const A=[e.m.instanceMatrix.array,e.lo.instanceMatrix.array,e.ul.instanceMatrix.array],N=[0,0,0],src=e.src;
  for(let i=0;i<keep;i++){const dx=e.xs[i]-px,dz=e.zs[i]-pz,d=dx*dx+dz*dz,l=d<d1?0:d<d2?1:2;A[l].set(src.subarray(i*16,i*16+16),N[l]*16);N[l]++}
- e.m.count=N[0];if(e.m.userData._lm===undefined)e.m.userData._lm=e.m.layers.mask;e.m.layers.mask=N[0]?e.m.userData._lm:0;e.lo.count=N[1];e.ul.count=N[2];e.lo.visible=N[1]>0;e.ul.visible=N[2]>0;e.m.instanceMatrix.needsUpdate=e.lo.instanceMatrix.needsUpdate=e.ul.instanceMatrix.needsUpdate=true;e.counts=N;e.lx=px;e.lz=pz;e.dirty=false}
+ e.m.count=N[0];if(e.m.userData._lm===undefined)e.m.userData._lm=e.m.layers.mask;e.m.layers.mask=N[0]?e.m.userData._lm:0;e.lo.count=N[1];e.ul.count=N[2];e.lo.visible=N[1]>0;e.ul.visible=N[2]>0;const P=e.counts||[0,0,0],ms=[e.m,e.lo,e.ul];for(let l=0;l<3;l++){if(!N[l]&&!P[l])continue;const im=ms[l].instanceMatrix;im.updateRange.offset=0;im.updateRange.count=Math.max(N[l],1)*16;im.needsUpdate=true}/* upload only the used part, skip empty levels (r128 otherwise re-sends the whole buffer) */e.counts=N;e.lx=px;e.lz=pz;e.dirty=false}
 // ================= harvestable objects =================
 const KINDS={tree:1,rock:1,bush:1,hemp:1,ore:1,sulfur:1};const OBJ=[];let scanI=0,objT=0;const SEEN=new WeakSet();
 function register(o){if(SEEN.has(o))return;SEEN.add(o);const k=o.userData.k;const lod=o.children.find(c=>c.isLOD);
@@ -52721,7 +52721,7 @@ function warm(cam,things){return pass(cam,things,Infinity)}
 function rewarm(cam,things,capMs){return pass(cam,things,capMs===undefined?CFG.rewarmMs:capMs)}
 function pass(cam,things,capMs){const t0=now(),p=cam.getWorldPosition?cam.getWorldPosition(new T.Vector3()):cam.position;let nb=0;
  if(things)for(const o of things)if(o&&o.userData&&KINDS[o.userData.k]&&!SEEN.has(o))register(o);
- for(const e of INST){if(!e.lo)instBuild(e);instUpdate(e,p.x,p.z)}
+ {const R=(cam.far||300)+40,R2=R*R;for(const e of INST){const dx=(e.c.cx===undefined?e.lx:e.c.cx)-p.x,dz=(e.c.cz===undefined?e.lz:e.c.cz)-p.z;if(capMs<Infinity&&dx*dx+dz*dz>R2){e.dirty=true;continue}/* rewarm: only chunks within view; the rest catch up in tick when near */if(!e.lo)instBuild(e);instUpdate(e,p.x,p.z)}}
  const BR=CFG.buildR*CFG.buildR,todo=[];Q.length=0;QS.clear();
  for(const o of OBJ){const L=o.userData.bpNat,dx=o.position.x-p.x,dz=o.position.z-p.z,d=dx*dx+dz*dz;if(d>BR)continue;const w=objLevelFor(o,p.x,p.z);L.want=w;if(w!=='high'&&!L.built[w]){o._bpD=d;todo.push(o)}else objShow(o,w)}
  if(todo.length){if(capMs<Infinity)todo.sort((a,b)=>a._bpD-b._bpD);const tb=now();
@@ -52731,7 +52731,7 @@ function setLow(on){LOWF=!!on;for(const e of INST)e.dirty=true;for(const o of OB
 function stats(){let it=[0,0,0],tr=[0,0,0];for(const e of INST){for(let l=0;l<3;l++){it[l]+=e.counts[l];const g=[e.m,e.lo,e.ul][l];if(g)tr[l]+=e.counts[l]*triN(g.geometry)}}
  const ob={};for(const o of OBJ){const L=o.userData.bpNat;const e=ob[L.k]||(ob[L.k]={n:0,low:0,ultra:0});e.n++;if(L.built.low)e.low++;if(L.built.ultra)e.ultra++}return{inst:INST.length,instances:it,instTris:tr,objects:ob,queued:Q.length,last:stat}}
 (typeof window!=='undefined'?window:root).BPNatLOD={tick,warm,rewarm,wrapInst,setLow,get low(){return LOWF},CFG,stats,material:VMAT,_objBuild:objBuild,_register:register,_inst:INST,_obj:OBJ};
-})(typeof window!=='undefined'&&window.THREE?window:(typeof T!=='undefined'&&T.Mesh?{T}:globalThis));// inlined in bootSurvival this picks up the game's T
+})(typeof window!=='undefined'&&window.THREE?window:(typeof T!=='undefined'&&T.Mesh?{T}:globalThis));// inlined in bootSurvival this picks up the game's T// inlined in bootSurvival this picks up the game's T
 
 // ===== Jim's extra use poses (BPHandAnim) =====
 const BPJHA={T,THREE:T};

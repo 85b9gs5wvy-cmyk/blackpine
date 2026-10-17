@@ -51579,8 +51579,8 @@ function tool(k){const s=SL[sel];return s&&ITEMS[s.id].tool===k?s:null}
 function toast(id,n){const d=document.createElement('div');d.className='toast';d.innerHTML='+'+n+' '+ico(id)+' '+ITEMS[id].n;$('toasts').prepend(d);setTimeout(()=>d.remove(),2600)}
 function useSlot(i){const s=SL[i];if(!s||dead||!ITEMS[s.id].use)return false;if(ITEMS[s.id].fx()===false)return false;startSwing('use',false,.34);if(--s.n<=0)SL[i]=null;render();return true}
 function selSlot(i){if(i===sel&&SL[i]&&ITEMS[SL[i].id].use)useSlot(i);else{sel=i;const q=SL[i];if(q&&(ITEMS[q.id].bd||ITEMS[q.id].dv))say('Aim and press Use to place. Green ghost = valid.');else if(q&&q.id==='wire')say('Wire tool: Use on one device, then on another.');else if(q&&ITEMS[q.id].plant)say('Aim at a wall and press Use to set the charge.');else if(q&&ITEMS[q.id].nade)say(q.id==='satchel'?'Use throws it. It sticks to the first wall.':'Use / Fire to throw.');else if(q&&q.id==='launcher')say('Loads rockets. Use / Fire to launch.');else if(q&&ITEMS[q.id].mel)say('Use / Fire to swing. Aim at what you want to hit.');else if(q&&ITEMS[q.id].gun)say('Use / Fire to shoot. R reloads. T swaps ammo.')}render()}
-function canPlace(i,s){if(!s)return true;if(i<30||i>=PX)return true;if(!curBox||i-30>=curBox.sl.length)return false;if(curBox.t==='tc')return s.id==='wood'||s.id==='stone'||s.id==='metal';if(curBox.t==='furnace'){const k=i-30;return k<3&&(s.id==='ore'||s.id==='sulfur'||s.id==='wood'||s.id==='fuel')}if(curBox.t==='recycler')return i-30<3&&!!RY[s.id];return true}
-function move(a,b,quiet){if(a===b)return true;const x=SL[a],y=SL[b],same=!!(x&&y&&x.id===y.id&&ITEMS[x.id].max>1&&y.n<ITEMS[x.id].max);if(same?!canPlace(b,x):((x&&!canPlace(b,x))||(y&&!canPlace(a,y)))){if(!quiet){if(curBox&&curBox.t==='tc')say('The cupboard only holds wood, stone and metal. That is the upkeep.');else if(curBox&&curBox.t==='furnace')say('Furnace inputs take Metal Ore, Sulfur, Wood and Low Grade Fuel. Burning wood leaves charcoal. The output slots are take-only.');else say('That slot will not take it.')}return false}if(same){const m=Math.min(ITEMS[x.id].max-y.n,x.n);y.n+=m;x.n-=m;if(!x.n)SL[a]=null}else{SL[a]=y;SL[b]=x}return true}
+function canPlace(i,s){if(!s)return true;if(i<30||i>=PX)return true;if(!curBox||i-30>=curBox.sl.length)return false;if(curBox.t==='tc')return s.id==='wood'||s.id==='stone'||s.id==='metal';if(curBox.t==='furnace'){const k=i-30;return k<3&&(s.id==='ore'||s.id==='sulfur'||s.id==='wood'||s.id==='fuel')}if(curBox.t==='recycler')return i-30<3&&!!RY[s.id];/* jim smallfix7 #9 */if(curBox.t==='refinery')return i-30<3&&(s.id==='crude'||s.id==='wood'||s.id==='fuel');if(curBox.t==='pump_jack'||curBox.t==='quarry')return i-30<3&&s.id==='fuel';return true}
+function move(a,b,quiet){if(a===b)return true;const x=SL[a],y=SL[b],same=!!(x&&y&&x.id===y.id&&ITEMS[x.id].max>1&&y.n<ITEMS[x.id].max);if(same?!canPlace(b,x):((x&&!canPlace(b,x))||(y&&!canPlace(a,y)))){if(!quiet){if(curBox&&curBox.t==='tc')say('The cupboard only holds wood, stone and metal. That is the upkeep.');else if(curBox&&curBox.t==='furnace')say('Furnace inputs take Metal Ore, Sulfur, Wood and Low Grade Fuel. Burning wood leaves charcoal. The output slots are take-only.');else if(curBox&&curBox.t==='refinery')say('Refinery inputs take Crude Oil, Wood and Low Grade Fuel. The output slots are take-only.');else if(curBox&&(curBox.t==='pump_jack'||curBox.t==='quarry'))say('It runs on Low Grade Fuel. The output slots are take-only.');else say('That slot will not take it.')}return false}if(same){const m=Math.min(ITEMS[x.id].max-y.n,x.n);y.n+=m;x.n-=m;if(!x.n)SL[a]=null}else{SL[a]=y;SL[b]=x}return true}
 function xferPick(){if(pick===null||!SL[pick])return;if(!curBox)return say('Open a box, furnace or cupboard first.');const dest=[];if(isCont(pick))dest.push(...bagIdx());else for(let i=0;i<curBox.sl.length;i++)dest.push(30+i);for(const b of dest){if(!SL[pick])break;const y=SL[b];if(!y||(y.id===SL[pick].id&&ITEMS[y.id].max>1&&y.n<ITEMS[y.id].max))move(pick,b,true)}if(!SL[pick])pick=null;else say('No room for the rest.')}
 function xferAll(dir){if(!curBox)return;const src=[],dest=[];if(dir==='take'){for(let i=0;i<curBox.sl.length;i++)src.push(30+i);dest.push(...bagIdx())}else{src.push(...bagIdx().filter(i=>i>=6));for(let i=0;i<curBox.sl.length;i++)dest.push(30+i)}for(const a of src){if(!SL[a])continue;for(const b of dest){if(!SL[a])break;const y=SL[b];if(!y||(y.id===SL[a].id&&ITEMS[y.id].max>1&&y.n<ITEMS[y.id].max))move(a,b,true)}}}
 function clickSlot(i){if(!open)return selSlot(i);eqPick=null;
@@ -51658,7 +51658,7 @@ const isDoor=t=>t==='door'||t==='metal_door'||t==='hq_door',isWin=t=>t==='window
 const COMP=['gears','circuit','charcoal','sulfur_s','powder','explosives','leather','crude','targeting_computer','cctv'],ELEC=['solar','wind','battery','lamp','heater','switch','turret','wire'],BLD=['door','metal_door','hq_door','window_bars','embrasure','water_collector','bed','box_s','box','box_l','tc','furnace','refinery','pump_jack','quarry','workbench','spike','snap','barricade'],SURV=['medkit','hatchet','pickaxe','metal_hatchet','metal_pickaxe','chainsaw','jackhammer','spear','club','campfire','bandage','bedroll','bed','water_collector','cooked'];
 function catOf(id){const it=ITEMS[id];if(it.arm||it.pack)return 'Clothing';if(COMP.includes(id))return 'Components';if(ELEC.includes(id))return 'Electrical';if(it.bd||BLD.includes(id))return 'Building';if(SURV.includes(id))return 'Survival';return 'Weapons'}
 const CLOTH_T1=['burlap_headwrap','burlap_shirt','burlap_trousers','burlap_shoes'];
-const needWB=r=>{if(CLOTH_T1.includes(r.out))return false;const c=catOf(r.out);return c==='Electrical'||c==='Weapons'||c==='Clothing'||['blade','sheet','propane','sewing_kit','tarp','fuse','pipe','spring','road_sign','semi_body','smg_body','explosives','targeting_computer','cctv','hq_door','gears','circuit','turret','metal_hatchet','metal_pickaxe','chainsaw','jackhammer'].includes(r.out)};
+var WB_ATT=[];/* jim smallfix7 #8: gun attachments need a workbench (filled by the ATT_DEFS loop) */const needWB=r=>{if(CLOTH_T1.includes(r.out))return false;if(WB_ATT.includes(r.out))return true;const c=catOf(r.out);return c==='Electrical'||c==='Weapons'||c==='Clothing'||['blade','sheet','propane','sewing_kit','tarp','fuse','pipe','spring','road_sign','semi_body','smg_body','explosives','targeting_computer','cctv','hq_door','gears','circuit','turret','metal_hatchet','metal_pickaxe','chainsaw','jackhammer'].includes(r.out)};
 const WB_TIERS={workbench:1,workbench2:2,workbench3:3};
 const WB_T2=['pistol','shotgun','pump','smg','thompson','semi_body','smg_body','turret','targeting_computer','cctv','ammo_ap','ammo_inc','hq_door','snap','helmet','vest','legs','tac_boots','winter_ushanka','winter_parka','winter_pants','winter_boots'],WB_T3=['rifle','sar','ak','launcher','rocket','c4','explosives','chainsaw','jackhammer','hq_helmet','hq_vest','hq_legs','hq_boots'];
 const wbTier=()=>{let t=0;for(const d of devs){if(d._gone)continue;const k=WB_TIERS[d.t];if(k>t&&Math.hypot(P.x-d.x,P.z-d.z)<8)t=k}return t};
@@ -51686,7 +51686,7 @@ function mkRecycler(x,z,ang,deckY){const g=new T.Group(),bx=(w,h,d,X,Y,Z,c)=>{co
 function btn(l,f){const b=document.createElement('button');b.textContent=l;b.onpointerdown=f;return b}
 function nearFire(){return fires.some(q=>Math.hypot(P.x-q.x,P.z-q.z)<7)||devs.some(d=>(d.t==='furnace'||d.t==='refinery')&&d.burn>0&&Math.hypot(P.x-d.x,P.z-d.z)<6)}
 function priced(r){const o={};for(const k in r.need)o[k]=r.fix?r.need[k]:costN(r.need[k]);return o}
-function craft(r){const fr=ch('free'),need=priced(r);if(RCOST[r.out]&&!BPK.has(r.out)&&!fr)return say('Locked. Research '+ITEMS[r.out].n+' at a Research Table or Workbench.');if(!fr&&!Object.keys(need).every(k=>cnt(k)>=need[k]))return;if(r.fire&&!nearFire()&&!fr)return say('Stand near a fire to cook.');if(wbNeed(r)>wbTier()&&!fr)return say(wbMsg(wbNeed(r)));if(!fr)for(const k in need)take(k,need[k]);if(!give(r.out,r.q)){if(!fr)for(const k in need)give(k,need[k],1);return}say('Crafted '+ITEMS[r.out].n)}
+function craft(r){const fr=ch('free'),need=priced(r);if(RCOST[r.out]&&!BPK.has(r.out)&&!fr)return say('Locked. Research '+ITEMS[r.out].n+' at a Research Table or Workbench.');if(!fr&&!Object.keys(need).every(k=>cnt(k)>=need[k]))return say('Missing '+Object.keys(need).filter(k=>cnt(k)<need[k]).map(k=>(need[k]-cnt(k))+' '+ITEMS[k].n).join(', ')+'.');/* jim smallfix7 #13 */if(r.fire&&!nearFire()&&!fr)return say('Stand near a fire to cook.');if(wbNeed(r)>wbTier()&&!fr)return say(wbMsg(wbNeed(r)));if(!fr)for(const k in need)take(k,need[k]);if(!give(r.out,r.q)){if(!fr)for(const k in need)give(k,need[k],1);return}say('Crafted '+ITEMS[r.out].n)}
 function effects(){const a=[];
  if(S.warmth<20)a.push(['🥶','Freezing','#2d6a9f']);else if(S.warmth<35)a.push(['❄','Cold','#4a86b5']);
  if(wx==='storm')a.push(['⛈','Storm','#3e4a54']);else if(wx==='rain')a.push(['🌧','Rain','#3f5a6a']);else if(wx==='snow')a.push(['🌨','Snow','#5a6874']);else if(wx==='fog')a.push(['🌫','Fog','#6a706c']);else if(wx==='overcast')a.push(['☁','Overcast','#4a5550']);
@@ -51778,7 +51778,7 @@ function bagItemActs(){const s=SL[pick],it=ITEMS[s.id],a=[];
  if(!isCont(pick))a.push(pbtn(pick<6?'To Backpack':'To Belt',()=>quickMoveSlot(pick)));
  if(it.gun)a.push(pbtn('Attachments',()=>{attTarget=SL[pick];if(pick<6)sel=pick;openAttUI()}));
  if(curBox)a.push(pbtn(isCont(pick)?'Take':'Store',()=>{xferPick();render()}));
- if(s.n>1)a.push(pbtn('Split',()=>{const e=bagIdx().find(i=>!SL[i]);if(e===undefined)return say('No free slot.');const q=s.n>>1;s.n-=q;SL[e]={id:s.id,n:q,dur:s.dur,mag:s.mag};render()}));
+ if(s.n>1)a.push(pbtn('Split',()=>{/* jim smallfix7 #12: split inside the container */const inC=isCont(pick)&&!!curBox,e=(inC?curBox.sl.map((_,k)=>30+k).filter(i=>canPlace(i,s)):bagIdx()).find(i=>!SL[i]);if(e===undefined)return say(inC?'No free slot in here.':'No free slot.');const q=s.n>>1;s.n-=q;SL[e]={id:s.id,n:q,dur:s.dur,mag:s.mag};render()}));
  if(s.n>1)a.push(pbtn('Drop 1',()=>{tossItemFromPlayer(s,1);if(--s.n<=0){SL[pick]=null;pick=null}render();persist()}));
  a.push(pbtn(s.n>1?'Drop stack':'Drop',()=>{tossItemFromPlayer(s,s.n);SL[pick]=null;pick=null;render();persist()}));
  return a}
@@ -53396,9 +53396,9 @@ function furnaces(dt){for(const d of devs){if(!isInd(d.t)||d._gone)continue;cons
   if(d.burn<=0&&room){const fi=sl.findIndex((s,i)=>i<3&&s&&s.id==='fuel');if(fi>=0){if(--sl[fi].n<=0)sl[fi]=null;d.burn=d.cmp?CMP_RATE.pumpBurn:20}}
   if(d.burn>0){d.burn-=dt;if(room){d.prog+=dt;const st=d.cmp?CMP_RATE.pump:d.npc?1.4:4;while(d.prog>=st){d.prog-=st;if(!hasOutRoom(sl,'crude',1)){d.prog=0;break}addOut(sl,'crude',1)}}}else d.prog=0;
  }else if(d.t==='quarry'){
-  const room=hasOutRoom(sl,'stone',6)||hasOutRoom(sl,'ore',3)||hasOutRoom(sl,'sulfur',2);
+  /* jim smallfix7 #10: run only if the whole cycle fits (no deleted output) */const qOut=d.cmp?[['stone',3],['ore',1],['sulfur',1]]:[['stone',6],['ore',3],['sulfur',2]],qFit=()=>{const tq=[sl[3],sl[4],sl[5]].map(q=>q?{id:q.id,n:q.n}:null);for(const [id,n] of qOut){let left=n;const mx=ITEMS[id].max;for(const q of tq)if(q&&q.id===id&&q.n<mx){const a=Math.min(mx-q.n,left);q.n+=a;left-=a}for(let i=0;i<3&&left>0;i++)if(!tq[i]){const a=Math.min(mx,left);tq[i]={id,n:a};left-=a}if(left>0)return false}return true},room=qFit();
   if(d.burn<=0&&room){const fi=sl.findIndex((s,i)=>i<3&&s&&s.id==='fuel');if(fi>=0){if(--sl[fi].n<=0)sl[fi]=null;d.burn=d.cmp?CMP_RATE.quarryBurn:24}}
-  if(d.burn>0){d.burn-=dt;if(room){d.prog+=dt;const st=d.cmp?CMP_RATE.quarry:d.npc?1.4:4;while(d.prog>=st){d.prog-=st;if(d.cmp){addOut(sl,'stone',3);addOut(sl,'ore',1);if(Math.random()<.4)addOut(sl,'sulfur',1)}else{addOut(sl,'stone',6);addOut(sl,'ore',3);addOut(sl,'sulfur',2)}if(d.npc)d.cyc=(d.cyc||0)+1}}}else d.prog=0;
+  if(d.burn>0){d.burn-=dt;if(room){d.prog+=dt;const st=d.cmp?CMP_RATE.quarry:d.npc?1.4:4;while(d.prog>=st){d.prog-=st;if(!qFit()){d.prog=0;break}if(d.cmp){addOut(sl,'stone',3);addOut(sl,'ore',1);if(Math.random()<.4)addOut(sl,'sulfur',1)}else{addOut(sl,'stone',6);addOut(sl,'ore',3);addOut(sl,'sulfur',2)}if(d.npc)d.cyc=(d.cyc||0)+1}}}else d.prog=0;
  }}
  if(curBox&&Math.hypot(P.x-curBox.x,P.z-curBox.z)>6){curBox=null;open=false;render();lookLock(true)}
  if(curBox&&isInd(curBox.t)&&open&&(age*2|0)!==fq){fq=age*2|0;render()}}
@@ -57336,8 +57336,8 @@ function powerSub(){const s=site(5,5);if(!s)return;mon('Power Substation',s.cx,s
 function helipadMon(){const s=site(5,4);if(!s)return;mon('Radar Helipad',s.cx,s.cz,5,4,s.y,k=>{const K=monKit(k),b=k.b;k.pad(-5.2,3.8);
  // Elevated reinforced concrete helipad deck (east side) with yellow H markings & corner beacons
  k.solid(2.2,0,7.2,7.2,1.3,MC.concD);b.box(7.4,.14,7.4,2.2,1.36,0,MC.asph);
- for(let s2=0;s2<5;s2++)b.box(.55,.26*(s2+1),2.4,-2.57+s2*.26,.13*(s2+1),2.0,MC.conc);
- {const rp={x0:k.X-2.85,x1:k.X-1.4,z0:k.Z+.8,z1:k.Z+3.2,y0:k.y,y1:k.y+1.43,ramp:1};ALLC.push(rp);DECKS.push(rp)}
+ for(let s2=0;s2<5;s2++)b.box(.55,.26*(s2+1),1.6,-2.57+s2*.26,.13*(s2+1),2.8,MC.conc);/* jim layout7: ramp clear of the radar bunker walls */
+ {const rp={x0:k.X-2.85,x1:k.X-1.4,z0:k.Z+2.0,z1:k.Z+3.6,y0:k.y,y1:k.y+1.43,ramp:1};ALLC.push(rp);DECKS.push(rp)}
  for(const sx of[-1.1,5.5])b.box(.22,.05,6.6,sx,1.45,0,MC.yel);
  for(const sz of[-3.2,3.2])b.box(6.6,.05,.22,2.2,1.45,sz,MC.yel);
  b.box(.42,.06,3.4,1.15,1.45,0,MC.yel);b.box(.42,.06,3.4,3.25,1.45,0,MC.yel);b.box(2.4,.06,.42,2.2,1.45,0,MC.yel);
@@ -57352,7 +57352,7 @@ function helipadMon(){const s=site(5,4);if(!s)return;mon('Radar Helipad',s.cx,s.
  k.post(-1.2,-3.8,4.8,MC.steel,.08);b.cone(.28,1.1,8,-.65,4.55,-3.8,MC.red,[0,0,-1.35]);
  K.sandbags(2.2,-4.4,2.8,true);K.sandbags(2.2,4.4,2.8,true);
  K.crate(3,2.2,0,0,1.36);K.crate(2,-4.1,-1.8,0);K.crate(2,-4.1,.6,1.57);
- K.barrel(-1.8,-4.2,MC.red);K.barrel(-1.0,-4.4,MC.blue);K.tires(-2.2,3.8);K.mast(6.0,-4.6,6.5)})}
+ K.barrel(-1.8,-4.2,MC.red);K.barrel(-1.0,-4.4,MC.blue);K.tires(-3.6,4.0);K.mast(6.0,-4.6,6.5)})}
 const RCR=rng(913);
 function campSite(w,d){
  for(let t=0;t<1600;t++){
@@ -57527,7 +57527,7 @@ function raiderCitadel(){
   // Make bunker roof a walkable overwatch deck (y+3.5) with exterior stepped ramp on West side
   {const dk={x0:k.X-3.9,x1:k.X+3.9,z0:k.Z-5.9,z1:k.Z-.3,y:k.y+2.9,top:k.y+3.5,found:1,pad:1};ALLC.push(dk);DECKS.push(dk);
    for(let st=0;st<8;st++){const u=(st+1)/8;b.box(1.3,3.5*u,.55,-4.55,3.5*u/2,-1.0-st*.55,MC.steel)}
-   const rp={x0:k.X-5.2,x1:k.X-3.9,z0:k.Z-4.95,z1:k.Z-.7,y0:k.y+3.5,y1:k.y,ramp:1,az:1};ALLC.push(rp);DECKS.push(rp)}
+   const rp={x0:k.X-5.2,x1:k.X-3.9,z0:k.Z-4.95,z1:k.Z-.7,y0:k.y+3.5,y1:k.y,ramp:1,az:1};ALLC.push(rp);DECKS.push(rp);/* jim layout7: landing at the stair top + rail over the gap */const ld={x0:k.X-5.2,x1:k.X-3.9,z0:k.Z-5.9,z1:k.Z-4.95,y:k.y+2.9,top:k.y+3.5,found:1,pad:1};ALLC.push(ld);DECKS.push(ld);b.box(1.3,.22,.95,-4.55,3.39,-5.425,MC.steel);for(const px of[-4.78,-4.35,-3.92])b.box(.06,1.05,.06,px,4.025,-5.87,MC.blk);b.box(.92,.06,.06,-4.35,4.52,-5.87,MC.yel);b.box(.92,.05,.05,-4.35,4.0,-5.87,MC.blk);ALLC.push({x0:k.X-4.8,x1:k.X-3.9,z0:k.Z-5.95,z1:k.Z-5.82,y:k.y+3.5,h:1.05,rail:1,mon:1})}
   K.sandbags(-2.2,-.5,2.4,true);K.sandbags(2.2,-.5,2.4,true);
   // Interior Warlord Map Table & Armory Gun Racks
   k.solid(0,-3.2,2.2,1.2,.88,MC.woodD);b.box(1.8,.05,.9,0,.92,-3.2,0x8a2820);
@@ -61183,7 +61183,7 @@ for (const id in ATT_DEFS) {
     }
   };
   REC.push({ out: id, q: 1, need: a.need });
-  COMP.push(id);
+  COMP.push(id);WB_ATT.push(id);if(['holo','scope8x','laser','ext_mag'].includes(id))WB_T2.push(id);
   RY[id] = { metal: 8, ...(a.need.circuit ? { circuit: 1 } : {}), ...(a.need.spring ? { spring: 1 } : {}) };
 }
 

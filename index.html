@@ -62987,4 +62987,11 @@ window.__bpLaunchSlot=launchSlot;
 refreshMenuUI();
 go.onclick=()=>begin(false);cont.onclick=()=>begin(true);
 })();
-</script></body></html>
+</script><script>/* BP FPS counter: F3 toggles, or add ?fps=1 to the URL */
+(function(){var el=document.createElement('div');el.id='bpFps';el.style.cssText='position:fixed;top:6px;right:8px;z-index:99999;font:bold 13px monospace;color:#7CFC00;background:rgba(0,0,0,.55);padding:3px 7px;border-radius:4px;pointer-events:none;display:none';
+var on=/[?&]fps=1/.test(location.search);function show(){el.style.display=on?'block':'none';}
+function add(){document.body.appendChild(el);show();}if(document.body)add();else addEventListener('DOMContentLoaded',add);
+addEventListener('keydown',function(e){if(e.code==='F3'){e.preventDefault();on=!on;show();}},true);
+var n=0,t=performance.now(),worst=0,last=t;(function loop(now){n++;var d=now-last;last=now;if(d>worst)worst=d;if(now-t>=500){if(on)el.textContent=Math.round(n*1000/(now-t))+' FPS  ('+Math.round(worst)+' ms worst)';n=0;t=now;worst=0;}requestAnimationFrame(loop);})(t);})();
+</script>
+</body></html>

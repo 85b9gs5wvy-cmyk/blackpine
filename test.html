@@ -51580,7 +51580,7 @@ function toast(id,n){const d=document.createElement('div');d.className='toast';d
 function useSlot(i){const s=SL[i];if(!s||dead||!ITEMS[s.id].use)return false;if(ITEMS[s.id].fx()===false)return false;startSwing('use',false,.34);if(--s.n<=0)SL[i]=null;render();return true}
 function selSlot(i){if(i===sel&&SL[i]&&ITEMS[SL[i].id].use)useSlot(i);else{sel=i;const q=SL[i];if(q&&(ITEMS[q.id].bd||ITEMS[q.id].dv))say('Aim and press Use to place. Green ghost = valid.');else if(q&&q.id==='wire')say('Wire tool: Use on one device, then on another.');else if(q&&ITEMS[q.id].plant)say('Aim at a wall and press Use to set the charge.');else if(q&&ITEMS[q.id].nade)say(q.id==='satchel'?'Use throws it. It sticks to the first wall.':'Use / Fire to throw.');else if(q&&q.id==='launcher')say('Loads rockets. Use / Fire to launch.');else if(q&&ITEMS[q.id].mel)say('Use / Fire to swing. Aim at what you want to hit.');else if(q&&ITEMS[q.id].gun)say('Use / Fire to shoot. R reloads. T swaps ammo.')}render()}
 function canPlace(i,s){if(!s)return true;if(i<30||i>=PX)return true;if(!curBox||i-30>=curBox.sl.length)return false;if(curBox.t==='tc')return s.id==='wood'||s.id==='stone'||s.id==='metal';if(curBox.t==='furnace'){const k=i-30;return k<3&&(s.id==='ore'||s.id==='sulfur'||s.id==='wood'||s.id==='fuel')}if(curBox.t==='recycler')return i-30<3&&!!RY[s.id];/* jim smallfix7 #9 */if(curBox.t==='refinery')return i-30<3&&(s.id==='crude'||s.id==='wood'||s.id==='fuel');if(curBox.t==='pump_jack'||curBox.t==='quarry')return i-30<3&&s.id==='fuel';return true}
-function move(a,b,quiet){if(a===b)return true;const x=SL[a],y=SL[b],same=!!(x&&y&&x.id===y.id&&ITEMS[x.id].max>1&&y.n<ITEMS[x.id].max);if(same?!canPlace(b,x):((x&&!canPlace(b,x))||(y&&!canPlace(a,y)))){if(!quiet){if(curBox&&curBox.t==='tc')say('The cupboard only holds wood, stone and metal. That is the upkeep.');else if(curBox&&curBox.t==='furnace')say('Furnace inputs take Metal Ore, Sulfur, Wood and Low Grade Fuel. Burning wood leaves charcoal. The output slots are take-only.');else if(curBox&&curBox.t==='refinery')say('Refinery inputs take Crude Oil, Wood and Low Grade Fuel. The output slots are take-only.');else if(curBox&&(curBox.t==='pump_jack'||curBox.t==='quarry'))say('It runs on Low Grade Fuel. The output slots are take-only.');else say('That slot will not take it.')}return false}if(same){const m=Math.min(ITEMS[x.id].max-y.n,x.n);y.n+=m;x.n-=m;if(!x.n)SL[a]=null}else{SL[a]=y;SL[b]=x}return true}
+function move(a,b,quiet){if(a===b)return true;const x=SL[a],y=SL[b],same=!!(x&&y&&x.id===y.id&&ITEMS[x.id].max>1&&y.n<ITEMS[x.id].max);if(same?!canPlace(b,x):((x&&!canPlace(b,x))||(y&&!canPlace(a,y)))){if(!quiet){if(curBox&&curBox.t==='tc')say('The cupboard only holds wood, stone and metal. That is the upkeep.');else if(curBox&&curBox.t==='furnace')say('Furnace inputs take Metal Ore, Sulfur, Wood and Low Grade Fuel. Burning wood leaves charcoal. The output slots are take-only.');else if(curBox&&curBox.t==='refinery')say('Refinery inputs take Crude Oil, Wood and Low Grade Fuel. The output slots are take-only.');else if(curBox&&(curBox.t==='pump_jack'||curBox.t==='quarry'))say('It runs on Low Grade Fuel. The output slots are take-only.');else if(curBox&&curBox.t==='recycler')say('Recycler inputs (slots 1–3) take components only. Recyclable items glow green in your bag. The output slots are take-only.');/* fred recycler7 */else say('That slot will not take it.')}return false}if(same){const m=Math.min(ITEMS[x.id].max-y.n,x.n);y.n+=m;x.n-=m;if(!x.n)SL[a]=null}else{SL[a]=y;SL[b]=x}return true}
 function xferPick(){if(pick===null||!SL[pick])return;if(!curBox)return say('Open a box, furnace or cupboard first.');const dest=[];if(isCont(pick))dest.push(...bagIdx());else for(let i=0;i<curBox.sl.length;i++)dest.push(30+i);for(const b of dest){if(!SL[pick])break;const y=SL[b];if(!y||(y.id===SL[pick].id&&ITEMS[y.id].max>1&&y.n<ITEMS[y.id].max))move(pick,b,true)}if(!SL[pick])pick=null;else say('No room for the rest.')}
 function xferAll(dir){if(!curBox)return;const src=[],dest=[];if(dir==='take'){for(let i=0;i<curBox.sl.length;i++)src.push(30+i);dest.push(...bagIdx())}else{src.push(...bagIdx().filter(i=>i>=6));for(let i=0;i<curBox.sl.length;i++)dest.push(30+i)}for(const a of src){if(!SL[a])continue;for(const b of dest){if(!SL[a])break;const y=SL[b];if(!y||(y.id===SL[a].id&&ITEMS[y.id].max>1&&y.n<ITEMS[y.id].max))move(a,b,true)}}}
 function clickSlot(i){if(!open)return selSlot(i);eqPick=null;
@@ -51628,11 +51628,14 @@ function quickMoveSlot(i){
   if(!SL[i])break;
   if(!SL[b])move(i,b,true);
  }
+ if(curBox&&curBox.t==='recycler'&&!isCont(i)&&SL[i]&&!RY[SL[i].id])say('The recycler only takes components. Recyclable items glow green.');/* fred recycler7 */
  pick=null;render();persist();return true;
 }
+{const styleId='bp-recycler-highlight-style';if(!document.getElementById(styleId)){const st=document.createElement('style');st.id=styleId;st.textContent='.slot.recyclable{border-color:#38d46a !important;box-shadow:0 0 8px rgba(56,212,106,0.6);background:rgba(56,212,106,0.15);}';document.head.appendChild(st);}}/* fred recycler7 */
 function sEl(i){const s=SL[i],it=s&&ITEMS[s.id],d=document.createElement('div');
  const dim=open&&tab==='bag'&&i>=6&&!isCont(i)&&bagFilter!=='all'&&s&&bagCatOf(s.id)!==bagFilter;
- d.className='slot'+(i===sel&&i<6?' on':'')+(pick===i?' pk':'')+(dim?' dim-slot':'');
+ const rcyHl=!!(open&&curBox&&curBox.t==='recycler'&&s&&!isCont(i)&&RY[s.id]);/* fred recycler7: player slots are 0-29 (hotbar 0-5) and backpack PX+ */
+ d.className='slot'+(i===sel&&i<6?' on':'')+(pick===i?' pk':'')+(dim?' dim-slot':'')+(rcyHl?' recyclable':'');
  const showNm=open&&i>=6&&s&&it;
  const shortLabel=showNm?(SHORT_NM[s.id]||it.n.replace(/^(Stone |Metal |Wooden |Wood |Sheet |Armored |Arctic |Burlap |Hide )/,'').slice(0,11)):'';
  d.innerHTML=(i<6?'<small>'+(i+1)+'</small>':(isCont(i)&&curBox&&(isInd(curBox.t)||curBox.t==='recycler')?'<small>'+(i-30<3?'IN':'OUT')+'</small>':(s&&it&&(it.arm||it.tool)&&it.tier?'<small class="tbadge '+(it.layer==='cloth'?'cl':'ar')+'">T'+it.tier+'</small>':'')))+(s?(s.id==='water_jug'?icoJug(s):ico(s.id))+(it.gun?'<em>'+(s.mag||0)+'</em>':s.n>1?'<em>'+s.n+'</em>':'')+(showNm?'<span class="sl-nm">'+shortLabel+'</span>':'')+(s.dur?'<u style="width:'+(s.dur/it.dur*46)+'px"></u>':''):'');
@@ -51666,7 +51669,31 @@ const nearWB=()=>wbTier()>0;
 const wbNeed=r=>r.out==='workbench2'?1:r.out==='workbench3'?2:!needWB(r)?0:WB_T3.includes(r.out)?3:WB_T2.includes(r.out)?2:1;
 const wbMsg=n=>n>1?'You need a Tier '+n+' Workbench in reach for that.':'You need a workbench in reach for that.';
 REC.push({out:'gears',q:1,need:{metal:8,wood:2}});REC.push({out:'circuit',q:1,need:{metal:6,fiber:5}});
-const RY={tech:{scrap:10,circuit:1},targeting_computer:{scrap:15,tech:1,circuit:2,metal:8},cctv:{scrap:8,circuit:1,gears:1,metal:4},explosives:{powder:6,sulfur_s:2,fuel:1},spring:{scrap:5,metal:6},sheet:{scrap:3,metal:8},pipe:{scrap:2,metal:6},semi_body:{scrap:8,metal:15},smg_body:{scrap:12,metal:20},gears:{metal:6},circuit:{metal:4,fiber:3},powder:{sulfur:1,charcoal:1},snap:{metal:6,gears:1},wire:{metal:2},turret:{metal:14,gears:2,circuit:1},rocket:{metal:6,powder:8}};
+const RY={
+ tech:{scrap:10,circuit:1},
+ targeting_computer:{scrap:15,tech:1,circuit:2,metal:8},
+ cctv:{scrap:8,circuit:1,gears:1,metal:4},
+ explosives:{powder:6,sulfur:2,fuel:1},
+ spring:{scrap:5,metal:6},
+ sheet:{scrap:3,metal:8},
+ pipe:{scrap:2,metal:6},
+ semi_body:{scrap:8,metal:15},
+ smg_body:{scrap:12,metal:20},
+ gears:{metal:6,scrap:5},
+ circuit:{metal:4,fiber:3,scrap:2},
+ powder:{sulfur:1,charcoal:1},
+ snap:{metal:6,gears:1},
+ wire:{metal:2},
+ turret:{metal:14,gears:2,circuit:1},
+ rocket:{metal:6,powder:8},
+ blade:{scrap:2,metal:5},
+ rope:{fiber:10},
+ tarp:{cloth:20},
+ propane:{metal:15,fuel:5},
+ sewing_kit:{cloth:5,metal:2,scrap:2},
+ road_sign:{metal:15,scrap:5},
+ fuse:{scrap:10,metal:5,circuit:1}
+};/* fred recycler7: user's RY table */
 const RECYS=[];let ra=0;
 function recyTick(){const dt=Math.min(.25,Math.max(0,age-ra));ra=age;for(const r of RECYS){const sl=r.sl,ii=sl.findIndex((q,i)=>i<3&&q&&RY[q.id]);if(ii<0){r.p=0;continue}r.p=(r.p||0)+dt;if(r.p<1.6)continue;const q=sl[ii],out=RY[q.id];
  const can=Object.keys(out).every(k=>{let sp=0;for(let i=3;i<6;i++){const o=sl[i];sp+=!o?ITEMS[k].max:o.id===k?ITEMS[k].max-o.n:0}return sp>=out[k]});if(!can)continue;r.p=0;
@@ -54836,11 +54863,11 @@ function jfRaidGo(n,r,sp,dt){const cp=r.cp,gd=cp.gd,shut=!!(gd&&!gd.open);if(n.s
   return stepTo(n,r.w[0],r.w[1],sp,dt)}
  const sv=n.tgtSettler;n._jfG=1;if(cp.n)n.tgtSettler=cp.n;try{return go(n,r.w[0],r.w[1],sp,dt)}finally{n._jfG=0;n.tgtSettler=sv}}
 // === JESSICA FIX END ===
-function go(n,tx,tz,sp,dt){/* === JESSICA FIX START: raiders route through compound gates === */if(n.k==='raider'&&!n.cmp&&!n._jfG){const jr=jfRaidGate(n,tx,tz);if(jr)return jfRaidGo(n,jr,sp,dt)}/* === JESSICA FIX END === */if(n.cmp){const r=cmpGo(n,tx,tz);if(r){tx=r[0];tz=r[1];const l=cmpLocal(n.cmp,n.x,n.z);if(Math.abs(l[0])<2.4&&l[1]<-10.5&&l[1]>-27.5){n.pth=[];n.pT=null;return stepTo(n,tx,tz,sp,dt)}}}if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
+function go(n,tx,tz,sp,dt){/* === JESSICA FIX START: raiders route through compound gates === */if(n.k==='raider'&&!n.cmp&&!n._jfG){const jr=jfRaidGate(n,tx,tz);if(jr)return jfRaidGo(n,jr,sp,dt)}/* === JESSICA FIX END === */if(n.cmp&&n.k==='settler'&&!cmpInside(n.cmp,tx,tz))n.outLock=age+CMP_OUT_LOCK;if(n.cmp){const r=cmpGo(n,tx,tz);if(r){tx=r[0];tz=r[1];const l=cmpLocal(n.cmp,n.x,n.z);if(Math.abs(l[0])<2.4&&l[1]<-10.5&&l[1]>-27.5){n.pth=[];n.pT=null;return stepTo(n,tx,tz,sp,dt)}}}if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
  while(n.pth.length&&Math.hypot(n.pth[0][0]-n.x,n.pth[0][1]-n.z)<.85)n.pth.shift();
  const w=n.pth.length?n.pth[0]:[tx,tz];return stepTo(n,w[0],w[1],sp,dt)}
 function gatherNode(n,kinds,flt){let farm=null,fd=1e9,b=null,bd=1e9;const list=resList();for(let i=0;i<list.length;i++){const o=list[i],k=o.userData.k;if(!kinds.includes(k)||(n.bad&&n.bad.has(o))||(flt&&!flt(o)))continue;const d=Math.hypot(o.position.x-n.x,o.position.z-n.z);if(o.userData.farm===n){if(d<fd){fd=d;farm=o}}else if(!o.userData.farm&&d<230&&d<bd&&!campDanger(n,o.position.x,o.position.z)){bd=d;b=o}}return farm||b}
-function takeNode(n,o){const y=o.userData.yield;if(y){for(const k in y)n.inv[k]=(n.inv[k]||0)+Math.max(1,Math.round(y[k]*.4))}else if(o.userData.k==='tree')n.inv.wood=(n.inv.wood||0)+8;else if(o.userData.k==='junk'||o.userData.k==='barrel'){const L=o.userData.k==='barrel'?barrelLoot(o.userData.kind):loot();if(o.userData.k==='junk'&&Math.random()<.35)L.circuit=(L.circuit||0)+1;if(o.userData.k==='barrel'&&o.userData.kind==='red'&&!L.fuel)L.fuel=1+(Math.random()*2|0);for(const k in L)if(L[k])n.inv[k]=(n.inv[k]||0)+L[k]}else if(o.userData.k==='ore'){n.inv.ore=(n.inv.ore||0)+6;n.inv.stone=(n.inv.stone||0)+2}else if(o.userData.k==='sulfur')n.inv.sulfur=(n.inv.sulfur||0)+4;else{n.inv.stone=(n.inv.stone||0)+4;n.inv.ore=(n.inv.ore||0)+3}o.userData.uses=0;remove(o);const rn=RN[RN.length-1];if(rn&&rn.o===o)rn.timer*=2.2}
+function takeNode(n,o){if(n&&n.cmp&&n.k==='settler')n.outLock=age+CMP_OUT_LOCK;const y=o.userData.yield;if(y){for(const k in y)n.inv[k]=(n.inv[k]||0)+Math.max(1,Math.round(y[k]*.4))}else if(o.userData.k==='tree')n.inv.wood=(n.inv.wood||0)+8;else if(o.userData.k==='junk'||o.userData.k==='barrel'){const L=o.userData.k==='barrel'?barrelLoot(o.userData.kind):loot();if(o.userData.k==='junk'&&Math.random()<.35)L.circuit=(L.circuit||0)+1;if(o.userData.k==='barrel'&&o.userData.kind==='red'&&!L.fuel)L.fuel=1+(Math.random()*2|0);for(const k in L)if(L[k])n.inv[k]=(n.inv[k]||0)+L[k]}else if(o.userData.k==='ore'){n.inv.ore=(n.inv.ore||0)+6;n.inv.stone=(n.inv.stone||0)+2}else if(o.userData.k==='sulfur')n.inv.sulfur=(n.inv.sulfur||0)+4;else{n.inv.stone=(n.inv.stone||0)+4;n.inv.ore=(n.inv.ore||0)+3}o.userData.uses=0;remove(o);const rn=RN[RN.length-1];if(rn&&rn.o===o)rn.timer*=2.2}
 function slotSum(sl,a,b,id){let n=0;for(let i=a;i<b;i++)if(sl[i]&&sl[i].id===id)n+=sl[i].n;return n}
 function furnacePut(f,id,n){const idx=id==='wood'||id==='fuel'?[2]:[0,1];let left=n;for(const i of idx){if(left<=0)break;const s=f.sl[i];if(s&&s.id===id){const a=Math.min(ITEMS[id].max-s.n,left);s.n+=a;left-=a}else if(!s){const a=Math.min(ITEMS[id].max,left);f.sl[i]={id,n:a};left-=a}}return n-left}
 function furnacePull(f,n){let g=0;for(let i=3;i<6;i++){const s=f.sl[i];if(s&&s.id==='metal'&&s.n>0){g+=s.n;f.sl[i]=null}else if(n&&s&&(s.id==='charcoal'||s.id==='sulfur_s')){n.inv[s.id]=(n.inv[s.id]||0)+s.n;f.sl[i]=null}}return g}
@@ -55567,6 +55594,7 @@ for(const D of[BPSettlers,BPRaiders]){const d0=D.dress;D.dress=function(m){const
 // ===== AI compounds: Jim's 36x36 m base replaces rollPlan/raiseStarter; settlers fuel rigs from oil deposits, plant trees, scavenge, arm, upgrade =====
 // economy: compound devices tick slower than legacy settler rigs; stockpiles are capped so settlers progress at roughly player pace
 const CMP_RATE={pump:14,pumpBurn:60,quarry:22,quarryBurn:70,refine:9},CMP_CAP={wood:450,stone:600,ore:260,metal:220,gears:24,circuit:10,sulfur:160,crude:60,fuel:40,charcoal:120,sulfur_s:120},CMP_RESPAWN=600;
+/* FRED SETTLER FIX: collect min/cooldown + outbound lock */const CMP_MIN_COLLECT=20,CMP_COLLECT_CD=60,CMP_OUT_LOCK=20;function cmpLocked(n){return n.outLock>age&&!(n.aggro>0)&&!!n.cmp&&!cmpInside(n.cmp,n.x,n.z)}
 function cmpCap(n){for(const k in CMP_CAP)if((n.inv[k]||0)>CMP_CAP[k])n.inv[k]=CMP_CAP[k]}
 function cmpRevive(cp){const n=cp.n,sp=cmpTf(cp,cp.ud.stockpile.x,cp.ud.stockpile.z);n._dead=0;n.hp=n.maxHp;n.aggro=0;n.fireT=0;n.pth=null;n.pT=null;n.rigGo=null;n.treeGo=null;n.cd=1;
  n.x=sp[0]+1;n.z=sp[1]+1;n.y=Math.max(H(n.x,n.z),cp.y);n.m.position.set(n.x,n.y,n.z);if(!n.m.parent)scene.add(n.m);if(!things.includes(n.m))things.push(n.m);if(window.BPSettlers)BPSettlers.dress(n.m,cp.tier||1,n.seed|0);if(!NP.includes(n))NP.push(n);
@@ -55620,18 +55648,18 @@ function cmpGo(n,tx,tz){const cp=n.cmp;if(!cp)return null;const inN=cmpInside(cp
  const W=(x,z)=>cmpTf(cp,x,z);if(inN){if(Math.abs(l[0])>1.3||l[1]>-11)return W(0,-12);return W(0,-26)}
  if(Math.abs(l[0])<1.6&&l[1]<-16&&l[1]>-27)return W(0,-12);return W(0,-26)}
 function fuelWork(n,dt){const ref=rigOf(n,'refinery');if(!ref)return false;const outF=slotSum(ref.sl,3,6,'fuel');
- if((n.inv.crude||0)>=20||(outF>=6&&(n.inv.fuel||0)<CMP_CAP.fuel-6)||((n.inv.crude||0)>0&&!OILS.some(o=>o.amount>=10))){if(Math.hypot(ref.x-n.x,ref.z-n.z)>3.4){go(n,ref.x+2,ref.z+2,3.6,dt);return true}
+ if((n.inv.crude||0)>=20||(!cmpLocked(n)&&outF>=(cmpInside(n.cmp,n.x,n.z)?6:CMP_MIN_COLLECT)&&(n.inv.fuel||0)<CMP_CAP.fuel-6)||((n.inv.crude||0)>0&&!OILS.some(o=>o.amount>=10))){if(Math.hypot(ref.x-n.x,ref.z-n.z)>3.4){go(n,ref.x+2,ref.z+2,3.6,dt);return true}
   for(let i=3;i<6;i++){const q=ref.sl[i];if(q&&q.id==='fuel'){n.inv.fuel=(n.inv.fuel||0)+q.n;ref.sl[i]=null}}if((n.inv.crude||0)>0)n.inv.crude-=furnacePut(ref,'crude',n.inv.crude);if(slotSum(ref.sl,0,3,'wood')<2&&(n.inv.wood||0)>3)n.inv.wood-=furnacePut(ref,'wood',2);n.cd=.4;n.sw=.45;rigStock(n);return true}
  let b=null,bd=260;for(const o of OILS){if(o.amount<10)continue;const d=Math.hypot(o.x-n.x,o.z-n.z);if(d<bd&&!campDanger(n,o.x,o.z)){bd=d;b=o}}if(!b)return false;
- if(bd>2.4){go(n,b.x,b.z,3.5,dt);return true}if(n.cd>0)return true;const take=Math.min(10,Math.floor(b.amount));b.amount-=take;n.inv.crude=(n.inv.crude||0)+take;n.cd=.7;n.sw=.45;return true}
+ if(bd>2.4){go(n,b.x,b.z,3.5,dt);return true}if(n.cd>0)return true;n.outLock=age+CMP_OUT_LOCK;const take=Math.min(10,Math.floor(b.amount));b.amount-=take;n.inv.crude=(n.inv.crude||0)+take;n.cd=.7;n.sw=.45;return true}
 function cmpUpgradeWork(n,dt){const cp=n.cmp,nt=cp.tier+1;if(nt>3||days<CMP_DAY[nt])return false;const need=CMP_COST[nt];
  for(const k in need){if((n.inv[k]||0)<need[k]&&n.tc&&!n.tc._gone)n.inv[k]=(n.inv[k]||0)+tcTake(n.tc,k,need[k]-(n.inv[k]||0));if((n.inv[k]||0)<need[k]){work(n,k,dt,need[k]);return true}}
  if(Math.hypot(cp.x-n.x,cp.z-n.z)>8){const w=cmpTf(cp,0,-4);go(n,w[0],w[1],3.6,dt);return true}if(n.cd>0)return true;n.cd=.5;n.sw=.45;n.upc=(n.upc||0)+.5;if(n.upc<6)return true;n.upc=0;
  for(const k in need)n.inv[k]-=need[k];cp.tier=nt;cmpBuild(cp);if(window.BPSettlers)for(const s of NP)if(s.cmp===cp)BPSettlers.dress(s.m,nt,s.seed|0);cp.gd.maxHp=nt===2?1500:3000;cp.gd.hp=cp.gd.maxHp;if(Math.hypot(P.x-cp.x,P.z-cp.z)<90)say('A settler compound was upgraded to tier '+nt+'.');return true}
-function cmpRigWork(n,dt){if((n.rigT=(n.rigT||0)-dt)>0&&!n.rigGo)return false;const pick=()=>{for(const k of['pump','quarry']){const d=rigOf(n,k);if(!d)continue;const out=slotSum(d.sl,3,6,'crude')+slotSum(d.sl,3,6,'stone')+slotSum(d.sl,3,6,'ore')+slotSum(d.sl,3,6,'sulfur')+(d.cyc||0),f=slotSum(d.sl,0,3,'fuel');if(out>=6||(f<2&&(n.inv.fuel||0)>0))return d}return null};
+function cmpRigWork(n,dt){if((n.rigT=(n.rigT||0)-dt)>0&&!n.rigGo)return false;if(!n.rigGo&&cmpLocked(n))return false;const pick=()=>{for(const k of['pump','quarry']){const d=rigOf(n,k);if(!d)continue;const out=slotSum(d.sl,3,6,'crude')+slotSum(d.sl,3,6,'stone')+slotSum(d.sl,3,6,'ore')+slotSum(d.sl,3,6,'sulfur')+(d.cyc||0),f=slotSum(d.sl,0,3,'fuel');const near=Math.hypot(d.x-n.x,d.z-n.z)<8,cdOk=!(age-(n.rigAt==null?-1e9:n.rigAt)<CMP_COLLECT_CD);if((cdOk&&out>=(near?6:CMP_MIN_COLLECT))||(f<2&&(n.inv.fuel||0)>0&&(near||cmpInside(n.cmp,n.x,n.z)||(f<1&&d.burn<=0))))return d}return null};
  const d=n.rigGo&&!n.rigGo._gone?n.rigGo:pick();if(!d){n.rigT=20;n.rigGo=null;return false}n.rigGo=d;if(Math.hypot(d.x-n.x,d.z-n.z)>3.4){go(n,d.x+2.3,d.z+2.3,3.6,dt);return true}
  rigPull(n,d);rigStock(n);n.rigGo=null;n.rigT=20;n.cd=.3;n.sw=.45;if(slotSum(d.sl,0,3,'fuel')<1&&(n.inv.fuel||0)<1)fuelWork(n,dt);return true}
-function cmpTreeWork(n,dt){const cp=n.cmp;if((n.treeT=(n.treeT||0)-dt)>0&&n.treeGo==null)return false;cp.trees=cp.trees.filter(t=>t.o.parent);
+function cmpTreeWork(n,dt){const cp=n.cmp;if((n.treeT=(n.treeT||0)-dt)>0&&n.treeGo==null)return false;if(n.treeGo==null&&cmpLocked(n))return false;cp.trees=cp.trees.filter(t=>t.o.parent);
  if(n.treeGo==null){if(cp.trees.length>=cp.spots.length||(n.inv.wood||0)<2){n.treeT=30;return false}let i=-1;for(let k=0;k<cp.spots.length;k++)if(!cp.trees.some(t=>t.i===k)){i=k;break}if(i<0){n.treeT=30;return false}n.treeGo=i}
  const q=cp.spots[n.treeGo];if(Math.hypot(q[0]-n.x,q[1]-n.z)>2.2){go(n,q[0]+1,q[1],3.4,dt);return true}if(n.cd>0)return true;cmpPlantTree(cp,n.treeGo,false);n.inv.wood-=1;n.treeGo=null;n.treeT=12;n.cd=.6;n.sw=.45;return true}
 function cmpGuardWork(n,dt){const cp=n.cmp,raid=EN.some(e=>e.hp>0&&Math.hypot(e.x-cp.x,e.z-cp.z)<70);if(!raid&&!(t>.8||t<.22))return false;const U=cp.ud;
@@ -55659,7 +55687,7 @@ function cmpsTick(dt){for(const cp of CMPS){const n=cp.n;if(n&&n._dead&&age-(cp.
 const RIG_RES={stone:'quarry',ore:'quarry',sulfur:'quarry',gears:'quarry',circuit:'quarry',fuel:'pump'};
 function rigOf(n,k){const d=n.devs&&n.devs[k];return d&&!d._gone&&d.hp>0?d:null}
 function rigStock(n){for(const k of['pump','quarry']){const d=rigOf(n,k);if(!d)continue;const q=slotSum(d.sl,0,3,'fuel');if(q<4&&(n.inv.fuel||0)>0)n.inv.fuel-=furnacePut(d,'fuel',Math.min(n.inv.fuel,4-q))}}
-function rigPull(n,d){let got=0;for(let i=3;i<6;i++){const s=d.sl[i];if(!s||s.n<=0)continue;if(s.id==='crude'){if(n.cmp)n.inv.crude=(n.inv.crude||0)+s.n;else n.inv.fuel=(n.inv.fuel||0)+s.n*3}else n.inv[s.id]=(n.inv[s.id]||0)+s.n;got+=s.n;d.sl[i]=null}
+function rigPull(n,d){let got=0;n.rigAt=age;for(let i=3;i<6;i++){const s=d.sl[i];if(!s||s.n<=0)continue;if(s.id==='crude'){if(n.cmp)n.inv.crude=(n.inv.crude||0)+s.n;else n.inv.fuel=(n.inv.fuel||0)+s.n*3}else n.inv[s.id]=(n.inv[s.id]||0)+s.n;got+=s.n;d.sl[i]=null}
  if(d.cyc){const c=d.cyc;d.cyc=0;d.cc=(d.cc||0)+c;n.inv.gears=(n.inv.gears||0)+c;const ci=Math.floor(d.cc/4);d.cc-=ci*4;if(ci)n.inv.circuit=(n.inv.circuit||0)+ci}return got}
 function rigWork(n,res,dt){const d=rigOf(n,RIG_RES[res]);if(!d)return false;
  if(Math.hypot(d.x-n.x,d.z-n.z)>3.4){go(n,d.x+2.3,d.z+2.3,3.6,dt);return true}
@@ -60016,22 +60044,7 @@ REC.push(
  {out:'revolver',q:1,need:{pipe:1,spring:1,cloth:4,metal:18}},
  {out:'ak',q:1,need:{smg_body:1,pipe:2,spring:3,sheet:2,wood:12,tech:1}}
 );
-Object.assign(RY,{
- blade:{scrap:2,metal:12},
- rope:{cloth:3,fiber:4},
- sheet:{scrap:5,metal:12},
- propane:{scrap:5,metal:25},
- sewing_kit:{cloth:5,rope:2},
- tarp:{cloth:8,fiber:4},
- fuse:{scrap:20,metal:6},
- gears:{scrap:10,metal:12},
- pipe:{scrap:5,metal:10},
- spring:{scrap:10,metal:10},
- road_sign:{scrap:8,metal:15},
- semi_body:{scrap:15,metal:25,spring:1},
- smg_body:{scrap:20,metal:30,spring:1},
- tech:{scrap:20,circuit:1}
-});
+/* fred recycler7: the old Object.assign(RY,{...}) override was removed so the user's RY table (top of the inventory code) is the one in effect */
 Object.assign(RCOST,{
  blade:15,rope:15,sheet:20,propane:35,sewing_kit:35,tarp:35,
  fuse:60,gears:60,pipe:50,spring:75,road_sign:60,semi_body:75

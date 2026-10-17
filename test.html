@@ -51670,30 +51670,30 @@ const wbNeed=r=>r.out==='workbench2'?1:r.out==='workbench3'?2:!needWB(r)?0:WB_T3
 const wbMsg=n=>n>1?'You need a Tier '+n+' Workbench in reach for that.':'You need a workbench in reach for that.';
 REC.push({out:'gears',q:1,need:{metal:8,wood:2}});REC.push({out:'circuit',q:1,need:{metal:6,fiber:5}});
 const RY={
- tech:{scrap:10,circuit:1},
- targeting_computer:{scrap:15,tech:1,circuit:2,metal:8},
- cctv:{scrap:8,circuit:1,gears:1,metal:4},
- explosives:{powder:6,sulfur:2,fuel:1},
- spring:{scrap:5,metal:6},
- sheet:{scrap:3,metal:8},
- pipe:{scrap:2,metal:6},
- semi_body:{scrap:8,metal:15},
- smg_body:{scrap:12,metal:20},
- gears:{metal:6,scrap:5},
- circuit:{metal:4,fiber:3,scrap:2},
- powder:{sulfur:1,charcoal:1},
- snap:{metal:6,gears:1},
- wire:{metal:2},
- turret:{metal:14,gears:2,circuit:1},
- rocket:{metal:6,powder:8},
- blade:{scrap:2,metal:5},
- rope:{fiber:10},
- tarp:{cloth:20},
- propane:{metal:15,fuel:5},
- sewing_kit:{cloth:5,metal:2,scrap:2},
- road_sign:{metal:15,scrap:5},
- fuse:{scrap:10,metal:5,circuit:1}
-};/* fred recycler7: user's RY table */
+  tech:{scrap:5,circuit:1},
+  targeting_computer:{scrap:8,circuit:1,metal:4},
+  cctv:{scrap:5,circuit:1,metal:2},
+  explosives:{powder:3,sulfur:1},
+  rocket:{metal:3,powder:4},
+  spring:{scrap:2,metal:3},
+  sheet:{scrap:2,metal:4},
+  pipe:{scrap:1,metal:3},
+  road_sign:{metal:6,scrap:2},
+  semi_body:{scrap:4,metal:6},
+  smg_body:{scrap:6,metal:8},
+  gears:{metal:3,scrap:2},
+  circuit:{metal:2,fiber:1,scrap:1},
+  powder:{sulfur:1},
+  snap:{metal:3,gears:1},
+  wire:{metal:1},
+  turret:{metal:6,gears:1},
+  blade:{scrap:1,metal:2},
+  rope:{fiber:4},
+  tarp:{cloth:8},
+  propane:{metal:6,fuel:2},
+  sewing_kit:{cloth:2,scrap:1},
+  fuse:{scrap:4,metal:2}
+};/* fred recycler7: user's RY table v2 */
 const RECYS=[];let ra=0;
 function recyTick(){const dt=Math.min(.25,Math.max(0,age-ra));ra=age;for(const r of RECYS){const sl=r.sl,ii=sl.findIndex((q,i)=>i<3&&q&&RY[q.id]);if(ii<0){r.p=0;continue}r.p=(r.p||0)+dt;if(r.p<1.6)continue;const q=sl[ii],out=RY[q.id];
  const can=Object.keys(out).every(k=>{let sp=0;for(let i=3;i<6;i++){const o=sl[i];sp+=!o?ITEMS[k].max:o.id===k?ITEMS[k].max-o.n:0}return sp>=out[k]});if(!can)continue;r.p=0;

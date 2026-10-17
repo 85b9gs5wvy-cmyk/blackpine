@@ -1615,11 +1615,11 @@ html,body{height:100%;margin:0;background:#100e0c;overflow:hidden}
 <section class="bp-title" id="title"><div class="bp-title-grid">
 <div class="bp-card">
 <p class="bp-kicker">Wilderness survival</p><h1>BLACKPINE</h1>
-<p>Gather, build a claim, and keep a rating the island does not forget. A tool cupboard holds the ground around it. Weather turns. Craft the charges the tenth-night crew carries — they come for the cupboard.</p>
+<p>Gather, build a claim, and keep a rating the island does not forget. A tool cupboard holds the ground around it. Smelt sulphur and charcoal into gunpowder. Every fifth night the crew comes for the cupboard.</p>
 <div class="bp-facts">
 <div><strong>Move</strong><span>WASD and mouse. On a phone, the stick and a drag to look.</span></div>
 <div><strong>Rating</strong><span>Scavenge, hunt, build, and blood. Heat sizes the raid.</span></div>
-<div><strong>Raid tools</strong><span>Craft guns, spike traps and snap traps. Settlers claim a cupboard, then build the camp themselves — a cupboard room, workshop, loot room and bedrooms, plus a furnace, windmill, battery, and a turret on a foundation outside each corner.</span></div>
+<div><strong>Raid tools</strong><span>Craft guns and traps, grow crops, and crack keycard rooms with a fuse. Settlers claim a cupboard and build their own camp with a cupboard room, workshop, loot room, bedrooms, a furnace, windmill, battery and corner turrets.</span></div>
 </div>
 <div class="bp-new-cfg" id="newClaimCfg">
 <div class="bp-new-cfg-hd"><span>New Claim Setup</span><span id="cfgPreview">Creates a fresh save slot</span></div>
@@ -50828,7 +50828,7 @@ const scene=new T.Scene(),cam=new T.PerspectiveCamera(72,1,.1,450),IS_MOBILE=/An
 cam.rotation.order='YXZ';scene.add(cam);const PR0=Math.min(devicePixelRatio||1,1.35)*(IS_MOBILE?.75:1);ren.setPixelRatio(PR0);
 // ===== Low-graphics test mode (?low=1 or cheat menu). Off = normal visuals untouched. =====
 let LOW=/[?&]low=1\b/.test(location.search);
-function applyLow(on){LOW=!!on;try{if(window.BPBuild&&BPBuild.setLow)BPBuild.setLow(LOW);ren.setPixelRatio(LOW?.5:PR0);const sh=!LOW;if(ren.shadowMap.enabled!==sh){ren.shadowMap.enabled=sh;scene.traverse(o=>{if(o.material){for(const m of[].concat(o.material))m.needsUpdate=true}})}
+function applyLow(on){LOW=!!on;try{if(window.BPNatLOD)BPNatLOD.setLow(LOW);if(window.BPTarp)BPTarp.setLow(LOW);window.BPManLOD&&BPManLOD.setLow(LOW);window.BPMonLOD&&BPMonLOD.setLow(LOW);window.BPAnimals&&BPAnimals.setLow&&BPAnimals.setLow(LOW);if(window.BPBuild&&BPBuild.setLow)BPBuild.setLow(LOW);ren.setPixelRatio(LOW?.5:PR0);const sh=!LOW;if(ren.shadowMap.enabled!==sh){ren.shadowMap.enabled=sh;scene.traverse(o=>{if(o.material){for(const m of[].concat(o.material))m.needsUpdate=true}})}
  cam.far=LOW?170:450;cam.updateProjectionMatrix();if(typeof INST_CHUNKS!=='undefined')for(const c of INST_CHUNKS)if(c.fol)c.m.count=LOW?Math.ceil(c.n0*.3):c.n0;if(typeof resize==='function')resize()}catch(e){}}ren.domElement.className='world';root.prepend(ren.domElement);
 const MK=[],MKC=['#ff4d4d','#ffb020','#38d46a','#33a8ff','#b86bff','#ff6bd0'];let mkN=0;
 let FOVB=72,VK=1,mapOpen=false;let attOpen=false,attTarget=null,adsHeld=false,adsLerp=0,tacLightOn=true;
@@ -52532,6 +52532,176 @@ function mkHands(){const root=new T.Group(),R=mkArm(1),L=mkArm(-1);root.add(R,L)
 root.BPHands={mkHands,mkHeldFood,GRIP,BY_ID,DUR,category,gripFor,durFor,PALM};
 })(BPJH);
 const BPHands=BPJH.BPHands;window.BPHands=BPHands;
+// ===== Jim's nature LODs (BPNatLOD) =====
+// Blackpine nature LODs by jim (trees, rocks, bushes, hemp, ore + sulfur nodes; instanced forest / rock / undergrowth chunks).
+// Export window.BPNatLOD = {tick(cam,things), wrapInst(chunk), setLow(on), low, CFG, stats()}.
+// Build 4 measured (headless, generated world): the INSTANCED decor chunks (fillInst: forest trees, shrubs, ferns, flowers,
+// mushrooms, decor rocks; 932 InstancedMeshes, full-detail geometry out to ~250 m) are ~86 % of the frame's triangles; the
+// harvestable things are per-object Groups (trees/rocks already have a game THREE.LOD hi -> proxy 85/70 m -> empty; bushes are
+// 9 meshes, ore 12, sulfur 14, hemp 1, all full detail out to the 160 m cull).
+//  * instanced chunks: each game InstancedMesh keeps the near instances (hi); two child InstancedMeshes (low, ultra; own
+//    vertex-colour material) take the rest. Instances are re-partitioned by distance when the camera has moved > CFG.step,
+//    budgeted per tick. A chunk whose hi part is empty is dropped via layers (mask 0; children still draw) to save its draw call. No raycast/collision involvement (decor colliders are addStaticCol circles, never meshes).
+//  * harvestables: trees/rocks get a 'low' level inserted into the game's own THREE.LOD (raycast = noop, so the hi mesh stays
+//    the only raycast target, exactly as now). Bushes/hemp/ore/sulfur get low/ultra child meshes (raycast = noop) and their hi
+//    meshes are shown/hidden with .visible (raycasts ignore .visible, so hit tests are unchanged; layers would drop them from
+//    the game's Raycaster). Bush berries' low/ultra live inside the berry group userData.f, so the game's depletion toggle
+//    (f.visible) drives every level. Root transform/visibility (cull, fall, respawn, grow) is untouched.
+//  * lazy: harvestables are discovered incrementally from `things`; low/ultra geometry is built on first need (cached per source
+//    geometry; per object for ore/sulfur, whose crystals are random), within CFG.budgetMs per tick (first job always runs).
+(function(root){
+const T=root.THREE||root.T;
+const CFG={tree:{low:25},rock:{low:20},bush:{low:25,ultra:60},hemp:{low:20,ultra:50},ore:{low:25,ultra:60},sulfur:{low:25,ultra:60},
+ inst:{tree:[30,80],rock:[25,60],small:[15,40]},step:3,budgetMs:1.5,scanPerTick:600,objEvery:.2,buildR:170,
+ frac:{tree:.13,rock:.2,bush:.15,hemp:.1,ore:.15,sulfur:.15,small:.2},ultraTris:{tree:40,rock:24,bush:24,hemp:16,ore:30,sulfur:30,small:12}};
+let LOWF=false;try{LOWF=typeof location!=='undefined'&&/[?&]low=1\b/.test(location.search)}catch(e){}
+let _vm=null;const VMAT=()=>_vm||(_vm=new T.MeshLambertMaterial({color:0xffffff,vertexColors:true}));
+const now=()=>(typeof performance!=='undefined'?performance:Date).now();
+const NOHIT=function(){};
+// ---------- texture factor: average colour of the material map on an 8x8 uv grid (game maps are small canvases) ----------
+const TEXF=new WeakMap();
+function texGrid(map){if(!map)return null;if(TEXF.has(map))return TEXF.get(map);let g=null;try{const im=map.image;if(im&&im.width){let cx=im.getContext?im.getContext('2d'):null;if(!cx&&typeof document!=='undefined'){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;cx=c.getContext('2d');cx.drawImage(im,0,0)}
+ if(cx){const W=im.width,H=im.height,d=cx.getImageData(0,0,W,H).data;g=new Float32Array(8*8*3);const lin=v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)};
+  for(let gy=0;gy<8;gy++)for(let gx=0;gx<8;gx++){let r=0,gg=0,b=0,n=0;for(let y=(gy*H/8)|0;y<((gy+1)*H/8)|0;y+=2)for(let x=(gx*W/8)|0;x<((gx+1)*W/8)|0;x+=2){const i=(y*W+x)*4;r+=d[i];gg+=d[i+1];b+=d[i+2];n++}
+   const o=((7-gy)*8+gx)*3;g[o]=lin(r/n);g[o+1]=lin(gg/n);g[o+2]=lin(b/n)}}}}catch(e){g=null}TEXF.set(map,g);return g}
+// ---------- triangle soup: world/object-space positions + one colour per triangle (vertex colour x material colour x map) ----------
+function soup(geo,mtx,mat,out){const P=geo.attributes.position,C=geo.attributes.color,U=geo.attributes.uv,I=geo.index?geo.index.array:null,n=I?I.length:P.count;
+ const mc=mat&&mat.color?mat.color:{r:1,g:1,b:1},vc=!!(mat&&mat.vertexColors&&C),tg=mat&&mat.map&&U?texGrid(mat.map):null,e=mtx?mtx.elements:null;
+ for(let t=0;t<n;t+=3){let r=0,g=0,b=0,u=0,v=0;for(let k=0;k<3;k++){const i=I?I[t+k]:t+k;let x=P.getX(i),y=P.getY(i),z=P.getZ(i);
+   if(e){const X=e[0]*x+e[4]*y+e[8]*z+e[12],Y=e[1]*x+e[5]*y+e[9]*z+e[13],Z=e[2]*x+e[6]*y+e[10]*z+e[14];x=X;y=Y;z=Z}out.pos.push(x,y,z);
+   if(vc){r+=C.getX(i);g+=C.getY(i);b+=C.getZ(i)}else{r+=1;g+=1;b+=1}if(tg){u+=U.getX(i);v+=U.getY(i)}}
+  let fr=1,fg=1,fb=1;if(tg){u/=3;v/=3;const gx=Math.min(7,Math.max(0,((u-Math.floor(u))*8)|0)),gy=Math.min(7,Math.max(0,((v-Math.floor(v))*8)|0)),o=(gy*8+gx)*3;fr=tg[o];fg=tg[o+1];fb=tg[o+2]}
+  out.col.push(r/3*mc.r*fr,g/3*mc.g*fg,b/3*mc.b*fb)}return out}
+// ---------- vertex clustering (as monlod.js) ----------
+function cluster(pos,col,cell){const cells=new Map(),ic=1/cell,ids=new Array(pos.length/3);
+ for(let i=0,v=0;i<pos.length;i+=3,v++){const k=((Math.floor(pos[i]*ic)+4096)*8192+(Math.floor(pos[i+1]*ic)+4096))*8192+(Math.floor(pos[i+2]*ic)+4096);let e=cells.get(k);if(!e)cells.set(k,e={x:0,y:0,z:0,n:0,i:cells.size});e.x+=pos[i];e.y+=pos[i+1];e.z+=pos[i+2];e.n++;ids[v]=e}
+ const seen=new Set(),out=[],oc=[];for(let t=0;t<ids.length;t+=3){const a=ids[t],b=ids[t+1],c=ids[t+2];if(a===b||b===c||a===c)continue;const s=[a.i,b.i,c.i],r=s.indexOf(Math.min(a.i,b.i,c.i)),k=s[r]+','+s[(r+1)%3]+','+s[(r+2)%3];
+  if(seen.has(k))continue;seen.add(k);for(const e of[a,b,c])out.push(e.x/e.n,e.y/e.n,e.z/e.n);oc.push(col[t],col[t+1],col[t+2])}
+ return out.length?{pos:out,col:oc}:null}
+function fit(S,target,cell0){let cell=cell0,res=null;for(let it=0;it<8;it++){res=cluster(S.pos,S.col,cell);const n=res?res.pos.length/9:0;if(n<=target&&(n>.45*target||it>=3))break;cell*=n>target?Math.max(1.1,Math.sqrt(n/target)*1.05):Math.max(.7,Math.sqrt(Math.max(1,n)/target)*1.05)}return res}
+function mkGeo(pos,triCol){const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));const n=pos.length/3,c=new Float32Array(n*3);
+ for(let t=0;t<n/3;t++)for(let k=0;k<3;k++){c[(t*3+k)*3]=triCol[t*3];c[(t*3+k)*3+1]=triCol[t*3+1];c[(t*3+k)*3+2]=triCol[t*3+2]}g.setAttribute('color',new T.BufferAttribute(c,3));g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g}
+function bboxOf(pos){const b=[1e9,1e9,1e9,-1e9,-1e9,-1e9];for(let i=0;i<pos.length;i+=3)for(let a=0;a<3;a++){const v=pos[i+a];if(v<b[a])b[a]=v;if(v>b[a+3])b[a+3]=v}return b}
+// ultra tree: trunk prism + crown (cone for conifers, icosahedron otherwise) in the averaged trunk/crown colours, same bbox
+function treeProxy(S){const b=bboxOf(S.pos),h=b[4]-b[1],cx=(b[0]+b[3])/2,cz=(b[2]+b[5])/2;const tc=[0,0,0,0],cc=[0,0,0,0];let rTop=0,rMid=0;
+ for(let t=0;t<S.col.length/3;t++){const y=(S.pos[t*9+1]+S.pos[t*9+4]+S.pos[t*9+7])/3,f=(y-b[1])/h,a=f<.18?tc:cc;a[0]+=S.col[t*3];a[1]+=S.col[t*3+1];a[2]+=S.col[t*3+2];a[3]++;
+  for(let k=0;k<3;k++){const q=t*9+k*3,r=Math.hypot(S.pos[q]-cx,S.pos[q+2]-cz),fy=(S.pos[q+1]-b[1])/h;if(fy>.72)rTop=Math.max(rTop,r);else if(fy>.3)rMid=Math.max(rMid,r)}}
+ const avg=a=>a[3]?[a[0]/a[3],a[1]/a[3],a[2]/a[3]]:[.3,.25,.2],T1=avg(tc),C1=avg(cc),W=Math.max(b[3]-b[0],b[5]-b[2])/2,con=rTop<rMid*.55;
+ const parts=[];const push=(g,c)=>{const s=soup(g,null,null,{pos:[],col:[]});for(let i=0;i<s.col.length;i+=3){s.col[i]=c[0];s.col[i+1]=c[1];s.col[i+2]=c[2]}parts.push(s);g.dispose()};
+ const tr=new T.CylinderGeometry(W*.07,W*.1,h*.3,4,1,true);tr.translate(cx,b[1]+h*.15,cz);push(tr,T1);
+ let cr;if(con){cr=new T.ConeGeometry(W,h*.86,6,1,true);cr.translate(cx,b[1]+h*.14+h*.43,cz)}else{cr=new T.IcosahedronGeometry(1,0);cr.scale(W,h*.36,W);cr.translate(cx,b[1]+h*.62,cz)}push(cr,C1);
+ return{pos:[].concat(...parts.map(p=>p.pos)),col:[].concat(...parts.map(p=>p.col))}}
+// low/ultra geometry of a soup (cached by caller)
+function lowGeo(S,kind){const n=S.col.length/3,b=bboxOf(S.pos),R=Math.max(b[3]-b[0],b[4]-b[1],b[5]-b[2]);const c=fit(S,Math.max(60,n*(CFG.frac[kind]||.15)),Math.max(.01,R*.04));return c?mkGeo(c.pos,c.col):null}
+function ultraGeo(S,kind){if(kind==='tree'){const p=treeProxy(S);return mkGeo(p.pos,p.col)}const b=bboxOf(S.pos),R=Math.max(b[3]-b[0],b[4]-b[1],b[5]-b[2]);const c=fit(S,CFG.ultraTris[kind]||24,Math.max(.02,R*.3));return c?mkGeo(c.pos,c.col):null}
+const GC=new WeakMap();// source geometry -> {mat->{low,ultra}}
+function cachedGeo(geo,mat,kind,lvl){let e=GC.get(geo);if(!e){e=new Map();GC.set(geo,e)}const key=(mat?mat.uuid:'')+kind;let q=e.get(key);if(!q){q={};e.set(key,q)}
+ if(!(lvl in q)){const S=soup(geo,null,mat,{pos:[],col:[]});q[lvl]=lvl==='low'?lowGeo(S,kind):ultraGeo(S,kind)}return q[lvl]}
+const triN=g=>g?(g.index?g.index.count:g.attributes.position.count)/3:0;
+// ================= instanced chunks =================
+const INST=[];
+function instKind(geo){geo.computeBoundingBox();const b=geo.boundingBox,h=b.max.y-b.min.y,w=Math.max(b.max.x-b.min.x,b.max.z-b.min.z);return h>3?'tree':Math.max(h,w)>1.1?'rock':'small'}
+function wrapInst(c){if(!c||!c.m||!c.m.isInstancedMesh||c.bpNat)return null;const m=c.m;if(m.material.transparent||triN(m.geometry)<=16)return null;
+ const n=c.n0||m.count,src=new Float32Array(m.instanceMatrix.array.subarray(0,n*16)),xs=new Float32Array(n),zs=new Float32Array(n);for(let i=0;i<n;i++){xs[i]=src[i*16+12];zs[i]=src[i*16+14]}
+ const e={c,m,n,src,xs,zs,kind:instKind(m.geometry),lo:null,ul:null,lx:1e9,lz:1e9,dirty:true,counts:[n,0,0]};c.bpNat=e;INST.push(e);return e}
+function instBuild(e){const m=e.m;const mk=l=>{const g=cachedGeo(m.geometry,m.material,e.kind,l);const im=new T.InstancedMesh(g||m.geometry,VMAT(),e.n);im.count=0;im.frustumCulled=false;im.castShadow=m.castShadow;im.receiveShadow=m.receiveShadow;im.name='natlod_'+l;im.raycast=NOHIT;im.userData.bpNat=l;m.add(im);return im};
+ e.lo=mk('low');e.ul=mk('ultra');return 1}
+function instUpdate(e,px,pz){const D=CFG.inst[e.kind],d1=LOWF?0:D[0]*D[0],d2=D[1]*D[1],keep=LOWF&&e.c.fol?Math.ceil(e.n*.3):e.n;
+ const A=[e.m.instanceMatrix.array,e.lo.instanceMatrix.array,e.ul.instanceMatrix.array],N=[0,0,0],src=e.src;
+ for(let i=0;i<keep;i++){const dx=e.xs[i]-px,dz=e.zs[i]-pz,d=dx*dx+dz*dz,l=d<d1?0:d<d2?1:2;A[l].set(src.subarray(i*16,i*16+16),N[l]*16);N[l]++}
+ e.m.count=N[0];if(e.m.userData._lm===undefined)e.m.userData._lm=e.m.layers.mask;e.m.layers.mask=N[0]?e.m.userData._lm:0;e.lo.count=N[1];e.ul.count=N[2];e.lo.visible=N[1]>0;e.ul.visible=N[2]>0;e.m.instanceMatrix.needsUpdate=e.lo.instanceMatrix.needsUpdate=e.ul.instanceMatrix.needsUpdate=true;e.counts=N;e.lx=px;e.lz=pz;e.dirty=false}
+// ================= harvestable objects =================
+const KINDS={tree:1,rock:1,bush:1,hemp:1,ore:1,sulfur:1};const OBJ=[];let scanI=0,objT=0;const SEEN=new WeakSet();
+function register(o){if(SEEN.has(o))return;SEEN.add(o);const k=o.userData.k;const lod=o.children.find(c=>c.isLOD);
+ const L=o.userData.bpNat={k,lod:lod||null,level:'high',want:'high',built:{},low:null,ultra:null,hi:null};
+ if(!lod){const hi=[];o.traverse(c=>{if(c.isMesh&&!c.userData.bpNat)hi.push(c)});L.hi=hi}OBJ.push(o)}
+// build one level for an object; returns 1 if work was done
+function objBuild(o,lvl){const L=o.userData.bpNat;if(L.built[lvl])return 0;L.built[lvl]=true;const k=L.k;
+ const fin=m=>{m.raycast=NOHIT;m.userData.bpNat=lvl;m.matrixAutoUpdate=false;m.updateMatrix();m.visible=false;return m};
+ if(L.lod){if(lvl!=='low')return 0;const hi=L.lod.levels[0].object;const g=cachedGeo(hi.geometry,hi.material,k==='tree'?'tree':'rock','low');if(!g)return 1;
+  const m=fin(new T.Mesh(g,VMAT()));m.castShadow=hi.castShadow;m.receiveShadow=hi.receiveShadow;m.visible=true;L.lod.addLevel(m,LOWF?0:CFG[k].low);sortLod(L.lod);L.low=m;return 1}
+ const parts=[];// [{parent, meshes}] : bush berries go to their own merged mesh inside userData.f
+ const f=o.userData.f||null,inF=c=>{for(let p=c.parent;p&&p!==o;p=p.parent)if(p===f)return true;return false};
+ const groups=new Map();for(const m of L.hi){const par=f&&inF(m)?f:o;if(!groups.has(par))groups.set(par,[]);groups.get(par).push(m)}
+ const out=[];o.updateMatrixWorld(true);
+ for(const[par,ms]of groups){const inv=new T.Matrix4().copy(par.matrixWorld).invert(),S={pos:[],col:[]};
+  if(ms.length===1&&par===o&&ms[0].parent===o&&(k==='bush'||k==='hemp')){const g=cachedGeo(ms[0].geometry,ms[0].material,k,lvl);if(g){const m=fin(new T.Mesh(g,VMAT()));m.position.copy(ms[0].position);m.quaternion.copy(ms[0].quaternion);m.scale.copy(ms[0].scale);m.updateMatrix();par.add(m);out.push(m)}continue}
+  for(const m of ms)soup(m.geometry,new T.Matrix4().multiplyMatrices(inv,m.matrixWorld),m.material,S);
+  const kk=par===f?'small':k,g=lvl==='low'?lowGeo(S,kk):ultraGeo(S,kk);if(!g)continue;const m=fin(new T.Mesh(g,VMAT()));m.castShadow=ms[0].castShadow;par.add(m);out.push(m)}
+ L[lvl]=out;return 1}
+function sortLod(lod){lod.levels.sort((a,b)=>a.distance-b.distance)}
+function objLevelFor(o,px,pz){const L=o.userData.bpNat,C=CFG[L.k],dx=o.position.x-px,dz=o.position.z-pz,d2=dx*dx+dz*dz;
+ if(L.lod)return d2<C.low*C.low*.6&&!LOWF?'high':'low';// trees/rocks: game LOD switches itself; we only need low built before it is reached
+ const lo=LOWF?0:C.low,h=L.level==='high'?1.1:L.level==='low'?.9:1,hu=L.level==='ultra'?.9:1.1;
+ if(d2>(C.ultra*hu)*(C.ultra*hu))return'ultra';if(d2>(lo*h)*(lo*h))return'low';return'high'}
+function objShow(o,lvl){const L=o.userData.bpNat;if(L.lod){L.level=lvl;return}if(lvl!=='high'&&!L.built[lvl])return;if(L.level===lvl)return;
+ for(const m of L.hi)m.visible=lvl==='high';for(const l of['low','ultra'])if(L[l])for(const m of L[l])m.visible=l===lvl;L.level=lvl}
+// ================= tick =================
+const Q=[];const QS=new Set();const _v=new T.Vector3();let lastT=0,stat={builds:0,instUpdates:0,ms:0};
+function tick(cam,things,dt){const t0=now();const p=cam.getWorldPosition?cam.getWorldPosition(_v):cam.position,px=p.x,pz=p.z;let jobs=0;const B=CFG.budgetMs,over=()=>jobs>0&&now()-t0>B;
+ if(things){const n=Math.min(things.length,CFG.scanPerTick);for(let i=0;i<n;i++){if(scanI>=things.length)scanI=0;const o=things[scanI++];if(o&&o.userData&&KINDS[o.userData.k]&&!SEEN.has(o))register(o)}}
+ // harvestables: every objEvery s, pick wanted level, queue missing builds (only within buildR of the camera)
+ const tn=now()/1000;if(tn-objT>=CFG.objEvery){objT=tn;const BR=CFG.buildR*CFG.buildR;for(const o of OBJ){const L=o.userData.bpNat,dx=o.position.x-px,dz=o.position.z-pz;if(dx*dx+dz*dz>BR)continue;const w=objLevelFor(o,px,pz);L.want=w;
+   if(w!=='high'&&!L.built[w]){const key=o.uuid+w;if(!QS.has(key)){QS.add(key);Q.push([o,w])}}else objShow(o,w)}}
+ while(Q.length&&!over()){const[o,w]=Q.shift();QS.delete(o.uuid+w);jobs+=objBuild(o,w);const L=o.userData.bpNat;if(L.want===w)objShow(o,w);stat.builds++}
+ // instanced chunks: nearest dirty/moved chunks first, within the same budget
+ const step2=CFG.step*CFG.step;let cand=null;
+ for(const e of INST){if(!e.m.visible||!e.m.parent)continue;const dx=e.lx-px,dz=e.lz-pz;if(e.dirty||dx*dx+dz*dz>step2)(cand||(cand=[])).push(e)}
+ if(cand){if(cand.length>1){for(const e of cand){const dx=e.c.cx-px,dz=e.c.cz-pz;e._d=dx*dx+dz*dz}cand.sort((a,b)=>a._d-b._d)}
+  for(const e of cand){if(over())break;if(!e.lo){instBuild(e);jobs++}instUpdate(e,px,pz);jobs++;stat.instUpdates++}}
+ stat.ms=now()-t0;return stat}
+function setLow(on){LOWF=!!on;for(const e of INST)e.dirty=true;for(const o of OBJ){const L=o.userData.bpNat;if(L.lod&&L.low){const lv=L.lod.levels.find(q=>q.object===L.low);lv.distance=LOWF?0:CFG[L.k].low;sortLod(L.lod)}}objT=0}
+function stats(){let it=[0,0,0],tr=[0,0,0];for(const e of INST){for(let l=0;l<3;l++){it[l]+=e.counts[l];const g=[e.m,e.lo,e.ul][l];if(g)tr[l]+=e.counts[l]*triN(g.geometry)}}
+ const ob={};for(const o of OBJ){const L=o.userData.bpNat;const e=ob[L.k]||(ob[L.k]={n:0,low:0,ultra:0});e.n++;if(L.built.low)e.low++;if(L.built.ultra)e.ultra++}return{inst:INST.length,instances:it,instTris:tr,objects:ob,queued:Q.length,last:stat}}
+(typeof window!=='undefined'?window:root).BPNatLOD={tick,wrapInst,setLow,get low(){return LOWF},CFG,stats,material:VMAT,_objBuild:objBuild,_register:register,_inst:INST,_obj:OBJ};
+})(typeof window!=='undefined'&&window.THREE?window:(typeof T!=='undefined'&&T.Mesh?{T}:globalThis));// inlined in bootSurvival this picks up the game's T
+
+// ===== Jim's extra use poses (BPHandAnim) =====
+const BPJHA={T,THREE:T};
+// Blackpine extra first-person hand poses by jim. Export window.BPHandAnim. Needs the game's BPHands rig (mkHands/anim).
+// The game already covers equip / unequip (syncVM drawT + FP.unq) for every item and use poses for tools, melee, guns, eat,
+// drink, bandage/medkit and throw. This adds the ones that fell back to the generic 'swing:none' nudge, or had no pose at all:
+//   place  (building plans + deployables via buildAct/construct; campfire/bedroll/bed/planter via useSlot 'Place')
+//   plant  (seeds 'Plant')                 wear   (clothing / armour / backpacks 'Wear')
+//   attach (gun attachments)               set    (C4 'Set', satchel stuck to a wall: plantHeld)
+//   fill   (water jug dipped at a river)   water  (water jug poured on a crop; both used to play 'drink')
+//   insert (fuse into a fuse box, keycard swipe at a reader)
+// Usage (fpAnimate, right after H.userData.anim(st,t,id,it)):  st=BPHandAnim.apply(H,dt,id,it,st,useP)||st
+//   useP = progress 0..1 of the current startSwing('use') or -1.  Explicit events: BPHandAnim.play(kind[,dur]).
+// Cost: one branch per frame when nothing is playing; while a pose plays, one extra rig pose + a few vector adds.
+(function(root){
+const DUR={place:.45,plant:.5,wear:.55,attach:.5,set:.5,fill:.5,water:.5,insert:.45};
+const sm=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)},tri=(p,a,b,c)=>p<=a||p>=c?0:p<b?sm((p-a)/(b-a)):1-sm((p-b)/(c-b));
+// per kind: env(p) -> weight; pos/rot offsets for the right hand (camera space: x right, y up, -z forward), lhand = left hand follows
+const POSE={
+ place:{env:p=>tri(p,0,.45,1),pos:[-.02,-.1,-.2],rot:[-.55,0,0],extra:(p,o)=>{o.pos[1]-=.03*tri(p,.4,.55,.75)}},
+ plant:{env:p=>tri(p,0,.4,1),pos:[-.05,-.22,-.16],rot:[-.9,0,.2],extra:(p,o)=>{const w=tri(p,.35,.55,.85);o.rot[2]+=Math.sin(p*40)*.12*w;o.curl=-.2*w}},
+ wear:{env:p=>tri(p,0,.4,.95),pos:[-.14,.08,.24],rot:[.35,.45,.5],extra:(p,o)=>{o.pos[1]-=.12*tri(p,.45,.7,.95)}},
+ attach:{env:p=>tri(p,0,.3,1),pos:[-.08,.08,.1],rot:[.2,0,0],extra:(p,o)=>{o.rot[2]+=.9*tri(p,.35,.6,.85)}},
+ set:{env:p=>tri(p,0,.4,.85),pos:[-.02,-.02,-.3],rot:[-.25,0,0],extra:(p,o)=>{o.pos[2]-=.04*tri(p,.35,.45,.6)}},
+ fill:{env:p=>tri(p,0,.3,1),pos:[-.02,-.3,-.12],rot:[-.45,0,0],extra:(p,o)=>{o.pos[1]+=Math.sin(p*18)*.012*tri(p,.3,.5,.8)}},
+ water:{env:p=>tri(p,0,.25,.95),pos:[-.04,-.04,-.14],rot:[-.7,0,-.9],extra:(p,o)=>{o.rot[0]+=Math.sin(p*22)*.05*tri(p,.25,.5,.85)}},
+ insert:{env:p=>tri(p,0,.35,1),pos:[-.06,.04,-.28],rot:[-.15,0,.25],extra:(p,o)=>{o.pos[0]+=.08*(tri(p,.35,.55,.75)-.5*tri(p,.55,.7,.9))}},
+};
+let cur=null;
+function play(kind,dur){if(!POSE[kind])return false;cur={kind,t:0,d:dur||DUR[kind]};return true}
+function kindFor(id,it,st){it=it||{};if(st!=='swing'&&st!=='throw')return null;
+ if(it.att)return'attach';if(st==='throw')return it.plant&&it.use==='Set'?'set':null;
+ const u=it.use;return u==='Plant'?'plant':u==='Place'||it.bd||it.dv?'place':u==='Wear'||it.arm||it.pack?'wear':u==='Set'?'set':null}
+const O={pos:[0,0,0],rot:[0,0,0],curl:0};
+function apply(H,dt,id,it,st,useP){let k=null,p=0;
+ if(cur){cur.t+=dt;if(cur.t>=cur.d)cur=null;else{k=cur.kind;p=cur.t/cur.d}}
+ if(!k&&useP>=0){k=kindFor(id,it,st);p=useP}
+ if(!k||!H||!H.userData||!H.userData.R)return null;
+ const u=H.userData,P=POSE[k],w=P.env(p);
+ u.anim('idle',0,id,it);// base pose (drops the generic swing / drink offsets this frame)
+ for(let i=0;i<3;i++){O.pos[i]=P.pos[i]*w;O.rot[i]=P.rot[i]*w}O.curl=0;if(P.extra)P.extra(p,O);
+ const R=u.R,L=u.L;R.position.x+=O.pos[0];R.position.y+=O.pos[1];R.position.z+=O.pos[2];R.rotation.x+=O.rot[0];R.rotation.y+=O.rot[1];R.rotation.z+=O.rot[2];
+ if(L&&L.visible){L.position.x+=O.pos[0]*.8;L.position.y+=O.pos[1];L.position.z+=O.pos[2];L.rotation.x+=O.rot[0];L.rotation.y-=O.rot[1];L.rotation.z-=O.rot[2]}
+ H.updateMatrixWorld(true);return k}
+root.BPHandAnim={play,apply,kindFor,stop(){cur=null},get active(){return cur&&cur.kind},DUR,POSE};
+})(BPJHA);
+const BPHandAnim=BPJHA.BPHandAnim;window.BPHandAnim=BPHandAnim;
 // bake a nested Jim group into one vertex-coloured mesh (1 draw call); transparent parts are kept as separate meshes
 function jimBake(src){src.updateMatrixWorld(true);const inv=new T.Matrix4().copy(src.matrixWorld).invert(),b=new MB(),tr=[];
  src.traverse(m=>{if(!m.isMesh)return;const gm=m.geometry.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv,m.matrixWorld)),n=new T.Mesh(gm,m.material);if(m.material.transparent)tr.push(n);else b.g.add(n)});const g=b.build();for(const n of tr)g.add(n);g.userData={};return g} // no userData copy: baked parts must not look like pickable crop/item roots
@@ -52569,7 +52739,7 @@ function takeOffPack(){if(!PACK)return false;const id=PACK,it=ITEMS[id];let move
 // ----- water jug -----
 function waterAhead(){const fx=-Math.sin(yaw),fz=-Math.cos(yaw);for(const d of[0,1.2,2.4]){const x=P.x+fx*d,z=P.z+fz*d;if(onBridge(x,z))continue;if(H(x,z)<-.22||inRiver(x,z,-.2)||inPond(x,z))return true}return false}
 function jugUse(){const s=(open&&pick!==null&&SL[pick]&&SL[pick].id==='water_jug')?SL[pick]:(SL[sel]&&SL[sel].id==='water_jug'?SL[sel]:null);if(!s)return false;
- if(waterAhead()){s.dur=ITEMS.water_jug.dur;startSwing('use',false,.5);blip(300,.06,'sine');say('Water jug filled (5/5).');render();return false}
+ if(waterAhead()){s.dur=ITEMS.water_jug.dur;startSwing('use',false,.5);if(window.BPHandAnim)BPHandAnim.play('fill',.5);blip(300,.06,'sine');say('Water jug filled (5/5).');render();return false}
  const c=nearCrop(2.6);if(c&&c.userData.stage<3&&!c.userData.wild){waterCrop(c,s);return false}
  if((s.dur||0)>0){s.dur--;S.thirst=Math.min(100,S.thirst+15);startSwing('use',false,.5);say('You drink from the jug ('+s.dur+'/5).');render();return false}
  say('The jug is empty. Fill it at a river or lake.');return false}
@@ -52611,7 +52781,7 @@ function plantSeed(kind){const fx=-Math.sin(yaw),fz=-Math.cos(yaw),x=P.x+fx*1.6,
  const o=mkCrop(kind,0,false);o.rotation.y=Math.random()*6.28;o.position.set(x,y,z);scene.add(o);things.push(o);CROPS.push(o);
  say(ITEMS[SEED_OF[kind]].n+' planted. Water it with a Water Jug to make it grow.');blip(220,.05,'triangle');return true}
 function waterCrop(o,s){if(!s||(s.dur||0)<=0){say('The jug is empty. Fill it at a river or lake.');return}const u=o.userData;if(u.water>=2){say('That plant is already well watered.');return}
- s.dur--;u.water++;setCropStage(o,u.stage);startSwing('use',false,.5);blip(380,.05,'sine');say('Watered ('+s.dur+'/5 left in the jug).');render()}
+ s.dur--;u.water++;setCropStage(o,u.stage);startSwing('use',false,.5);if(window.BPHandAnim)BPHandAnim.play('water',.5);blip(380,.05,'sine');say('Watered ('+s.dur+'/5 left in the jug).');render()}
 // nearby crops: swap the merged stage mesh for Jim's unmerged rig and call its sway(); far crops stay one merged draw call
 const CROP_LIVE_R=11,CROP_LIVE_N=8,CROP_LIVE=[],CROP_MAT=new Map();let cropLiveT=0;
 function cropMat(m){const c=m.color.getHex();let q=CROP_MAT.get(c);if(!q){q=new T.MeshPhongMaterial({color:c,shininess:48,specular:0x525a64});CROP_MAT.set(c,q)}return q}
@@ -52950,7 +53120,7 @@ function construct(it,g,npc){const m=mk(it,null,(g.x*7+g.z*13)|0);m.position.set
   ALLC.push({x0:g.x-hx,x1:g.x+hx,z0:g.z-hz,z1:g.z+hz,y:g.y,h:dh,d,devBody:1});
  }
  if(it.dv==='lamp'){d.l=new T.PointLight(0xffe2a0,0,12);d.l.position.set(0,1.8,0);m.add(d.l)}if(it.dv==='furnace'||it.dv==='refinery'){d.l=new T.PointLight(0xff7a2a,0,9);d.l.position.set(0,1,.8);m.add(d.l)}}
-function buildAct(s){const it=ITEMS[s.id],a=aim(it);if(!a.ok)return say(a.why);if(it.dv==='tc'&&tcCovering(a.x,a.z))return say('Too close to another tool cupboard.');const why=privWhy(a.x,a.z,null);if(why)return say(why);construct(it,a);if(--s.n<=0)SL[sel]=null;render()}
+function buildAct(s){const it=ITEMS[s.id],a=aim(it);if(!a.ok)return say(a.why);if(it.dv==='tc'&&tcCovering(a.x,a.z))return say('Too close to another tool cupboard.');const why=privWhy(a.x,a.z,null);if(why)return say(why);construct(it,a);if(window.BPHandAnim)BPHandAnim.play('place');if(--s.n<=0)SL[sel]=null;render()}
 function addWire(a,b){const l=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(a.x,a.y+1.1,a.z),new T.Vector3(b.x,b.y+1.1,b.z)]),new T.LineBasicMaterial({color:0xe6c340}));scene.add(l);wires.push({a,b,l})}
 function devAct(o){const d=o.userData.d;
  if(isBox(d.t)||isInd(d.t)){curBox=d;open=true;tab='bag';pick=null;render();lookLock(false);return}
@@ -53082,7 +53252,7 @@ function furnaces(dt){for(const d of devs){if(!isInd(d.t)||d._gone)continue;cons
   if(d.l)d.l.intensity=d.burn>0?1.6+Math.random()*.5:0;const gl=d.m.userData.glow;if(gl)gl.material.color.set(d.burn>0?0xff8a2a:0x331a0a);
  }else if(d.t==='refinery'){
   const ci=sl.findIndex((s,i)=>i<3&&s&&s.id==='crude'),room=hasOutRoom(sl,'fuel',3);
-  if(d.burn<=0&&ci>=0&&room){const fi=sl.findIndex((s,i)=>i<3&&s&&s.id==='fuel');if(fi>=0){if(--sl[fi].n<=0)sl[fi]=null;d.burn=32}else{const wi=sl.findIndex((s,i)=>i<3&&s&&s.id==='wood');if(wi>=0){if(--sl[wi].n<=0)sl[wi]=null;d.burn=12}}}
+  if(d.burn<=0&&ci>=0&&room){const fi=sl.findIndex((s,i)=>i<3&&s&&s.id==='fuel');if(fi>=0){if(--sl[fi].n<=0)sl[fi]=null;d.burn=32}else{const wi=sl.findIndex((s,i)=>i<3&&s&&s.id==='wood');if(wi>=0){if(--sl[wi].n<=0)sl[wi]=null;d.burn=12}else if(d.cmp&&sl[ci].n>1){if(--sl[ci].n<=0)sl[ci]=null;d.burn=32}}}
   if(d.burn>0){d.burn-=dt;if(ci>=0&&room){d.prog+=dt;const rs=d.cmp?CMP_RATE.refine:3;while(d.prog>=rs){d.prog-=rs;const ci2=sl.findIndex((s,i)=>i<3&&s&&s.id==='crude');if(ci2<0||!hasOutRoom(sl,'fuel',3)){d.prog=0;break}if(--sl[ci2].n<=0)sl[ci2]=null;addOut(sl,'fuel',3)}}}else d.prog=0;
   if(d.l)d.l.intensity=d.burn>0?1.6+Math.random()*.5:0;const gl=d.m.userData.glow;if(gl)gl.material.color.set(d.burn>0?0xff8a2a:0x331a0a);
  }else if(d.t==='pump_jack'){
@@ -53740,8 +53910,10 @@ const BPJI2={T,THREE:T};
 // Material: one module-owned MeshLambertMaterial({vertexColors:true}) — NOT the game's colour-keyed M() cache.
 (function(root){
 const T=root.THREE||root.T;
-let _vm=null;const VMAT=()=>_vm||(_vm=new T.MeshLambertMaterial({color:0xffffff,vertexColors:true}));
-const SZ={"tin_can":[-0.135,-0.02,-0.133,0.155,0.125,0.124],"old_radio":[-0.155,0,-0.047,0.183,0.383,0.06],"car_battery":[-0.132,0,-0.16,0.132,0.23,0.089],"brass_fittings":[-0.145,-0.01,-0.059,0.145,0.21,0.11],"bike_chain":[-0.172,-0.011,-0.015,0.152,0.251,0.09],"fat":[-0.114,-0.001,-0.095,0.13,0.112,0.11],"bone":[-0.209,0.004,-0.123,0.187,0.063,0.121],"charcoal":[-0.133,-0.004,-0.141,0.143,0.124,0.141],"sulfur_s":[-0.233,0,-0.13,0.24,0.098,0.13]};
+let _vm=null,_gm=null;const VMAT=()=>_vm||(_vm=new T.MeshLambertMaterial({color:0xffffff,vertexColors:true}));
+// translucent shell material (water jug plastic), also module-owned + vertex coloured; matches BPFarming.mkWaterJug's .55 opacity shell
+const GMAT=()=>_gm||(_gm=new T.MeshLambertMaterial({color:0xffffff,vertexColors:true,transparent:true,opacity:.55,depthWrite:false}));
+const SZ={"tin_can":[-0.135,-0.02,-0.133,0.155,0.125,0.124],"old_radio":[-0.155,0,-0.047,0.183,0.383,0.06],"car_battery":[-0.132,0,-0.16,0.132,0.23,0.089],"brass_fittings":[-0.145,-0.01,-0.059,0.145,0.21,0.11],"bike_chain":[-0.172,-0.011,-0.015,0.152,0.251,0.09],"fat":[-0.114,-0.001,-0.095,0.13,0.112,0.11],"bone":[-0.209,0.004,-0.123,0.187,0.063,0.121],"charcoal":[-0.133,-0.004,-0.141,0.143,0.124,0.141],"sulfur_s":[-0.233,0,-0.13,0.24,0.098,0.13],"powder":[-0.148,0,-0.15,0.148,0.22,0.153],"card_g":[-0.085,0,-0.052,0.085,0.008,0.052],"card_b":[-0.085,0,-0.052,0.085,0.008,0.052],"card_r":[-0.085,0,-0.052,0.085,0.008,0.052],"fuse":[-0.14,-0.005,-0.04,0.14,0.075,0.04],"water_jug":[-0.12,0,-0.08,0.12,0.39,0.08],"hemp_seed":[-0.078,0,-0.044,0.078,0.122,0.044],"pumpkin_seed":[-0.078,0,-0.044,0.078,0.122,0.044],"corn_seed":[-0.078,0,-0.044,0.078,0.122,0.044],"pumpkin":[-0.175,0.014,-0.169,0.175,0.309,0.169],"corn":[-0.057,-0.015,-0.212,0.057,0.075,0.202]};
 let D=1;const rs=seg=>Math.min(32,Math.max(12,Math.round((seg||8)*D*1.5)));
 // rounded box: subdivided box whose vertices are pulled onto a rounded shell (radius 22% of the thinnest side); extents unchanged
 function rbox(w,h,d){const n=Math.min(8,Math.max(2,Math.round(2*D))),g=new T.BoxGeometry(w,h,d,n,n,n),r=Math.min(w,h,d)*.22,P=g.attributes.position,N=g.attributes.normal,hx=w/2-r,hy=h/2-r,hz=d/2-r,v=new T.Vector3(),q=new T.Vector3();
@@ -53760,8 +53932,8 @@ class B{constructor(){this.parts=[]}
  bounds(){const bb=new T.Box3();for(const p of this.parts){p.geo.computeBoundingBox();bb.union(p.geo.boundingBox)}return bb}
  xform(m){for(const p of this.parts)p.geo.applyMatrix4(m);return this}
  // one mesh per builder: parts are baked with per-vertex colours into a single geometry (one draw call)
- build(){const col=new T.Color();for(const p of this.parts){col.set(p.c);const n=p.geo.attributes.position.count,a=new Float32Array(n*3);for(let i=0;i<n;i++){a[i*3]=col.r;a[i*3+1]=col.g;a[i*3+2]=col.b}p.geo.setAttribute('color',new T.BufferAttribute(a,3))}
-  const g=new T.Group();if(this.parts.length)g.add(new T.Mesh(merge(this.parts.map(p=>p.geo)),VMAT()));return g}}
+  build(mat){const col=new T.Color();for(const p of this.parts){col.set(p.c);const n=p.geo.attributes.position.count,a=new Float32Array(n*3);for(let i=0;i<n;i++){a[i*3]=col.r;a[i*3+1]=col.g;a[i*3+2]=col.b}p.geo.setAttribute('color',new T.BufferAttribute(a,3))}
+  const g=new T.Group();if(this.parts.length)g.add(new T.Mesh(merge(this.parts.map(p=>p.geo)),mat||VMAT()));return g}}
 function merge(gs){let nv=0,ni=0;for(const g of gs){nv+=g.attributes.position.count;ni+=g.index?g.index.count:g.attributes.position.count}
  const col=new Float32Array(nv*3),pos=new Float32Array(nv*3),nor=new Float32Array(nv*3),uv=new Float32Array(nv*2),idx=new (nv>65535?Uint32Array:Uint16Array)(ni);let vo=0,io=0;
  for(const g of gs){const P=g.attributes.position,N=g.attributes.normal,U=g.attributes.uv;pos.set(P.array,vo*3);if(g.attributes.color)col.set(g.attributes.color.array,vo*3);if(N)nor.set(N.array,vo*3);if(U)uv.set(U.array,vo*2);
@@ -53806,13 +53978,146 @@ const DES={
   for(let i=0;i<4;i++)lump(b,.012,Math.cos(i*1.7)*.11,.006,Math.sin(i*1.7)*.11,0x6a6866,[1,.5,1],i+30,.3);return b},
  sulfur_s(){const b=new B(),y=0xe8d030,y2=0xd0b420;for(const[x,z,ry]of[[-.1,-.03,.1],[.08,-.05,-.08],[-.01,.06,.05]]){b.box(.17,.05,.08,x,.025,z,y,[0,ry,0]);b.box(.15,.012,.065,x,.054,z,y2,[0,ry,0])}
   b.box(.16,.045,.075,0,.07,-.01,y,[0,.5,0]);for(let i=0;i<5;i++)lump(b,.018,.17-i*.03+(i%2)*.01,.012,.09-(i%3)*.03,i%2?y:y2,[1,.7,1],i+40,.25);return b}};
-const DL={"tin_can":1.4,"old_radio":0.85,"car_battery":1.2,"brass_fittings":2.45,"bike_chain":0.5,"fat":1.75,"bone":1.65,"charcoal":0.5,"sulfur_s":1.25};// tuned detail per item
+
+// ---------- items2 pass 2: gunpowder, keycards, fuse, water jug, seed pouches, crops ----------
+const card=t=>()=>{const b=new B(),k=[0,0x2e9a3a,0x2a5ec8,0xc02a24][t],dk=[0,0x1e6a28,0x1a3e8a,0x80180f][t];
+  b.box(.17,.006,.105,0,.003,0,k);b.box(.168,.0012,.022,0,.0062,.03,0x111111);b.box(.15,.0012,.006,0,.0062,-.047,dk);
+  b.box(.03,.0014,.024,-.05,.0063,-.012,0xc9a437);for(let i=0;i<3;i++)b.box(.026,.0016,.002,-.05,.0068,-.02+i*.008,0x8a7020);for(let i=0;i<2;i++)b.box(.002,.0016,.02,-.058+i*.016,.0068,-.012,0x8a7020);
+  b.box(.06,.0013,.012,.035,.0063,-.03,0xe4e0d6);b.box(.032,.0013,.032,.055,.0063,-.004,0xe4e0d6);b.sph(.009,.055,.0066,-.004,dk,[1,.08,1]);
+  for(let i=0;i<t;i++)b.box(.012,.0015,.012,-.07+i*.018,.0064,-.035,0xffffff);b.tor(.008,.0015,.07,.0062,.038,0x0a0a0a,[H,0,0],16);b.cyl(.0075,.0075,.0008,14,.07,.0063,.038,0x0a0a0a);return b};
+Object.assign(DES,{
+ powder(){const b=new B(),r=R(21),kr=0xc8b48a,kd=0xa8946a,g=[0x2e2e30,0x3a3a3c,0x262628,0x48484a];
+  // opened kraft-paper sachet lying flat: square sheet with raised folded rim, a mounded heap of dark grains, a few spilled grains
+  b.box(.27,.006,.27,0,.003,0,kr,[0,.2,0]);for(let i=0;i<4;i++){const a=.2+i*H,c=Math.cos(a),s=Math.sin(a);b.box(.27,.03,.012,s*.13,.016,c*.13,i%2?kd:kr,[i%2?.35:-.35,a,0])}
+  const hs=(r,n)=>new T.SphereGeometry(r,Math.round(n*D),Math.max(6,Math.round(n*D*.4)),0,PI*2,0,H);b.add(hs(.105,22),0,.005,0,g[0],null,[1,.95,1]);b.add(hs(.06,16),.02,.06,-.01,g[1],null,[1,.85,1]);
+  for(let i=0;i<18;i++){const a=r()*PI*2,d=r()*.09,h=Math.sqrt(Math.max(0,1-(d/.105)**2))*.1;lump(b,.007+r()*.006,Math.cos(a)*d,h+.004,Math.sin(a)*d,g[i%4],[1,.8,1],i+60,.3)}
+  for(let i=0;i<6;i++){const a=r()*PI*2,d=.11+r()*.03;lump(b,.006,Math.cos(a)*d,.008,Math.sin(a)*d,g[i%4],[1,.7,1],i+120,.3)}
+  b.box(.06,.002,.035,-.06,.0075,.1,0xe8dcc0,[0,.2,0]);b.box(.024,.0025,.024,-.06,.008,.1,0xb83222,[0,.2,0]);return b},
+ card_g:card(1),card_b:card(2),card_r:card(3),
+ fuse(){const b=new B(),br=0xc9a437,bd=0x9a7a28,st=0xb0b4ba;
+  b.cyl(.03,.03,.15,20,0,.035,0,0xeae6dc,[0,0,H]);b.cyl(.031,.031,.03,20,0,.035,0,0xb83222,[0,0,H]); // ceramic body + red rating band
+  for(const s of[-1,1]){b.cyl(.036,.036,.045,20,s*.09,.035,0,br,[0,0,H]);b.tor(.036,.004,s*.07,.035,0,bd,[0,H,0],20);b.tor(.036,.004,s*.11,.035,0,bd,[0,H,0],20);b.cyl(.014,.016,.03,14,s*.125,.035,0,st,[0,0,H]);b.sph(.014,s*.138,.035,0,st,[.5,1,1])}
+  b.box(.05,.002,.024,0,.0655,0,0xf4f0e6);b.box(.03,.0022,.006,0,.066,.004,0x1a1a1a);b.box(.016,.0022,.004,0,.066,-.006,0x1a1a1a);b.box(.26,.006,.05,0,-.002,0,0x8a8e94);return b},
+ water_jug(){const w=new B(),b=new B(),g=new B(),pl=0xd8d4c8,wt=0x3a7ab8,cp=0x2a4e8c;
+  // opaque: water volume, neck/spout, cap, handle, ribs; translucent: the jerrycan shell (like BPFarming.mkWaterJug)
+  w.box(.22,.24,.14,0,.13,0,wt);w.box(.221,.006,.141,0,.252,0,0x6aa8d8);
+  b.cyl(.035,.045,.06,.06,.33,0,pl,null);b.cyl(.04,.04,.03,.06,.375,0,cp);for(let i=0;i<10;i++){const a=i/10*PI*2;b.box(.006,.028,.006,.06+Math.cos(a)*.04,.375,Math.sin(a)*.04,0x1e3a6a,[0,-a,0])}
+  b.box(.04,.06,.1,-.07,.33,0,pl);b.box(.12,.02,.04,-.04,.355,0,pl);b.box(.03,.016,.06,-.07,.36,0,0xb8b4a8);
+  g.box(.24,.3,.16,0,.15,0,pl);for(const z of[-1,1])for(let i=0;i<3;i++)g.box(.2,.012,.004,0,.07+i*.08,z*.081,0xb8b4a8);g.box(.236,.01,.156,0,.004,0,0xa8a498);return[w,b,[g,GMAT]]},
+ hemp_seed:()=>pouch(0x5aa02a,0x6a5a2a),pumpkin_seed:()=>pouch(0xd8701e,0xf0e2c0),corn_seed:()=>pouch(0xe8c840,0xe8c040),
+ pumpkin(){const b=new B(),o=[0xe0761c,0xcc6612,0xea841e];for(let r=0;r<12;r++){const a=r*PI/6;b.sph(.105,Math.cos(a)*.075,.11,Math.sin(a)*.075,o[r%3],[.75,.85,.75],20)}b.sph(.12,0,.112,0,o[2],[1,.88,1],24);
+  for(let r=0;r<12;r++){const a=r*PI/6+PI/12;b.limb(Math.cos(a)*.06,.02,Math.sin(a)*.06,Math.cos(a)*.12,.11,Math.sin(a)*.12,.006,.006,0xb85a10,6)}
+  b.limb(0,.2,0,.025,.28,.01,.024,.016,0x6a5a2a,12);b.cyl(.03,.024,.012,12,0,.205,0,0x4a3a1a);b.limb(.02,.27,.01,.08,.3,.05,.004,.003,0x5a8a30,6);
+  const lf=new T.SphereGeometry(.05,14,8);lf.scale(1,.12,.7);b.add(lf,.09,.3,.06,0x4f8a34,[.3,.6,.2]);b.add(new T.TorusGeometry(.03,.003,5,14,PI*1.5),.06,.27,-.04,0x5a8a30,[.5,0,0]);return b},
+ corn(){const b=new B(),r=R(5),ks=[0xf2cc44,0xe0b030,0xf6d860];
+  b.limb(0,.03,-.14,0,.03,.12,.034,.026,0xe0b830,16);for(let i=0;i<11;i++){const z=-.125+i*.024,rr=.036-Math.max(0,(z-.05))*.12;for(let j=0;j<10;j++){const a=j*PI/5+(i%2)*PI/10;b.add(new T.IcosahedronGeometry(.0105,0),Math.cos(a)*rr,.03+Math.sin(a)*rr,z,ks[(i+j)%3],[a,i,j],[1,1,1.15])}}
+  // husk leaves peeled back + silk + stalk stub
+  for(let k=0;k<5;k++){const a=k*1.25,lf=new T.SphereGeometry(.045,10,8);lf.scale(.55,.12,2.3);b.add(lf,Math.cos(a)*.03,.03+Math.sin(a)*.03-.004,-.12,k%2?0x9aa04a:0x7a8a3a,[0,0,a+H])}
+  b.limb(0,.03,-.165,0,.03,-.21,.016,.012,0x6a7a32,10);for(let i=0;i<6;i++)b.limb(0,.03,.125,(r()-.5)*.03,.03+(r()-.5)*.03,.16+r()*.04,.002,.0015,0xb07a3a,4);return b}});
+function pouch(tag,seed){const b=new B(),cl=0xb8a888,cd=0x8a7a5e,st=0x3a2a1a;
+ b.cyl(.05,.062,.06,16,0,.03,0,cl,null,[1.25,1,.7]);b.cyl(.062,.058,.012,16,0,.006,0,cd,null,[1.25,1,.7]);b.cyl(.026,.05,.022,16,0,.071,0,cl,null,[1.2,1,.7]);
+ b.cyl(.022,.022,.012,14,0,.087,0,cd,null,[1.15,1,.75]);b.add(new T.TorusGeometry(.022,.0045,6,16),0,.087,0,st,[H,0,0],[1.15,.75,1]);
+ for(let i=0;i<4;i++)b.box(.026,.028,.006,Math.sin(i*H)*.012,.103,Math.cos(i*H)*.008,cl,[(i%2?0:1)*(i<2?.5:-.5),i*H,(i%2?1:0)*(i<2?-.5:.5)]);
+ b.cyl(.0025,.0025,.045,6,.03,.075,.012,st,[0,0,.9]);b.box(.032,.024,.004,.05,.058,.03,tag,[0,.4,-.25]);b.box(.012,.012,.005,.046,.062,.032,0xffffff,[0,.4,-.25]);
+ for(let i=0;i<2;i++)b.box(.035,.002,.002,0,.035+i*.02,-.044,cd);for(let i=0;i<5;i++)lump(b,.005,-.05+i*.012,.004,.034+(i%2)*.004,seed,[1.3,.7,.9],i+80,.2);return b}
+const DL={"tin_can":1.4,"old_radio":0.85,"car_battery":1.2,"brass_fittings":2.45,"bike_chain":0.5,"fat":1.75,"bone":1.65,"charcoal":0.5,"sulfur_s":1.25,"powder":1,"card_g":1,"card_b":1,"card_r":1,"fuse":1,"water_jug":1,"hemp_seed":1,"pumpkin_seed":1,"corn_seed":1,"pumpkin":0.75,"corn":1};// tuned detail per item
 const cache=new Map();
-function make(id,d){D=d||DL[id]||1;const b=DES[id]();fit(id,b);const g=b.build();g.userData={k:'item',id};D=1;return g}
-function build(id){if(!DES[id])return null;if(!cache.has(id))cache.set(id,make(id));const c=cache.get(id).clone();c.userData=Object.assign({},c.userData);return c}
-root.BPItems2={build,has:id=>!!DES[id],ids:Object.keys(DES),_raw:make,material:VMAT};
+function make(id,d){D=d||DL[id]||1;let r=DES[id]();const L=(Array.isArray(r)?r:[r]).map(e=>Array.isArray(e)?e:[e,VMAT]);fit(id,...L.map(e=>e[0]));let g;
+ if(L.length===1)g=L[0][0].build();else{g=new T.Group();for(const[b,m]of L){const s=b.build(m());const ms=s.children[0];if(m===GMAT)ms.renderOrder=1;g.add(ms)}}g.userData={k:'item',id};D=1;return g}
+// jug water level (0..1) like BPFarming.mkWaterJug().userData.setLevel; bound per clone; water mesh = child 0 (its bottom sits at the jug base)
+function jugLevel(g){const w=g.children[0];w.geometry.computeBoundingBox();const y0=w.geometry.boundingBox.min.y;g.userData.level=1;g.userData.setLevel=v=>{v=Math.max(0,Math.min(1,v));w.scale.y=Math.max(.001,v);w.position.y=y0*(1-w.scale.y);g.userData.level=v}}
+function build(id){if(!DES[id])return null;if(!cache.has(id))cache.set(id,make(id));const c=cache.get(id).clone();c.userData=Object.assign({},c.userData);if(id==='water_jug')jugLevel(c);return c}
+root.BPItems2={build,has:id=>!!DES[id],ids:Object.keys(DES),_raw:make,material:VMAT,glassMaterial:GMAT};
 })(BPJI2);
 const BPItems2=BPJI2.BPItems2;window.BPItems2=BPItems2;
+// ===== Jim's tarp (BPTarp) =====
+const BPJTP={T,THREE:T};
+// Blackpine detailed Tarp item model by jim. Pass THREE as root.THREE or root.T. Export window.BPTarp.
+// Replaces ITM.tarp (build 4: `tarp:bld(` inside the late Object.assign(ITM,{...}) "ported from old build") for icons, held view
+// model and world drops. Same origin/orientation and the SAME bounding box as the current build-4 model (drops size and place
+// themselves from Box3.setFromObject, so the footprint is unchanged): every level is fitted per axis onto SZ below.
+// Folded blue polyethylene tarp: three folded layers with rolled fold edges, a wrinkled top sheet with a corner flap, a tight roll
+// on top (wrap seam, banded end spirals), two tie cords with knot + tails, brass grommets with holes, hem stitching, a label.
+// Levels (one merged vertex-coloured mesh each, own MeshLambertMaterial): high near, low beyond LOD_DIST.low, ultra beyond .ultra.
+// build({lod:'high'|'low'|'ultra'|'auto'}) ; default 'auto' (THREE.LOD) or 'low' under ?low=1 / setLow(true) like BPBuild.
+(function(root){
+const T=root.THREE||root.T;
+const SZ=[-0.2218,-0.0098,-0.176,0.2218,0.1498,0.2067];
+const LOD_DIST={low:12,ultra:35};
+let LOWF=false;try{LOWF=typeof location!=='undefined'&&/[?&]low=1\b/.test(location.search)}catch(e){}
+let _m=null;const VMAT=()=>_m||(_m=new T.MeshLambertMaterial({color:0xffffff,vertexColors:true}));
+const C={l1:0x1d5280,l2:0x2668a2,l3:0x2f74b4,top:0x2a6ab8,topD:0x225a9c,roll:0x2e78b8,rollD:0x24609a,cap:0x1b242c,brass:0xd4af37,brassD:0x9a7a22,hole:0x141414,cord:0xc8b48a,cordD:0xa08c64,stitch:0xd8d0b8,label:0xe8e4d8,ink:0x202428};
+// ---- tiny merger: every part is a non-indexed BufferGeometry with a colour attribute ----
+function Bd(){this.g=[]}
+const P=Bd.prototype;
+P.add=function(geo,c,pos,rot){const g=geo.index?geo.toNonIndexed():geo;g.deleteAttribute('uv');if(rot)g.applyMatrix4(new T.Matrix4().makeRotationFromEuler(new T.Euler(rot[0],rot[1],rot[2])));if(pos)g.translate(pos[0],pos[1],pos[2]);
+ const n=g.attributes.position.count,a=new Float32Array(n*3),cc=new T.Color(c);for(let i=0;i<n;i++){a[i*3]=cc.r;a[i*3+1]=cc.g;a[i*3+2]=cc.b}g.setAttribute('color',new T.BufferAttribute(a,3));this.g.push(g);return g};
+P.box=function(w,h,d,c,pos,rot,seg){return this.add(new T.BoxGeometry(w,h,d,seg||1,seg||1,seg||1),c,pos,rot)};
+// rounded slab: box with rounded vertical edges via segmented box pushed toward a superellipse
+P.slab=function(w,h,d,r,c,pos,rot,seg){const g=new T.BoxGeometry(w,h,d,seg,2,seg),p=g.attributes.position,hw=w/2,hh=h/2,hd=d/2;
+ for(let i=0;i<p.count;i++){let x=p.getX(i),y=p.getY(i),z=p.getZ(i);const ix=Math.max(0,Math.abs(x)-(hw-r)),iz=Math.max(0,Math.abs(z)-(hd-r)),iy=Math.max(0,Math.abs(y)-(hh-r*.5));
+  const L=Math.hypot(ix,iy,iz);if(L>0){const k=(r*.5+(r-r*.5)*(Math.hypot(ix,iz)/(L||1)))/L;const nx=Math.sign(x)*(hw-r+ix*k),nz=Math.sign(z)*(hd-r+iz*k),ny=Math.sign(y)*(hh-r*.5+iy*k);
+   if(ix>0)x=nx;if(iz>0)z=nz;if(iy>0)y=ny}p.setXYZ(i,x,y,z)}return this.add(g,c,pos,rot)};
+P.cyl=function(r0,r1,h,s,c,pos,rot,open){return this.add(new T.CylinderGeometry(r0,r1,h,s,1,!!open),c,pos,rot)};
+P.tor=function(R,r,c,pos,rot,s,t,arc){return this.add(new T.TorusGeometry(R,r,t||6,s||12,arc||Math.PI*2),c,pos,rot)};
+P.sph=function(r,c,pos,s,sc){const g=new T.SphereGeometry(r,s||8,Math.max(4,(s||8)*.75|0));if(sc)g.scale(sc[0],sc[1],sc[2]);return this.add(g,c,pos)};
+P.limb=function(a,b,r,c,s){const A=new T.Vector3(...a),B=new T.Vector3(...b),d=B.clone().sub(A),L=d.length(),g=new T.CylinderGeometry(r,r,L,s||6,1,true);
+ g.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),d.normalize())));g.translate((A.x+B.x)/2,(A.y+B.y)/2,(A.z+B.z)/2);return this.add(g,c)};
+// wrinkled sheet: plane (x,z) lifted by wrinkles, front-right corner folded down as a flap
+P.sheet=function(w,d,y,c,cd,nx,nz,amp,flap){const g=new T.PlaneGeometry(w,d,nx,nz);g.rotateX(-Math.PI/2);const p=g.attributes.position,n=p.count,col=new Float32Array(n*3),a=new T.Color(c),b=new T.Color(cd),q=new T.Color();
+ for(let i=0;i<n;i++){const x=p.getX(i),z=p.getZ(i),u=x/w+.5,v=z/d+.5;let h=amp*(Math.sin(u*17.3+v*3.1)*.6+Math.sin(v*11.7-u*5.3)*.4)*Math.sin(Math.PI*Math.min(1,u*1.15))*Math.sin(Math.PI*v);
+  let yy=y+h,zz=z;if(flap&&u>flap[0]&&v>flap[1]){const t=Math.min(1,((u-flap[0])/(1-flap[0])+(v-flap[1])/(1-flap[1]))*.6);yy-=flap[2]*t*t;zz+=flap[3]*t}
+  p.setXYZ(i,x,yy,zz);q.copy(a).lerp(b,Math.max(0,Math.min(1,.5-h/amp*.5)));col[i*3]=q.r;col[i*3+1]=q.g;col[i*3+2]=q.b}
+ const g2=g.toNonIndexed();g2.deleteAttribute('uv');const p2=g2.attributes.position,c2=new Float32Array(p2.count*3);// map colours through the non-indexed copy
+ const idx=g.index.array;for(let i=0;i<idx.length;i++){const k=idx[i];c2[i*3]=col[k*3];c2[i*3+1]=col[k*3+1];c2[i*3+2]=col[k*3+2]}
+ // double-sided: add a flipped copy so the underside of the flap shows
+ const g3=g2.clone(),pa=g3.attributes.position.array,ca=c2.slice();for(let i=0;i<pa.length;i+=9){for(let k=0;k<3;k++){const t=pa[i+3+k];pa[i+3+k]=pa[i+6+k];pa[i+6+k]=t;const s=ca[i+3+k];ca[i+3+k]=ca[i+6+k];ca[i+6+k]=s}pa[i+1]-=.0015;pa[i+4]-=.0015;pa[i+7]-=.0015}
+ g2.setAttribute('color',new T.BufferAttribute(c2,3));g3.setAttribute('color',new T.BufferAttribute(ca,3));this.g.push(g2,g3)};
+P.mesh=function(){let n=0;for(const g of this.g)n+=g.attributes.position.count;const pos=new Float32Array(n*3),col=new Float32Array(n*3);let o=0;
+ for(const g of this.g){pos.set(g.attributes.position.array,o*3);col.set(g.attributes.color.array,o*3);o+=g.attributes.position.count;g.dispose()}
+ const geo=new T.BufferGeometry();geo.setAttribute('position',new T.BufferAttribute(pos,3));geo.setAttribute('color',new T.BufferAttribute(col,3));return geo};
+// fit a geometry per axis onto SZ (exact bbox = the current model's, so drops/icons/held size do not move)
+function fit(geo){geo.computeBoundingBox();const b=geo.boundingBox;fit.raw=b.clone(),p=geo.attributes.position.array;const lo=[b.min.x,b.min.y,b.min.z],hi=[b.max.x,b.max.y,b.max.z];
+ for(let i=0;i<p.length;i++){const a=i%3;p[i]=SZ[a]+(p[i]-lo[a])/(hi[a]-lo[a])*(SZ[a+3]-SZ[a])}geo.attributes.position.needsUpdate=true;geo.computeVertexNormals();geo.computeBoundingBox();geo.computeBoundingSphere();return geo}
+// ---- levels ----
+const RY=.075,RR=.07;// roll axis height / radius (current model: cyl .07 x .34 at y .07)
+function high(){const b=new Bd();
+ // folded layers (bottom up), each with a rolled fold edge on the front (+z) and back (-z)
+ const L=[[.42,.026,.31,0,.008,0,C.l1,.08],[.40,.024,.29,-.008,.032,.006,C.l2,-.06],[.39,.022,.285,.006,.054,-.004,C.l3,.03]];
+ for(const[w,h,d,x,y,z,c,r]of L){b.slab(w,h,d,.012,c,[x,y,z],[0,r,0],6);for(const s of[-1,1]){const g=b.cyl(h*.62,h*.62,w*.96,14,c,[0,0,0],[0,0,Math.PI/2]);g.applyMatrix4(new T.Matrix4().makeRotationY(r));g.translate(x+Math.sin(r)*s*d*.5,y,z+Math.cos(r)*s*d*.5)}
+  for(let i=0;i<9;i++){const t=(i+.5)/9-.5;b.box(w*.07,.0025,.003,C.stitch,[x+t*w*.92*Math.cos(r)+Math.sin(r)*d*.47,y+h*.5,z-t*w*.92*Math.sin(r)+Math.cos(r)*d*.47],[0,r,0])}}
+ // wrinkled top sheet with a folded-down corner flap toward +z (reaches the old bbox front at z .2067)
+ b.sheet(.37,.3,.068,C.top,C.topD,18,14,.006,[.45,.55,.07,.06]);
+ // roll
+ b.cyl(RR,RR,.34,24,C.roll,[0,RY,0],[0,0,Math.PI/2]);
+ for(let i=0;i<7;i++){const x=-.15+i*.05;b.tor(RR+.0012,.0016,i%2?C.rollD:C.roll,[x,RY,0],[0,Math.PI/2,0],24,3)}// wrap layers
+ b.box(.33,.004,.03,C.rollD,[0,RY+RR*.86,RR*.48],[-.5,0,0]);// outer wrap lip
+ for(const s of[-1,1]){b.cyl(.074,.074,.022,20,C.cap,[s*.11,RY,0],[0,0,Math.PI/2]);// banded end caps (as in build 4)
+  for(const r of[.055,.038,.022])b.tor(r,.0028,C.rollD,[s*.171,RY,0],[0,Math.PI/2,0],16,3);// rolled-sheet spiral at the ends
+  b.cyl(.012,.012,.006,10,C.cap,[s*.171,RY,0],[0,0,Math.PI/2])}
+ // tie cords + knot + tails
+ for(const x of[-.06,.06]){b.tor(RR+.006,.006,C.cord,[x,RY,0],[0,Math.PI/2,0],24,5);b.sph(.011,C.cordD,[x,RY+.004,RR+.008],8,[1.2,1,.9]);
+  b.limb([x,RY,RR+.012],[x+.012,RY-.05,RR+.03],.004,C.cord,6);b.limb([x+.012,RY-.05,RR+.03],[x+.02,RY-.075,RR+.05],.0035,C.cordD,6);
+  b.limb([x,RY,RR+.012],[x-.016,RY-.045,RR+.04],.004,C.cord,6)}
+ // corner grommets (brass ring + dark hole) on the bottom layer, plus two along the front hem
+ for(const[x,z]of[[-.17,-.12],[.17,-.12],[-.17,.12],[.17,.12],[-.06,.135],[.08,.135]]){b.tor(.016,.005,C.brass,[x,.023,z],[Math.PI/2,0,0],14,6);b.tor(.011,.0025,C.brassD,[x,.025,z],[Math.PI/2,0,0],12,4);b.cyl(.0105,.0105,.004,10,C.hole,[x,.0215,z])}
+ // printed label patch
+ b.box(.07,.003,.04,C.label,[-.1,.072,-.11],[0,.04,0]);b.box(.05,.0035,.006,C.ink,[-.1,.072,-.115],[0,.04,0]);b.box(.035,.0035,.004,C.ink,[-.105,.072,-.102],[0,.04,0]);
+ // hanging cord loop at the back corner (old model's tail cords)
+ for(const x of[-.12,.02])b.tor(.012,.005,C.brass,[x,.03,.19],[Math.PI/2,0,0],12,6);
+ return fit(b.mesh())}
+function low(){const b=new Bd();b.box(.42,.03,.31,C.l1,[0,.012,0],[0,.08,0]);b.box(.39,.03,.285,C.l2,[0,.045,0],[0,-.05,0]);
+ b.box(.2,.004,.12,C.topD,[.07,.058,.13],[.5,0,0]);b.cyl(RR,RR,.34,10,C.roll,[0,RY,0],[0,0,Math.PI/2],true);
+ for(const s of[-1,1])b.cyl(.074,.074,.022,10,C.cap,[s*.16,RY,0],[0,0,Math.PI/2]);for(const x of[-.06,.06])b.tor(RR+.006,.006,C.cord,[x,RY,0],[0,Math.PI/2,0],10,3);
+ for(const x of[-.12,.02])b.box(.02,.006,.02,C.brass,[x,.03,.19]);return fit(b.mesh())}
+function ultra(){const b=new Bd();b.box(.42,.06,.31,C.l2,[0,.028,0]);b.cyl(RR,RR,.34,6,C.roll,[0,RY,0],[0,0,Math.PI/2]);b.box(.3,.004,.05,C.topD,[0,.04,.18]);return fit(b.mesh())}
+const cache={};const mk=l=>{if(!cache[l]){const geo=l==='high'?high():l==='low'?low():ultra();const m=new T.Mesh(geo,VMAT());m.castShadow=true;m.name='tarp_'+l;cache[l]=m}const c=cache[l].clone();c.userData={k:'item',id:'tarp',lod:l};return c};
+function build(opts){opts=opts||{};const lod=opts.lod||(LOWF?'low':'auto');
+ if(lod!=='auto'){const g=new T.Group();g.add(mk(lod));g.userData={k:'item',id:'tarp',lod};return g}
+ const L=new T.LOD();L.addLevel(mk('high'),0);L.addLevel(mk('low'),LOD_DIST.low);L.addLevel(mk('ultra'),LOD_DIST.ultra);L.userData={k:'item',id:'tarp',lod:'auto'};return L}
+root.BPTarp={build,has:id=>id==='tarp',ids:['tarp'],SZ,LOD_DIST,setLow(on){LOWF=!!on},get low(){return LOWF},material:VMAT};
+})(BPJTP);
+const BPTarp=BPJTP.BPTarp;window.BPTarp=BPTarp;
 // ===== Jim's detailed building pieces (BPBuild); wrapper is BPJBD because BPJB is the AI-base module =====
 const BPJBD={T,THREE:T};
 // Blackpine detailed base-building pieces by jim. Pass THREE as root.THREE or root.T.
@@ -53948,7 +54253,7 @@ root.BPBuild={setLow:on=>{LOWF=!!on},get low(){return LOWF},LOD_DIST,build,has:(
 })(BPJBD);
 const BPBuild=BPJBD.BPBuild;window.BPBuild=BPBuild;
 const JIM_ITEMS=new Set(['hammer','hatchet','metal_hatchet','burlap_shirt','burlap_shoes']);
-function itemModel(id){if(JIM_ITEMS.has(id)&&BPItems.has(id)){try{return BPItems.build(id)}catch(e){}}if(window.BPItems2&&BPItems2.has(id)){try{return BPItems2.build(id)}catch(e){}}if(ITM[id]) return ITM[id]();{const it=ITEMS[id];if(it&&(it.bd||it.dv)){const m=mk(it,null);m.scale.setScalar(.3);return m}}const b=new MB();b.box(.2,.2,.2,0,0,0,0x777777);const m=b.build();m.userData.gd=[.2,-.3,-.5];return m;}
+function itemModel(id){if(id==='tarp'&&window.BPTarp)return BPTarp.build();if(JIM_ITEMS.has(id)&&BPItems.has(id)){try{return BPItems.build(id)}catch(e){}}if(window.BPItems2&&BPItems2.has(id)){try{return BPItems2.build(id)}catch(e){}}if(ITM[id]) return ITM[id]();{const it=ITEMS[id];if(it&&(it.bd||it.dv)){const m=mk(it,null);m.scale.setScalar(.3);return m}}const b=new MB();b.box(.2,.2,.2,0,0,0,0x777777);const m=b.build();m.userData.gd=[.2,-.3,-.5];return m;}
 
 function mergeStatic(g){const by=new Map();
  for(const m of[...g.children]){if(!m.isMesh)continue;m.updateMatrix();const gm=m.geometry.clone().applyMatrix4(m.matrix),key=m.material.color.getHex()+(m.material.transparent?'t':'');let a=by.get(key);if(!a)by.set(key,a={mat:m.material,p:[],n:[],i:[],o:0});
@@ -54167,7 +54472,7 @@ function mkMan(c,raider,V){V=V||{};const pk=a=>a[rnd()*a.length|0],val=(k,f)=>V[
  const pd={ set visible(on){for(const p of armPads)p.visible=!!on}, get visible(){return armPads[0]?armPads[0].visible:false} };
  const ar=!!heavy,AV=V.arm||{};hel.visible=ar||!!AV.h;vst.visible=pd.visible=ar||!!AV.v;legArmVis.visible=ar||!!AV.l;
  u.parts={head,armL,armR,foreL,foreR,legL,legR,kneeL,kneeR,torso,vst};u.tw=tw;u.raider=!!raider;u.arm={helmet:hel,vest:vst,legs:[legArmVis,legArmVis],pads:pd};u.skin=sk;return g}
-function wearArmor(g,on){const a=g.userData.arm;a.helmet.visible=a.vest.visible=a.pads.visible=a.legs[0].visible=a.legs[1].visible=!!on}
+function wearArmor(g,on){const a=g.userData.arm;a.helmet.visible=a.vest.visible=a.pads.visible=a.legs[0].visible=a.legs[1].visible=!!on;if(window.BPManLOD)BPManLOD.refresh(g)}
 function animMan(n,dt){
  const q=n.m.userData.parts,tw=n.m.userData.tw,isGun=!!(tw&&tw.userData.isGun);if(!q)return;
  const mv=n._mv||0,spd=dt>0?mv/dt:0,rawF=Math.min(1,spd/2.2);
@@ -54281,7 +54586,7 @@ let PAV=null;function playerAvatar(){if(!PAV){PAV=mkMan(0x4a5636,false,{heavy:fa
   if(BPFarming)for(const id of['pack_s','pack_l']){const pk=jimBake(BPFarming.mkBackpack(id==='pack_l'?'large':'small'));pk.visible=false;pk.traverse(c=>c.castShadow=true);PAV.add(pk);PAV.userData.packM[id]=pk}}
  avatarSync();return PAV}
 function avatarSync(){if(!PAV)return;const m=PAV.userData.packM;for(const id in m)m[id].visible=PACK===id}
-function spawnMan(c,raider,V){const g=mkMan(c,raider,V);scene.add(g);return g}
+function spawnMan(c,raider,V){const g=mkMan(c,raider,V);scene.add(g);if(window.BPManLOD)BPManLOD.wrap(g);return g}
 const NP=[],EN=[];let rt=8;
 function col(o,ownerN){const rad=.36;for(let pass=0;pass<2;pass++)for(let i=0;i<ALLC.length;i++){const c=ALLC[i];if(c.ramp)continue;if(c.d&&(c.d.open||c.d._gone||c.devBody))continue;if(c.found){if(c.top-o.y<=2.35)continue}else{const ch=c.h||2.85;if(c.y!==undefined&&(o.y>=c.y+ch-.22||o.y<c.y-2.2))continue}const nx=Math.max(c.x0,Math.min(c.x1,o.x)),nz=Math.max(c.z0,Math.min(c.z1,o.z)),dx=o.x-nx,dz=o.z-nz,d=Math.hypot(dx,dz);if(d>=rad)continue;if(d>1e-4){o.x=nx+dx/d*rad;o.z=nz+dz/d*rad}else{const a=o.x-c.x0,b=c.x1-o.x,e=o.z-c.z0,f=c.z1-o.z,m=Math.min(a,b,e,f);if(m===a)o.x=c.x0-rad;else if(m===b)o.x=c.x1+rad;else if(m===e)o.z=c.z0-rad;else o.z=c.z1+rad}}
  let pad=null,py=-1e9;for(let i=0;i<ALLC.length;i++){const c=ALLC[i];if(!c.found||o.x<c.x0-.05||o.x>c.x1+.05||o.z<c.z0-.05||o.z>c.z1+.05)continue;if(c.top>=py&&c.top-o.y<=2.35&&o.y-c.top<1.2){py=c.top;pad=c}}if(pad&&pad.top>o.y+.04)o.y=pad.top;touchPosts(o,rad);touchStaticGrid(o,.28,o.y)}
@@ -54340,7 +54645,7 @@ function plan(n,tx,tz){
  if(out[out.length-1]!==raw[raw.length-1])out.push(raw[raw.length-1]);
  if(fullD>30)out.push([tx,tz]);
  return out}
-function go(n,tx,tz,sp,dt){if(n.cmp){const r=cmpGo(n,tx,tz);if(r){tx=r[0];tz=r[1]}}if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
+function go(n,tx,tz,sp,dt){if(n.cmp){const r=cmpGo(n,tx,tz);if(r){tx=r[0];tz=r[1];const l=cmpLocal(n.cmp,n.x,n.z);if(Math.abs(l[0])<2.4&&l[1]<-10.5&&l[1]>-27.5){n.pth=[];n.pT=null;return stepTo(n,tx,tz,sp,dt)}}}if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
  while(n.pth.length&&Math.hypot(n.pth[0][0]-n.x,n.pth[0][1]-n.z)<.85)n.pth.shift();
  const w=n.pth.length?n.pth[0]:[tx,tz];return stepTo(n,w[0],w[1],sp,dt)}
 function gatherNode(n,kinds,flt){let farm=null,fd=1e9,b=null,bd=1e9;const list=resList();for(let i=0;i<list.length;i++){const o=list[i],k=o.userData.k;if(!kinds.includes(k)||(n.bad&&n.bad.has(o))||(flt&&!flt(o)))continue;const d=Math.hypot(o.position.x-n.x,o.position.z-n.z);if(o.userData.farm===n){if(d<fd){fd=d;farm=o}}else if(!o.userData.farm&&d<230&&d<bd&&!campDanger(n,o.position.x,o.position.z)){bd=d;b=o}}return farm||b}
@@ -54801,6 +55106,103 @@ function dress(man,level,seed,opt){opt=opt||{};const boss=level==='boss'||!!opt.
 root.BPRaiders={dress,undress,levelFor,LEVELS};
 })(BPJRD);
 const BPRaiders=BPJRD.BPRaiders;window.BPRaiders=BPRaiders;
+// ===== Jim's human LODs (BPManLOD) =====
+const BPJML={T,THREE:T};
+// Blackpine human LODs by jim (settlers + raiders: build 4 mkMan + BPSettlers/BPRaiders outfits). Pass THREE as root.THREE or root.T. Export window.BPManLOD.
+// Per-pivot LOD swap: the low/ultra meshes are extra children of the SAME pivots (userData.parts.*, tw), so animMan / aim / swing / tw / muzzle code is untouched.
+// Switching uses Object3D.layers (mask 0 = not drawn, not raycast), NOT .visible, so it never fights wearArmor / outfit armour toggles and raycasts
+// (r128 Raycaster tests layers, not visible) only hit the level on screen. Headshots (relY>=1.38 of the hit point) keep working because every level
+// fills the same volume (bbox per bin is restored after decimation).
+//  high  : the untouched mkMan + outfit + held item
+//  low   : per pivot one vertex-clustered (decimated) vertex-coloured mesh, incl. outfit, glow (baked colour) and the held item (in tw); <=25% tris
+//  ultra : 8 meshes of palette-coloured boxes (torso+head, armL, foreL, armR, foreR, held box in tw, legL+knee, legR+knee), <=200 tris
+(function(root){
+const T=root.THREE||root.T;
+const LOD_DIST={low:25,ultra:60};let LOWF=typeof location!=='undefined'&&/[?&]low=1\b/.test(location.search||'');
+let _vm=null;const VMAT=()=>_vm||(_vm=new T.MeshLambertMaterial({color:0xffffff,vertexColors:true}));
+const PIV=['torso','head','armL','armR','foreL','foreR','legL','legR','kneeL','kneeR','vst'];
+const ULT={torso:['torso','root','vst','head'],armL:['armL'],foreL:['foreL'],armR:['armR'],foreR:['foreR'],tw:['tw'],legL:['legL','kneeL'],legR:['legR','kneeR']};
+const SLABS={torso:2,head:2,armL:2,armR:2};
+function pivots(man){const u=man.userData,q=u.parts||{},m=new Map();m.set(man,'root');for(const k of PIV)if(q[k])m.set(q[k],k);if(u.tw)m.set(u.tw,'tw');return m}
+const shown=(o,top)=>{for(let p=o;p&&p!==top;p=p.parent)if(!p.visible)return false;return true};
+// gather visible high triangles per pivot, in pivot space, with per-triangle colour
+function gather(man){man.updateMatrixWorld(true);const pv=pivots(man),bins=new Map(),c2=new T.Color(0x888888),list=[];let total=0;
+ man.traverse(m=>{if(!m.isMesh||m.userData.bpLod||!shown(m,man))return;let p=m.parent;while(p&&!pv.has(p))p=p.parent;if(!p)return;const name=pv.get(p),g=m.geometry,n=(g.index?g.index.count:g.attributes.position.count)/3|0;
+  let b=bins.get(name);if(!b)bins.set(name,b={p,n:0,ms:[]});b.ms.push(m);b.n+=n;if(m.castShadow)b.shadow=true;total+=n});
+ const M=new T.Matrix4();for(const b of bins.values()){const pos=new Float32Array(b.n*9),col=new Float32Array(b.n*3),inv=new T.Matrix4().copy(b.p.matrixWorld).invert();let o=0;
+  for(const m of b.ms){const g=m.geometry,P=g.attributes.position.array,C=g.attributes.color,CA=C&&C.array,I=g.index&&g.index.array,mat=Array.isArray(m.material)?m.material[0]:m.material;
+   const em=mat&&mat.emissive&&mat.emissiveIntensity>0&&mat.emissive.getHex()?mat.emissive:null,mc=em||(mat&&mat.color)||c2,cs=C&&!em?C.itemSize:0;M.multiplyMatrices(inv,m.matrixWorld);const e=M.elements;
+   const n=I?I.length:g.attributes.position.count;for(let t=0;t<n;t+=3){let r=0,gg=0,bb=0;for(let k=0;k<3;k++){const i=I?I[t+k]:t+k,x=P[i*3],y=P[i*3+1],z=P[i*3+2],q=o*9+k*3;
+     pos[q]=e[0]*x+e[4]*y+e[8]*z+e[12];pos[q+1]=e[1]*x+e[5]*y+e[9]*z+e[13];pos[q+2]=e[2]*x+e[6]*y+e[10]*z+e[14];if(cs){r+=CA[i*cs];gg+=CA[i*cs+1];bb+=CA[i*cs+2]}else{r++;gg++;bb++}}
+    col[o*3]=r/3*mc.r;col[o*3+1]=gg/3*mc.g;col[o*3+2]=bb/3*mc.b;o++}}
+  b.pos=pos;b.col=col;delete b.ms}
+ return{bins,total,pv}}
+function bboxOf(pos){const mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];for(let i=0;i<pos.length;i+=3)for(let k=0;k<3;k++){const a=pos[i+k];if(a<mn[k])mn[k]=a;if(a>mx[k])mx[k]=a}return{mn,mx}}
+// vertex clustering decimation; cell in pivot units; result stretched back to the bin's bbox
+function cluster(b,cell){const pos=b.pos,col=b.col,cells=new Map(),ic=1/cell,key=(x,y,z)=>((Math.floor(x*ic)+512)*1024+(Math.floor(y*ic)+512))*1024+(Math.floor(z*ic)+512),ids=[];
+ for(let i=0;i<pos.length;i+=3){const k=key(pos[i],pos[i+1],pos[i+2]);let e=cells.get(k);if(!e)cells.set(k,e={x:0,y:0,z:0,n:0,i:cells.size});e.x+=pos[i];e.y+=pos[i+1];e.z+=pos[i+2];e.n++;ids.push(e)}
+ const seen=new Set(),out=[],oc=[];for(let t=0;t<ids.length;t+=3){const a=ids[t],b2=ids[t+1],c=ids[t+2];if(a===b2||b2===c||a===c)continue;
+  const s=[a.i,b2.i,c.i],r=s.indexOf(Math.min(a.i,b2.i,c.i)),k=(s[r]*65536+s[(r+1)%3])*65536+s[(r+2)%3];if(seen.has(k))continue;seen.add(k);
+  for(const e of[a,b2,c])out.push(e.x/e.n,e.y/e.n,e.z/e.n);const ci=t;oc.push(col[ci],col[ci+1],col[ci+2])}
+ if(!out.length)return null;const A=bboxOf(pos),B=bboxOf(out);for(let i=0;i<out.length;i+=3)for(let k=0;k<3;k++){const s=B.mx[k]-B.mn[k];out[i+k]=s>1e-6?A.mn[k]+(out[i+k]-B.mn[k])/s*(A.mx[k]-A.mn[k]):out[i+k]}
+ return{pos:out,col:oc}}
+function meshFrom(pos,triCol,name,tag){const g=new T.BufferGeometry(),n=pos.length/3,c=new Float32Array(n*3);for(let t=0;t<n/3;t++)for(let k=0;k<3;k++)c.set([triCol[t*3],triCol[t*3+1],triCol[t*3+2]],(t*3+k)*3);
+ g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('color',new T.BufferAttribute(c,3));g.computeVertexNormals();g.computeBoundingSphere();
+ const m=new T.Mesh(g,VMAT());m.name=name;m.userData.bpLod=tag;return m}
+function scaleOf(man,p){const s=new T.Vector3();new T.Matrix4().copy(man.matrixWorld).invert().multiply(p.matrixWorld).decompose(new T.Vector3(),new T.Quaternion(),s);return Math.max(1e-3,(s.x+s.y+s.z)/3)}
+let CELL0=.03; // last cell size that met the budget: the next man usually needs a single clustering pass
+function buildLow(man,G,frac){const target=Math.max(60,frac*G.total);let cell=CELL0,res=null;
+ for(let it=0;it<6;it++){const r=new Map();let n=0;for(const[name,b]of G.bins){const c=cluster(b,cell/scaleOf(man,b.p));if(c){r.set(name,c);n+=c.pos.length/9}}res=r;if(n<=target&&(n>.55*target||it>=1))break;
+  cell=n>target?cell*Math.max(1.08,Math.sqrt(n/target)*1.04):cell*Math.max(.7,Math.sqrt(n/target)*1.04)} // tris ~ 1/cell^2: jump straight to the estimate
+ CELL0=cell;const out=[];for(const[name,c]of res){const b=G.bins.get(name),m=meshFrom(c.pos,c.col,'lod_low_'+name,'low');m.castShadow=!!b.shadow;b.p.add(m);out.push(m)}return out}
+// dominant colour by triangle area (5-bit quantised)
+function domCol(pos,col,sel){const h=new Map();for(const t of sel){const o=t*9,ax=pos[o+3]-pos[o],ay=pos[o+4]-pos[o+1],az=pos[o+5]-pos[o+2],bx=pos[o+6]-pos[o],by=pos[o+7]-pos[o+1],bz=pos[o+8]-pos[o+2];
+  const cx=ay*bz-az*by,cy=az*bx-ax*bz,cz=ax*by-ay*bx,ar=Math.sqrt(cx*cx+cy*cy+cz*cz),r=col[t*3],g=col[t*3+1],b=col[t*3+2],k=((r*31|0)<<10)|((g*31|0)<<5)|(b*31|0);
+  let e=h.get(k);if(!e)h.set(k,e=[0,0,0,0]);e[0]+=ar;e[1]+=r*ar;e[2]+=g*ar;e[3]+=b*ar}
+ let best=null;for(const e of h.values())if(!best||e[0]>best[0])best=e;return best&&best[0]>0?[best[1]/best[0],best[2]/best[0],best[3]/best[0]]:[.5,.5,.5]}
+function relMat(man,src,tgt,name){ // source pivot space -> target pivot space, at REST (ignores animated pivot rotations)
+ if(src===tgt)return new T.Matrix4();if(name==='head')return new T.Matrix4().makeTranslation(src.position.x-tgt.position.x,src.position.y-tgt.position.y,src.position.z-tgt.position.z); /* head is a sibling of torso; both bob together */if(name==='root'||name==='vst')return new T.Matrix4(); // root/vst move with torso (animMan mirrors torso onto vst; torso rest = identity)
+ return new T.Matrix4().compose(src.position,new T.Quaternion(),src.scale)} // knee in leg
+function buildUltra(man,G){const out=[],q=man.userData.parts;
+ for(const tn in ULT){const tgt=tn==='tw'?man.userData.tw:q[tn];if(!tgt)continue;const P=[],Cc=[];
+  for(const sn of ULT[tn]){const b=G.bins.get(sn);if(!b||!b.pos.length)continue;const M=relMat(man,b.p,tgt,sn),nt=b.pos.length/9,S=SLABS[sn]||1,bb=bboxOf(b.pos),h=bb.mx[1]-bb.mn[1];
+   const sl=Array.from({length:S},()=>({sel:[],mn:[1e9,1e9,1e9],mx:[-1e9,-1e9,-1e9]}));
+   for(let t=0;t<nt;t++){const cy=(b.pos[t*9+1]+b.pos[t*9+4]+b.pos[t*9+7])/3,e=sl[Math.min(S-1,Math.max(0,Math.floor((cy-bb.mn[1])/Math.max(h,1e-9)*S)))];if((t&3)===0||nt<400)e.sel.push(t); /* colour vote from every 4th triangle */for(let k=0;k<9;k++){const a=b.pos[t*9+k],ax=k%3;if(a<e.mn[ax])e.mn[ax]=a;if(a>e.mx[ax])e.mx[ax]=a}}
+   for(const{sel,mn,mx}of sl){if(!sel.length)continue;
+    const ins=/^arm/.test(sn)?.76:/^(fore|leg|knee)/.test(sn)?.86:1,sx=(mx[0]-mn[0])*ins,sy=mx[1]-mn[1],sz=(mx[2]-mn[2])*ins; /* limbs are round: an inset box matches their silhouette and stays inside the swept bbox when rotated */if(sx<=0||sy<=0||sz<=0)continue;const g=new T.BoxGeometry(sx,sy,sz).toNonIndexed();g.translate((mx[0]+mn[0])/2,(mx[1]+mn[1])/2,(mx[2]+mn[2])/2);g.applyMatrix4(M);
+    const dc=domCol(b.pos,b.col,sel);const a=g.attributes.position.array;for(let i=0;i<a.length;i++)P.push(a[i]);for(let t=0;t<a.length/9;t++)Cc.push(dc[0],dc[1],dc[2]);g.dispose()}}
+  if(P.length){const m=meshFrom(P,Cc,'lod_ultra_'+tn,'ultra');m.castShadow=true;tgt.add(m);out.push(m)}}return out}
+function sig(man){let n=0,v=0;man.traverse(o=>{if(o.isMesh&&!o.userData.bpLod){n+=o.id;if(shown(o,man))v+=o.id}});return n+'/'+v} // mesh ids: any added/removed/re-shown high mesh changes it
+function clear(man){const L=man.userData.bpLOD;if(!L)return;for(const m of[...L.low,...L.ultra]){if(m.parent)m.parent.remove(m);m.geometry.dispose()}L.low=[];L.ultra=[];L.built={low:false,ultra:false}}
+function setLayers(man,lvl){man.traverse(m=>{if(!m.isMesh)return;const tag=m.userData.bpLod||'high';if(m.userData._lm===undefined)m.userData._lm=m.layers.mask;m.layers.mask=tag===lvl?(m.userData._lm||1):0})}
+function show(man,l){const L=man.userData.bpLOD;if(L.level!==l){L.level=l;setLayers(man,l)}}
+// lazy builds: wrap() only tags + registers; a level is built the first time it is wanted, through a budgeted queue (tick), and the man keeps
+// showing his current level until it is ready. low ~5-10 ms, ultra ~2-4 ms per man (node, see report)
+function build(man,lvl){const L=man.userData.bpLOD;if(!L||L.built[lvl])return 0;if(!L.built.low&&!L.built.ultra)L.sig=sig(man);const G=gather(man);L.highTris=G.total;
+ if(lvl==='low')L.low=buildLow(man,G,.22);else L.ultra=buildUltra(man,G);L.built[lvl]=true;
+ const tag=lvl;for(const m of L[lvl]){m.userData._lm=1;m.layers.mask=L.level===tag?1:0}return 1}
+const MEN=new Set(),Q=[],QS=new Set();const BUDGET={maxBuilds:2,ms:8},COST={low:8,ultra:6};const now=()=>typeof performance!=='undefined'?performance.now():Date.now();
+const enqueue=(man,l)=>{const k=man.uuid+l;if(QS.has(k))return;QS.add(k);Q.push([man,l])};
+function wrap(man,opts){opts=opts||{};const u=man.userData;if(!u||!u.parts)throw new Error('BPManLOD: not a mkMan rig');
+ if(!u.bpLOD)u.bpLOD={mode:opts.lod||'auto',level:'high',low:[],ultra:[],built:{low:false,ultra:false},n:(MEN.size*7)%30};else if(opts.lod)u.bpLOD.mode=opts.lod;
+ MEN.add(man);if(opts.eager){build(man,'low');build(man,'ultra')}return man}
+function levelFor(L,d){if(L.mode!=='auto')return L.mode;const l=d>=LOD_DIST.ultra?'ultra':d>=LOD_DIST.low?'low':'high';return LOWF&&l==='high'?'low':l}
+function refresh(man,eager){const L=man.userData.bpLOD;if(!L)return man;clear(man);show(man,'high');L.sig=sig(man);if(eager){build(man,'low');build(man,'ultra')}return man}
+function update(man,camPos){const L=man.userData.bpLOD;if(!L)return null;if(++L.n>=30){L.n=0;if((L.built.low||L.built.ultra)&&sig(man)!==L.sig)refresh(man)}
+ const want=levelFor(L,man.getWorldPosition(new T.Vector3()).distanceTo(camPos));L.want=want;
+ if(want==='high'||L.built[want])show(man,want);else enqueue(man,want);return L.level}
+// one call per frame: update every man, then run queued builds within BUDGET (always at least one build if any are queued)
+function tick(cam,budget){const cp=cam.getWorldPosition?cam.getWorldPosition(new T.Vector3()):cam.position;for(const m of MEN){if(!m.parent){MEN.delete(m);continue}update(m,cp)}
+ const B=budget||BUDGET,t0=now();let n=0;
+ // a further build only starts if the measured cost of that level (running average) still fits in B.ms; the first one always runs
+ while(Q.length&&n<B.maxBuilds){const[m,l]=Q[0];if(n>0&&now()-t0+COST[l]>B.ms)break;Q.shift();QS.delete(m.uuid+l);const L=m.userData.bpLOD;if(!L||!m.parent||L.want!==l)continue;
+  const tb=now(),k=build(m,l);if(k){COST[l]=COST[l]*.7+(now()-tb)*.3;n++}if(L.built[l])show(m,l)}
+ return{built:n,ms:now()-t0,queued:Q.length}}
+function setLevel(man,l){const L=man.userData.bpLOD;if(!L)return;if(l!=='high')build(man,l);L.want=l;show(man,l)}
+root.BPManLOD={wrap,refresh,update,tick,setLevel,BUDGET,COST,_queue:Q,LOD_DIST,setLow(on){LOWF=!!on},get low(){return LOWF},material:VMAT,_men:MEN};
+})(BPJML);
+const BPManLOD=BPJML.BPManLOD;window.BPManLOD=BPManLOD;
+for(const D of[BPSettlers,BPRaiders]){const d0=D.dress;D.dress=function(m){const r=d0.apply(this,arguments);try{BPManLOD.refresh(m)}catch(e){}return r}}
 // ===== AI compounds: Jim's 36x36 m base replaces rollPlan/raiseStarter; settlers fuel rigs from oil deposits, plant trees, scavenge, arm, upgrade =====
 // economy: compound devices tick slower than legacy settler rigs; stockpiles are capped so settlers progress at roughly player pace
 const CMP_RATE={pump:14,pumpBurn:60,quarry:22,quarryBurn:70,refine:9},CMP_CAP={wood:450,stone:600,ore:260,metal:220,gears:24,circuit:10,sulfur:160,crude:60,fuel:40,charcoal:120,sulfur_s:120},CMP_RESPAWN=600;
@@ -54812,6 +55214,10 @@ function cmpRevive(cp){const n=cp.n,sp=cmpTf(cp,cp.ud.stockpile.x,cp.ud.stockpil
 const CMPS=[],OILS=[],CMP_R=32,CMP_COST=[null,null,{stone:220,wood:120},{metal:160,gears:6,stone:60}],CMP_DAY=[0,0,2,6];
 function cmpTf(cp,x,z){const c=Math.cos(cp.ry),s=Math.sin(cp.ry);return[cp.x+x*c+z*s,cp.z-x*s+z*c]}
 function cmpLocal(cp,x,z){const dx=x-cp.x,dz=z-cp.z,c=Math.cos(cp.ry),s=Math.sin(cp.ry);return[dx*c-dz*s,dx*s+dz*c]}
+// outside -> outside across the compound: walk round a corner instead of pressing into the wall (settlers stood at the gate for hours)
+function cmpCross(a,b){for(let i=1;i<20;i++){const u=i/20,x=a[0]+(b[0]-a[0])*u,z=a[1]+(b[1]-a[1])*u;if(Math.abs(x)<18.2&&Math.abs(z)<18.2)return true}return false}
+function cmpDetour(cp,x,z,tx,tz){const a=cmpLocal(cp,x,z),b=cmpLocal(cp,tx,tz);if(!cmpCross(a,b))return null;let best=null,bd=1e9;for(const c of[[23,23],[23,-23],[-23,23],[-23,-23]]){if(cmpCross(a,c))continue;const d=Math.hypot(c[0]-a[0],c[1]-a[1])+Math.hypot(b[0]-c[0],b[1]-c[1]);if(d<bd){bd=d;best=c}}
+ if(!best){const s=Math.abs(a[0])>Math.abs(a[1])?[Math.sign(a[0])*23,a[1]]:[a[0],Math.sign(a[1])*23];best=s}return cmpTf(cp,best[0],best[1])}
 function cmpInside(cp,x,z){const l=cmpLocal(cp,x,z);return Math.abs(l[0])<17.6&&Math.abs(l[1])<17.6}
 // flatten terrain to y inside a square of half-size `inner`, smooth blend out to `outer` (heightfield HG + terrain mesh)
 function flattenArea(x,z,y,inner,outer){const map=terrLookup();const W=TN+1,pos=terrMesh&&terrMesh.geometry.attributes.position,r=Math.ceil(outer/(TS/TN))+1,cx=Math.round((x/TS+.5)*TN),cz=Math.round((.5-z/TS)*TN);
@@ -54824,7 +55230,7 @@ function cmpSite(sx,sz){for(let r=0;r<16;r++)for(let k=0;k<10;k++){const a=k*.62
   let lo=1e9,hi=-1e9,sum=0,n=0,road=false;for(let i=-4;i<=4;i++)for(let j=-4;j<=4;j++){const px=x+i*7.5,pz=z+j*7.5,h=H(px,pz);lo=Math.min(lo,h);hi=Math.max(hi,h);if(Math.abs(i)<=2&&Math.abs(j)<=2){sum+=h;n++}if(!road&&nearAnyRoad(px,pz))road=true}
   if(road||lo<1||hi>8.4||hi-lo>4.6)continue;return{x,z,y:Math.max(lo+.4,sum/n)}}return null}
 function cmpBuild(cp){if(cp.g)scene.remove(cp.g);const src=BPAIBase.mkAIBase({tier:cp.tier,oilSide:cp.oil}),gt=src.userData.gate,hinges=gt.leaves.map(l=>l.h);for(const h of hinges)src.remove(h);
- const g=bakeGroup(src);g.userData={k:'aibase'};for(const h of hinges)g.add(h);g.position.set(cp.x,cp.y,cp.z);g.rotation.y=cp.ry;g.traverse(c=>{if(c.isMesh){c.castShadow=c.receiveShadow=true}});scene.add(g);
+ const g=bakeGroup(src);g.userData={k:'aibase'};for(const h of hinges)g.add(h);g.position.set(cp.x,cp.y,cp.z);g.rotation.y=cp.ry;g.traverse(c=>{if(c.isMesh){c.castShadow=c.receiveShadow=true}});scene.add(g);if(window.BPMonLOD)BPMonLOD.wrap(g);
  if(cp.gate){gt.open=cp.gate.open;gt.set(cp.gate.k)}cp.gate=gt;cp.g=g;cp.ud=src.userData;cp.src=src}
 function placeCompound(n,sx,sz){const st=cmpSite(sx,sz);if(!st)return false;
  const ry=(Math.floor(hash(st.x*.3,st.z*.7)*4)%4)*Math.PI/2,cp={n,x:st.x,z:st.z,y:st.y,ry,tier:1,oil:hash(st.z,st.x)<.5?'east':'west',rigs:{},trees:[],gateT:0};
@@ -54846,11 +55252,11 @@ function cmpPlantTree(cp,i,grown){const q=cp.spots[i];if(!q||cp.trees.some(t=>t.
 function spawnOilDeposits(){const Rg=rng(5150),add=(x,z,amt)=>{const y=H(x,z);if(y<1||y>8.5||inRiver(x,z,4)||nearAnyRoad(x,z)||nearMon(x,z,8)||onPlan(x,z,4))return false;const g=BPRigs.mkOilDeposit(amt);g.rotation.y=Rg()*6.28;plantProp(g,x,y,z);OILS.push({g,x,z,amount:amt,max:amt});return true};
  for(const cp of CMPS){const sgn=cp.oil==='east'?1:-1;let made=0;for(let t=0;t<40&&made<2;t++){const lx=sgn*(48+Rg()*60),lz=(Rg()-.5)*90,w=cmpTf(cp,lx,lz);if(add(w[0],w[1],500))made++}}
  for(let t=0,m=0;t<400&&m<24;t++){const x=(Rg()*2-1)*(B-80),z=(Rg()*2-1)*(B-80);if(Math.hypot(x-SP.x,z-SP.z)<60||OILS.some(o=>Math.hypot(o.x-x,o.z-z)<60))continue;if(add(x,z,350))m++}return OILS.length}
-function cmpGo(n,tx,tz){const cp=n.cmp;if(!cp)return null;const inN=cmpInside(cp,n.x,n.z),inT=cmpInside(cp,tx,tz);if(inN===inT)return null;const l=cmpLocal(cp,n.x,n.z);
+function cmpGo(n,tx,tz){const cp=n.cmp;if(!cp)return null;const inN=cmpInside(cp,n.x,n.z),inT=cmpInside(cp,tx,tz);if(!inN&&!inT)return cmpDetour(cp,n.x,n.z,tx,tz);if(inN===inT)return null;const l=cmpLocal(cp,n.x,n.z);
  const W=(x,z)=>cmpTf(cp,x,z);if(inN){if(Math.abs(l[0])>1.3||l[1]>-11)return W(0,-12);return W(0,-26)}
  if(Math.abs(l[0])<1.6&&l[1]<-16&&l[1]>-27)return W(0,-12);return W(0,-26)}
 function fuelWork(n,dt){const ref=rigOf(n,'refinery');if(!ref)return false;const outF=slotSum(ref.sl,3,6,'fuel');
- if((n.inv.crude||0)>=20||(outF>=6&&(n.inv.fuel||0)<6)||((n.inv.crude||0)>0&&!OILS.some(o=>o.amount>=10))){if(Math.hypot(ref.x-n.x,ref.z-n.z)>3.4){go(n,ref.x+2,ref.z+2,3.6,dt);return true}
+ if((n.inv.crude||0)>=20||(outF>=6&&(n.inv.fuel||0)<CMP_CAP.fuel-6)||((n.inv.crude||0)>0&&!OILS.some(o=>o.amount>=10))){if(Math.hypot(ref.x-n.x,ref.z-n.z)>3.4){go(n,ref.x+2,ref.z+2,3.6,dt);return true}
   for(let i=3;i<6;i++){const q=ref.sl[i];if(q&&q.id==='fuel'){n.inv.fuel=(n.inv.fuel||0)+q.n;ref.sl[i]=null}}if((n.inv.crude||0)>0)n.inv.crude-=furnacePut(ref,'crude',n.inv.crude);if(slotSum(ref.sl,0,3,'wood')<2&&(n.inv.wood||0)>3)n.inv.wood-=furnacePut(ref,'wood',2);n.cd=.4;n.sw=.45;rigStock(n);return true}
  let b=null,bd=260;for(const o of OILS){if(o.amount<10)continue;const d=Math.hypot(o.x-n.x,o.z-n.z);if(d<bd&&!campDanger(n,o.x,o.z)){bd=d;b=o}}if(!b)return false;
  if(bd>2.4){go(n,b.x,b.z,3.5,dt);return true}if(n.cd>0)return true;const take=Math.min(10,Math.floor(b.amount));b.amount-=take;n.inv.crude=(n.inv.crude||0)+take;n.cd=.7;n.sw=.45;return true}
@@ -54874,7 +55280,7 @@ function cmpWork(n,dt){
  if(cmpUpgradeWork(n,dt))return; // base first
  if(weaponWork(n,dt))return;      // normal gun tier progression (wantTier follows raid nights)
  if(cmpRigWork(n,dt))return;
- if(((n.inv.crude||0)>=20||(n.inv.fuel||0)<6)&&fuelWork(n,dt))return; // haul crude to the refinery / hunt oil deposits
+ if(((n.inv.crude||0)>=20||(n.inv.fuel||0)<6||(rigOf(n,'refinery')&&slotSum(rigOf(n,'refinery').sl,3,6,'fuel')>=12))&&fuelWork(n,dt))return; // haul crude to the refinery / hunt oil deposits
  if(cmpTreeWork(n,dt))return;
  if(cmpGuardWork(n,dt))return;
  roam(n,dt)}
@@ -55315,7 +55721,7 @@ function campGunTier(){return 3}
 function settlerArmed(n){return !!n&&(n.wt||0)>=campGunTier()}
 function campPad(){return Math.ceil(58*DF.sight)+10}
 function campDanger(n,x,z){try{if(!n||n.k!=='settler'||(n.wt||0)>=campGunTier())return null;const hm=n.home||n.lot||{x:n.hx,z:n.hz};if(Math.hypot(n.x-hm.x,n.z-hm.z)<26&&Math.hypot(x-hm.x,z-hm.z)<30)return null;const pad=campPad();for(const c of RCAMPS){if(!c.raiders||!c.raiders.some(r=>r&&r.hp>0))continue;if(Math.hypot(x-c.x,z-c.z)<c.r+pad)return c}}catch(e){}return null}
-function setSettlerWeapon(n,w){n.wp=w;n.wt=w.t;const tw=n.m&&n.m.userData&&n.m.userData.tw;if(!tw)return;mountHeld3P(tw,w.id,!!w.rng,false)}
+function setSettlerWeapon(n,w){n.wp=w;n.wt=w.t;const tw=n.m&&n.m.userData&&n.m.userData.tw;if(!tw)return;mountHeld3P(tw,w.id,!!w.rng,false);if(window.BPManLOD)BPManLOD.refresh(n.m)}
 function weaponWork(n,dt){
  if(n.hp<=0)return false;
  const have=n.wt||0,want=wantTier();
@@ -55466,7 +55872,7 @@ function boom(o){const spec=BLAST[o.kind];if(!spec){dropOrd(o);return}blastN++;c
  blip(o.kind==='beancan'?90:55,.35,'square');blip(140,.12,'sawtooth')}
 function plantSpot(){const fx=-Math.sin(yaw),fz=-Math.cos(yaw);let best=null,bd=2.7;for(const c of ALLC){let ok=false,cx,cz,cy;if(c.piece&&c.hp>0){ok=true;cx=(c.x0+c.x1)/2;cz=(c.z0+c.z1)/2;cy=(c.y||0)+1.25}else if(c.d&&c.d.hp>0&&!c.d.open&&!c.d._gone){ok=true;cx=(c.x0+c.x1)/2;cz=(c.z0+c.z1)/2;cy=(c.y||0)+1.1}if(!ok)continue;const dx=cx-P.x,dz=cz-P.z,d=Math.hypot(dx,dz)||1;if(d>2.55)continue;if((dx*fx+dz*fz)/d<0.12)continue;if(d<bd){bd=d;best={x:cx,y:cy,z:cz}}}return best}
 function plantHeld(kind){if(throwCd>0)return false;let spot=plantSpot();if(!spot){const x=P.x-Math.sin(yaw)*1.5,z=P.z-Math.cos(yaw)*1.5;if(H(x,z)<.3){say('Too wet to set a charge.');return false}spot={x,y:H(x,z)+.18,z}}
- spawnOrd({kind,x:spot.x,y:spot.y,z:spot.z,vx:0,vy:0,vz:0,fuse:BLAST[kind].fuse,stuck:true,owner:'you'});throwCd=.45;blip(kind==='c4'?640:220,.07,'square');say(kind==='c4'?'Charge set. Five seconds.':'Satchel stuck. Get clear.');return true}
+ spawnOrd({kind,x:spot.x,y:spot.y,z:spot.z,vx:0,vy:0,vz:0,fuse:BLAST[kind].fuse,stuck:true,owner:'you'});throwCd=.45;if(window.BPHandAnim)BPHandAnim.play('set');blip(kind==='c4'?640:220,.07,'square');say(kind==='c4'?'Charge set. Five seconds.':'Satchel stuck. Get clear.');return true}
 function tossHeld(kind){if(throwCd>0)return false;if(kind==='satchel'&&plantSpot())return plantHeld('satchel');const spec=BLAST[kind],cp=Math.cos(Math.max(-.15,pitch)),spd=spec.toss;
  spawnOrd({kind,x:P.x-Math.sin(yaw)*.45,y:P.y-.05,z:P.z-Math.cos(yaw)*.45,vx:-Math.sin(yaw)*cp*spd,vy:Math.sin(pitch)*spd+2.6,vz:-Math.cos(yaw)*cp*spd,fuse:spec.fuse,owner:'you'});throwCd=.42;blip(260,.05,'square');return true}
 function fireRocketPlayer(){if(throwCd>0||dead)return;if(cnt('rocket')<=0){say('No rockets.');throwCd=.3;return}take('rocket',1);const cp=Math.cos(pitch),spd=34;
@@ -55893,6 +56299,7 @@ function quad(o){
  // tail
  const tail=piv(rig,0,by+o.br*.4,-o.bl*.55);tail.rotation.x=o.tailX||-1;
  if(o.tailL>0)p.cyl(o.tailR*.5,o.tailR,o.tailL,0,o.tailL/2,0,o.tailC||o.dark,tail);
+ rig.name='rig';legs.forEach((l,i)=>l.name='leg'+i);knees.forEach((k,i)=>k.name='knee'+i);neck.name='neck';headG.name='headG';jaw.name='jaw';tail.name='tail';ears.forEach((e,i)=>e.name='ear'+i);
  g.userData={rig,legs,knees,neck,headG,jaw,tail,ears,by};
  return{g,rig,p,legs,knees,neck,headG,jaw,tail,ears,by,hs}}
 
@@ -55919,7 +56326,7 @@ function quadAnim(Q,sp){const{rig,legs,knees,headG,neck,jaw,tail,ears}=Q,n0=neck
    legs.forEach((l,i)=>{l.rotation.x=(i<2?-.3:.3)*k;l.rotation.z=-.15*k});neck.rotation.x=n0+.6*k;jaw.rotation.x=.3*k;tail.rotation.x=t0-.3*k;
    if(t>.9&&t<1.6){const tw=Math.sin(t*30)*(1.6-t)*.15;legs[2].rotation.x+=tw;legs[3].rotation.x-=tw}}
  }}
-function finish(Q,kind,sp,stats){const u=Q.g.userData;Object.assign(u,{k:kind,kind,rad:stats.rad,height:stats.height,stats,anim:quadAnim(Q,sp)});u.anim('idle',0);return Q.g}
+function finish(Q,kind,sp,stats){const u=Q.g.userData;Object.assign(u,{k:kind,kind,rad:stats.rad,height:stats.height,stats,anim:quadAnim(Q,sp),_sp:sp,_by:Q.by});u.anim('idle',0);return Q.g}
 
 // ---------- species ----------
 function mkBear(){const fur=0x4a3222,dark=0x2e1e14,belly=0x5c4030;
@@ -55953,6 +56360,54 @@ function mkRabbit(){const fur=0x8a7a66,dark=0x6a5a48,belly=0xe0d8c8;
  for(const i of[2,3]){p.sph(.035,0,-.03,.01,fur,Q.legs[i],1,1.3,1.6)}
  return finish(Q,'rabbit',{freq:7,runFreq:12,swing:.5,bob:.02,hop:.12,attack:'thump',tailWag:5},
   {hp:12,speed:{walk:1,run:7},dmg:0,aggressive:false,flees:true,attackRange:0,attackCd:0,loot:{meat:1,leather:1,fat:0,bone:0},rad:.18,height:.3})}
+
+
+// ---------- LODs (high near, low beyond 25 m, ultra beyond 60 m) ----------
+// low: same named pivot tree (rig, leg0-3, knee0-3, neck, headG, jaw, tail, ear0-1) as plain Object3D (so the game's mkAnimalJ->mergeStatic,
+//   which only merges Groups, leaves them alone); geometry rebuilt with fewer segments, tiny details dropped, baked with vertex colours into
+//   8 meshes: rig, 4 legs (knee geometry folded in), neck, headG (jaw + ears folded in), tail. Every pivot still exists so quadAnim drives it.
+// ultra: same pivot tree; 9 world-aligned boxes (torso, neck, tail on rig; 4 legs; head) in 6 meshes.
+const LOD_DIST={low:25,ultra:60};let LOWF=typeof location!=='undefined'&&/[?&]low=1\b/.test(location.search||'');
+let _vm=null;const VMAT=()=>_vm||(_vm=new T.MeshLambertMaterial({color:0xffffff,vertexColors:true}));
+const FOLD_LOW={knee0:'leg0',knee1:'leg1',knee2:'leg2',knee3:'leg3',jaw:'headG',ear0:'headG',ear1:'headG'};
+const FOLD_ULT=Object.assign({},FOLD_LOW,{neck:'rig',tail:'rig'});
+function lowGeo(m){const g=m.geometry,q=g.parameters||{};switch(g.type){
+ case'SphereGeometry':return new T.SphereGeometry(q.radius,6,4).scale(1,1,1/Math.cos(Math.PI/6));case'CylinderGeometry':return new T.CylinderGeometry(q.radiusTop,q.radiusBottom,q.height,6,1).scale(1/Math.cos(Math.PI/6),1,1); // stretch the short axis so low hexagons keep the full extents
+ case'ConeGeometry':return new T.ConeGeometry(q.radius,q.height,4);default:return g.clone()}}
+function colorize(g,c){const n=g.attributes.position.count,a=new Float32Array(n*3),col=new T.Color(c);for(let i=0;i<n;i++){a[i*3]=col.r;a[i*3+1]=col.g;a[i*3+2]=col.b}g.setAttribute('color',new T.BufferAttribute(a,3));return g}
+function mergeG(gs){let nv=0,ni=0;for(const g of gs){nv+=g.attributes.position.count;ni+=g.index?g.index.count:g.attributes.position.count}
+ const pos=new Float32Array(nv*3),nor=new Float32Array(nv*3),col=new Float32Array(nv*3),idx=new Uint16Array(ni);let vo=0,io=0;
+ for(const g of gs){const P=g.attributes.position;pos.set(P.array,vo*3);nor.set(g.attributes.normal.array,vo*3);col.set(g.attributes.color.array,vo*3);
+  if(g.index){const a=g.index.array;for(let i=0;i<a.length;i++)idx[io+i]=a[i]+vo;io+=a.length}else{for(let i=0;i<P.count;i++)idx[io+i]=vo+i;io+=P.count}vo+=P.count}
+ const o=new T.BufferGeometry();o.setAttribute('position',new T.BufferAttribute(pos,3));o.setAttribute('normal',new T.BufferAttribute(nor,3));o.setAttribute('color',new T.BufferAttribute(col,3));o.setIndex(new T.BufferAttribute(idx,1));o.computeBoundingSphere();return o}
+// copy the pivot tree (no meshes) as Object3D
+function skel(n){const o=new T.Object3D();o.name=n.name;o.position.copy(n.position);o.quaternion.copy(n.quaternion);o.scale.copy(n.scale);for(const c of n.children)if(!c.isMesh)o.add(skel(c));return o}
+function makeLevel(high,ultra){high.updateMatrixWorld(true);const inv=new T.Matrix4().copy(high.matrixWorld).invert(),root=skel(high),byName=new Map();root.traverse(o=>{if(o.name)byName.set(o.name,o)});root.updateMatrixWorld(true);
+ const H=high.userData.height||1,fold=ultra?FOLD_ULT:FOLD_LOW,bins=new Map(),boxes=new Map();
+ const srcName=n=>{while(n&&n!==high&&!n.name)n=n.parent;return n&&n!==high?n.name:'rig'};
+ high.traverse(m=>{if(!m.isMesh)return;const src=srcName(m.parent),tgt=fold[src]||src,T0=byName.get(tgt)||root;
+  if(ultra){const key=src.startsWith('knee')?'leg'+src[4]:src==='jaw'||src.startsWith('ear')?'headG':src;let e=boxes.get(key);if(!e)boxes.set(key,e={bb:new T.Box3(),c:new Map(),tgt});
+   m.geometry.computeBoundingBox();const bw=m.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv,m.matrixWorld));e.bb.union(bw);
+   const w=bw.getSize(new T.Vector3());const a=w.x*w.y+w.y*w.z+w.x*w.z,hx=m.material.color.getHex();e.c.set(hx,(e.c.get(hx)||0)+a);return}
+  m.geometry.computeBoundingBox();const sz=m.geometry.boundingBox.getSize(new T.Vector3()).multiply(m.getWorldScale(new T.Vector3()));if(Math.max(sz.x,sz.y,sz.z)<.06*H)return;
+  const g=colorize(lowGeo(m),m.material.color.getHex());const tinv=new T.Matrix4().copy(T0.matrixWorld).invert();g.applyMatrix4(new T.Matrix4().multiplyMatrices(tinv,m.matrixWorld));
+  if(!bins.has(T0))bins.set(T0,[]);bins.get(T0).push(g)});
+ if(ultra)for(const e of boxes.values()){const T0=byName.get(e.tgt)||root,s=e.bb.getSize(new T.Vector3()),c=e.bb.getCenter(new T.Vector3());let best=0,bc=0x888888;for(const[k,v]of e.c)if(v>best){best=v;bc=k}
+  const g=colorize(new T.BoxGeometry(s.x,s.y,s.z),bc);g.translate(c.x,c.y,c.z);g.applyMatrix4(new T.Matrix4().copy(T0.matrixWorld).invert().multiply(high.matrixWorld));if(!bins.has(T0))bins.set(T0,[]);bins.get(T0).push(g)}
+ for(const[n,gs]of bins){const me=new T.Mesh(mergeG(gs),VMAT());n.add(me)}for(const gs of bins.values())for(const g of gs)g.dispose();
+ root.userData={lod:ultra?'ultra':'low'};return root}
+function partsOf(root,by){const f=n=>root.getObjectByName(n);return{rig:f('rig'),legs:[0,1,2,3].map(i=>f('leg'+i)),knees:[0,1,2,3].map(i=>f('knee'+i)),neck:f('neck'),headG:f('headG'),jaw:f('jaw'),tail:f('tail'),ears:[0,1].map(i=>f('ear'+i)).filter(Boolean),by}}
+const TPL=new Map();
+function withLod(kind,mk,opts){opts=opts||{};const lod=opts.lod||(LOWF?'low':'auto'),high=mk();if(lod==='high')return high;
+ const hu=high.userData;let t=TPL.get(kind);if(!t){t={low:makeLevel(high,false),ultra:makeLevel(high,true)};TPL.set(kind,t)}
+ const level=k=>{const r=t[k].clone();const Q=partsOf(r,hu._by);r.userData={lod:k};return{r,Q,anim:quadAnim(Q,hu._sp)}};
+ const g=new T.Group(),base={k:kind,kind,rad:hu.rad,height:hu.height,stats:hu.stats,_sp:hu._sp,_by:hu._by};
+ if(lod==='low'||lod==='ultra'){const L=level(lod);g.add(L.r);Object.assign(g.userData,base,L.Q,{lod,anim:L.anim,levels:[L]});L.anim('idle',0);return g}
+ const L=new T.LOD(),hiQ={rig:hu.rig,legs:hu.legs,knees:hu.knees,neck:hu.neck,headG:hu.headG,jaw:hu.jaw,tail:hu.tail,ears:hu.ears},hiA=hu.anim;high.userData={lod:'high'};
+ const lo=level('low'),ul=level('ultra'),lv=[{r:high,Q:hiQ,anim:hiA},lo,ul];L.addLevel(high,0);L.addLevel(lo.r,LOD_DIST.low);L.addLevel(ul.r,LOD_DIST.ultra);L.name='lod';g.add(L);
+ // drive only the visible level(s): THREE.LOD.update (renderer, autoUpdate) leaves exactly one visible; before the first render all are visible -> all driven
+ const anim=(s,tt)=>{for(const l of lv)if(l.r.visible)l.anim(s,tt)};
+ Object.assign(g.userData,base,hiQ,{lod:'auto',anim,levels:lv,lodObj:L});anim('idle',0);return g}
 
 // ---------- trader NPCs (mkMan-compatible rig) ----------
 const OUT={
@@ -56013,7 +56468,8 @@ function mkKeycard(tier){tier=cl(tier|0||1,1,3);const k=KC[tier],g=new T.Group()
  const hole=p.cyl(.008,.008,.0075,.07,.004,.04,0x0a0a0a);void hole;
  Object.assign(g.userData,{k:'item',id:k.n,tier,color:k.c,rad:.12,height:.01});return g}
 
-root.BPAnimals={mkBear,mkWolf,mkBoar,mkDeer,mkRabbit,mkTraderNPC,mkFuse,mkKeycard,TRADER_ROLES:Object.keys(OUT)};
+const W=(k,f)=>o=>withLod(k,f,o);
+root.BPAnimals={mkBear:W('bear',mkBear),mkWolf:W('wolf',mkWolf),mkBoar:W('boar',mkBoar),mkDeer:W('deer',mkDeer),mkRabbit:W('rabbit',mkRabbit),LOD_DIST,setLow(on){LOWF=!!on},get low(){return LOWF},material:VMAT,mkTraderNPC,mkFuse,mkKeycard,TRADER_ROLES:Object.keys(OUT)};
 })(BPJA);
 
 const BPAnimals=BPJA.BPAnimals;window.BPAnimals=BPAnimals;
@@ -56247,7 +56703,7 @@ function mon(name,cx,cz,w,d,y,build){const X=(cx+(w-1)/2)*C,Z=(cz+(d-1)/2)*C,b=n
  for(let i=0;i<w;i++)for(let j=0;j<d;j++){FD.set(key(cx+i,cz+j),{y});const fx=(cx+i)*C,fz=(cz+j)*C;ALLC.push({x0:fx-1.5,x1:fx+1.5,z0:fz-1.5,z1:fz+1.5,y:y-2.6,top:y,found:1})}clearNodes(X,Z,Math.hypot(w,d)*C/2+17);b.box(w*C,3,d*C,0,-1.5,0,0x7d7b76);monDeck(b,w*C,d*C,X,Z);
  const rc=(x0,z0,x1,z1,h,extra)=>ALLC.push(Object.assign({x0:X+x0,x1:X+x1,z0:Z+z0,z1:Z+z1,y,h:h||2.85},extra||{}));
  let MP=null;const k={b,rc,X,Z,y,pad(x,z){MP=[x,z];monPad(b,x,z)},wall(x0,z0,x1,z1,h,c){b.box(x1-x0,h,z1-z0,(x0+x1)/2,h/2,(z0+z1)/2,c);rc(x0,z0,x1,z1,h)},post(x,z,h,c,r){const pr=r||.15;b.cyl(pr,pr,h,8,x,h/2,z,c);rc(x-pr,z-pr,x+pr,z+pr,h)},crate(t,lx,lz,rot,up){addCrate(t,X+lx,y+(up||0),Z+lz,rot)},solid(x,z,sx,sz,sy,c){b.box(sx,sy,sz,x,sy/2,z,c);if(sy<=.55){const p={x0:X+x-sx/2,x1:X+x+sx/2,z0:Z+z-sz/2,z1:Z+z+sz/2,y:y-.4,top:y+sy,found:1,pad:1};ALLC.push(p);DECKS.push(p)}else{const p={top:y+sy,deck:sy<=1.5?1:0};rc(x-sx/2,z-sz/2,x+sx/2,z+sz/2,sy,p);if(p.deck)DECKS.push(ALLC[ALLC.length-1])}}};
- build(k);mergeStatic(b.g);MONS.push({g:b.g,n:name,x:X,z:Z,w,d,y,cx,cz,rp:MP&&[X+MP[0],Z+MP[1]],r:Math.hypot(w,d)*C/2+6,seen:0})}
+ build(k);mergeStatic(b.g);if(window.BPMonLOD)BPMonLOD.wrap(b.g);MONS.push({g:b.g,n:name,x:X,z:Z,w,d,y,cx,cz,rp:MP&&[X+MP[0],Z+MP[1]],r:Math.hypot(w,d)*C/2+6,seen:0})}
 const MR=rng(77);
 function site(w,d){for(let t=0;t<900;t++){const x=(MR()*2-1)*(B-55),z=(MR()*2-1)*(B-40),cx=Math.round(x/C),cz=Math.round(z/C),X=(cx+(w-1)/2)*C,Z=(cz+(d-1)/2)*C;let lo=1e9,hi=-1e9;
   for(let i=0;i<=w*2;i++)for(let j=0;j<=d*2;j++){const h=H(cx*C-1.5+i*1.5,cz*C-1.5+j*1.5);lo=Math.min(lo,h);hi=Math.max(hi,h)}
@@ -57554,6 +58010,67 @@ root.BPProps={mkBarrelV2,mkBarrelCluster,mkCrateV2,mkWreckCar,mkCrashSite,rollRo
 })(BPJ);
 
 const BPMonuments=BPJ.BPMonuments,BPMonuments2=BPJ.BPMonuments2,BPProps=BPJ.BPProps;window.BPMonuments=BPMonuments;window.BPMonuments2=BPMonuments2;window.BPProps=BPProps;
+// ===== Jim's monument LODs (BPMonLOD) =====
+const BPJMN={T,THREE:T};
+// Blackpine monument LODs by jim. Pass THREE as root.THREE or root.T. Export window.BPMonLOD.
+// Works on what build 4 actually renders: every monument (native + Jim's, flattened by jimMon/flatInto) ends up as mon()'s b.g after
+// mergeStatic = one static mesh per colour (~56251); AI bases are bakeGroup()'d (~54827) with the gate hinges re-added as live children.
+// wrap(g) LODs only the STATIC meshes that are direct children of g (mergeStatic output). Everything else (gate hinge groups, rigs, crates,
+// traders, key-room parts, doors) is a separate live object and stays at all levels. userData / collision (ALLC, DECKS, userData.col, doors,
+// keyroom, loot) are never read or written. Levels swap through Object3D.layers (not .visible), so a raycast only sees the level on screen.
+//  low   : per-colour vertex clustering (same materials/palette as high, one mesh per high mesh), small props/bolts/rails collapse away
+//  ultra : one vertex-coloured silhouette mesh (coarse clustering over all colours)
+// Distances scale with the monument's radius R: low beyond max(60, 2.2R), ultra beyond max(150, 5.5R). ?low=1 -> low near (setLow).
+(function(root){
+const T=root.THREE||root.T;
+let LOWF=typeof location!=='undefined'&&/[?&]low=1\b/.test(location.search||'');
+const CFG={lowMin:60,lowR:2.2,ultraMin:150,ultraR:5.5,lowFrac:.2,ultraFrac:.03};
+let _vm=null;const VMAT=()=>_vm||(_vm=new T.MeshLambertMaterial({color:0xffffff,vertexColors:true}));
+const now=()=>typeof performance!=='undefined'?performance.now():Date.now();
+// triangles of one mesh in g space (typed), with per-triangle colour
+function tris(m,inv,out){const g=m.geometry,P=g.attributes.position.array,C=g.attributes.color,CA=C&&C.array,cs=C?C.itemSize:0,I=g.index&&g.index.array,mc=(m.material&&m.material.color)||new T.Color(0x888888);
+ const M=new T.Matrix4().multiplyMatrices(inv,m.matrixWorld),e=M.elements,n=I?I.length:g.attributes.position.count,pos=new Float32Array(n*3),col=new Float32Array(n);
+ for(let t=0;t<n;t+=3){let r=0,gg=0,bb=0;for(let k=0;k<3;k++){const i=I?I[t+k]:t+k,x=P[i*3],y=P[i*3+1],z=P[i*3+2],q=(t+k)*3;pos[q]=e[0]*x+e[4]*y+e[8]*z+e[12];pos[q+1]=e[1]*x+e[5]*y+e[9]*z+e[13];pos[q+2]=e[2]*x+e[6]*y+e[10]*z+e[14];
+   if(cs){r+=CA[i*cs];gg+=CA[i*cs+1];bb+=CA[i*cs+2]}else{r++;gg++;bb++}}col[t]=r/3*mc.r;col[t+1]=gg/3*mc.g;col[t+2]=bb/3*mc.b}
+ return{pos,col,mat:m.material,mesh:m}}
+function bbox(pos){const mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];for(let i=0;i<pos.length;i+=3)for(let k=0;k<3;k++){const a=pos[i+k];if(a<mn[k])mn[k]=a;if(a>mx[k])mx[k]=a}return{mn,mx}}
+// vertex clustering; output stretched back onto the input bbox (so the level's bounds match high exactly)
+function cluster(pos,col,cell){const cells=new Map(),ic=1/cell,ids=new Array(pos.length/3);
+ for(let i=0,v=0;i<pos.length;i+=3,v++){const k=((Math.floor(pos[i]*ic)+4096)*8192+(Math.floor(pos[i+1]*ic)+4096))*8192+(Math.floor(pos[i+2]*ic)+4096);let e=cells.get(k);if(!e)cells.set(k,e={x:0,y:0,z:0,n:0,i:cells.size});e.x+=pos[i];e.y+=pos[i+1];e.z+=pos[i+2];e.n++;ids[v]=e}
+ const seen=new Set(),out=[],oc=[];for(let t=0;t<ids.length;t+=3){const a=ids[t],b=ids[t+1],c=ids[t+2];if(a===b||b===c||a===c)continue;const s=[a.i,b.i,c.i],r=s.indexOf(Math.min(a.i,b.i,c.i)),k=s[r]+','+s[(r+1)%3]+','+s[(r+2)%3];
+  if(seen.has(k))continue;seen.add(k);for(const e of[a,b,c])out.push(e.x/e.n,e.y/e.n,e.z/e.n);oc.push(col[t],col[t+1],col[t+2])}
+ if(!out.length)return null;const A=bbox(pos),B=bbox(out);for(let i=0;i<out.length;i+=3)for(let k=0;k<3;k++){const s=B.mx[k]-B.mn[k];if(s>1e-6)out[i+k]=A.mn[k]+(out[i+k]-B.mn[k])/s*(A.mx[k]-A.mn[k])}
+ return{pos:out,col:oc}}
+function geo(pos,triCol){const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));if(triCol){const n=pos.length/3,c=new Float32Array(n*3);for(let t=0;t<n/3;t++)for(let k=0;k<3;k++){c[(t*3+k)*3]=triCol[t*3];c[(t*3+k)*3+1]=triCol[t*3+1];c[(t*3+k)*3+2]=triCol[t*3+2]}g.setAttribute('color',new T.BufferAttribute(c,3))}
+ g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();return g}
+// find a cell size whose total output fits the target (tris ~ 1/cell^2 -> jump to the estimate)
+function fitCell(parts,target,cell0){let cell=cell0,res=null;for(let it=0;it<7;it++){let n=0;res=parts.map(p=>{const c=cluster(p.pos,p.col,cell);if(c)n+=c.pos.length/9;return c});if(n<=target&&(n>.5*target||it>=2))break;cell*=n>target?Math.max(1.1,Math.sqrt(n/target)*1.05):Math.max(.7,Math.sqrt(n/target)*1.05)}return{res,cell}}
+function statics(g){return g.children.filter(c=>c.isMesh&&!c.userData.bpLod)}
+function build(g,lvl){const L=g.userData.bpMonLOD;if(L.built[lvl])return 0;g.updateMatrixWorld(true);const inv=new T.Matrix4().copy(g.matrixWorld).invert(),ms=statics(g);
+ if(!L.parts)L.parts=ms.map(m=>tris(m,inv));const parts=L.parts,R=L.R,highTris=parts.reduce((s,p)=>s+p.pos.length/9,0);L.highTris=highTris;
+ if(lvl==='low'){const{res,cell}=fitCell(parts,Math.max(200,CFG.lowFrac*highTris),Math.max(.08,R*.006));L.lowCell=cell;
+  res.forEach((c,i)=>{if(!c)return;const p=parts[i],m=new T.Mesh(geo(c.pos,null),p.mat);m.name='lod_low';m.userData.bpLod='low';m.castShadow=p.mesh.castShadow;m.receiveShadow=p.mesh.receiveShadow;m.matrixAutoUpdate=false;g.add(m);L.low.push(m)})}
+ else{let n=0;for(const p of parts)n+=p.pos.length;const pos=new Float32Array(n),col=new Float32Array(n/3);let o=0;for(const p of parts){pos.set(p.pos,o);col.set(p.col,o/3);o+=p.pos.length}
+  const{res,cell}=fitCell([{pos,col}],Math.max(60,CFG.ultraFrac*highTris),Math.max(.5,R*.05));L.ultraCell=cell;const c=res[0];
+  if(c){const m=new T.Mesh(geo(c.pos,c.col),VMAT());m.name='lod_ultra';m.userData.bpLod='ultra';m.castShadow=true;m.matrixAutoUpdate=false;g.add(m);L.ultra.push(m)}}
+ L.built[lvl]=true;if(L.built.low&&L.built.ultra)L.parts=null;for(const m of L[lvl])m.layers.mask=L.level===lvl?1:0;return 1}
+function setLayers(g,lvl){for(const m of g.children){if(!m.isMesh)continue;const tag=m.userData.bpLod||'high';if(m.userData._lm===undefined)m.userData._lm=m.layers.mask;m.layers.mask=tag===lvl?(m.userData._lm||1):0}}
+function show(g,l){const L=g.userData.bpMonLOD;if(L.level!==l){L.level=l;setLayers(g,l)}}
+const MONS=new Set(),Q=[],QS=new Set(),BUDGET={maxBuilds:1,ms:8};
+function wrap(g,opts){opts=opts||{};let L=g.userData.bpMonLOD;if(!L){g.updateMatrixWorld(true);const bb=new T.Box3();for(const m of statics(g))bb.expandByObject(m);const s=bb.getBoundingSphere(new T.Sphere());
+  L=g.userData.bpMonLOD={mode:opts.lod||'auto',level:'high',built:{low:false,ultra:false},low:[],ultra:[],R:s.radius||10,C:s.center.clone().applyMatrix4(new T.Matrix4().copy(g.matrixWorld).invert())}}
+ L.dist={low:Math.max(CFG.lowMin,CFG.lowR*L.R),ultra:Math.max(CFG.ultraMin,CFG.ultraR*L.R)};if(opts.dist)Object.assign(L.dist,opts.dist);MONS.add(g);
+ if(opts.eager){build(g,'low');build(g,'ultra')}return g}
+function levelFor(g,d){const L=g.userData.bpMonLOD;if(L.mode!=='auto')return L.mode;const l=d>=L.dist.ultra?'ultra':d>=L.dist.low?'low':'high';return LOWF&&l==='high'?'low':l}
+function update(g,cp){const L=g.userData.bpMonLOD;if(!L)return null;const c=L.C.clone().applyMatrix4(g.matrixWorld),want=levelFor(g,c.distanceTo(cp));L.want=want;
+ if(want==='high'||L.built[want])show(g,want);else{const k=g.uuid+want;if(!QS.has(k)){QS.add(k);Q.push([g,want])}}return L.level}
+function tick(cam,budget){const cp=cam.getWorldPosition?cam.getWorldPosition(new T.Vector3()):cam.position;for(const g of MONS){if(!g.parent){MONS.delete(g);continue}update(g,cp)}
+ const B=budget||BUDGET,t0=now();let n=0;while(Q.length&&n<B.maxBuilds&&(n===0||now()-t0<B.ms)){const[g,l]=Q.shift();QS.delete(g.uuid+l);const L=g.userData.bpMonLOD;if(!L||L.want!==l)continue;n+=build(g,l);if(L.built[l])show(g,l)}
+ return{built:n,ms:now()-t0,queued:Q.length}}
+function setLevel(g,l){const L=g.userData.bpMonLOD;if(!L)return;if(l!=='high')build(g,l);L.want=l;show(g,l)}
+root.BPMonLOD={wrap,update,tick,setLevel,CFG,BUDGET,setLow(on){LOWF=!!on},get low(){return LOWF},material:VMAT,_mons:MONS,_queue:Q};
+})(BPJMN);
+const BPMonLOD=BPJMN.BPMonLOD;window.BPMonLOD=BPMonLOD;
 // Flatten every descendant mesh of src into direct children of dst (src.position/rotation are relative to dst), then merge by colour.
 function flatInto(dst,src){src.updateMatrix();src.updateMatrixWorld(true);const base=src.matrix.clone(),inv=new T.Matrix4().copy(src.matrixWorld).invert(),m4=new T.Matrix4();
  src.traverse(m=>{if(!m.isMesh)return;m4.multiplyMatrices(inv,m.matrixWorld).premultiply(base);const gm=m.geometry.clone().applyMatrix4(m4);const n=new T.Mesh(gm,m.material);dst.add(n)})}
@@ -57623,9 +58140,9 @@ function setupKeyRoom(kr,ox,oy,oz,ry,cardTier){if(!kr||!kr.door)return;const c=M
  for(const L of kr.loot||[]){const [x,z]=tf(L.x,L.z);addCrate(Math.max(2,Math.min(4,(L.tier||2))),x,oy+L.y,z,ry+(hash(x,z)-.5)*.4)}
  KROOMS.push(st);return st}
 function kfuseUse(o){const st=o.userData.room;if(st.open)return say('The door is already open.');if(st.powered)return say('The fuse box is live. Swipe a '+ITEMS[st.card].n+' at the reader.');
- if(cnt('fuse')<1)return say('The fuse box is empty. You need an Electric Fuse.');take('fuse',1);st.powered=true;st.lamp.material.color.setHex(0xffc030);blip(520,.06,'square');say('Fuse in. The card reader powers up: swipe a '+ITEMS[st.card].n+'.');render()}
+ if(cnt('fuse')<1)return say('The fuse box is empty. You need an Electric Fuse.');take('fuse',1);st.powered=true;if(window.BPHandAnim)BPHandAnim.play('insert');st.lamp.material.color.setHex(0xffc030);blip(520,.06,'square');say('Fuse in. The card reader powers up: swipe a '+ITEMS[st.card].n+'.');render()}
 function kreadUse(o){const st=o.userData.room;if(st.open)return say('The door is open ('+Math.ceil(KR_OPEN_T-st.t)+'s).');if(!st.powered)return say('The card reader is dead. Put a fuse in the fuse box first.');
- if(cnt(st.card)<1)return say('This reader needs a '+ITEMS[st.card].n+'.');st.open=1;st.t=0;const i=ALLC.indexOf(st.col);if(i>=0)ALLC.splice(i,1);st.lamp.material.color.setHex(0x30ff60);blip(880,.05,'square');setTimeout(()=>blip(1180,.05,'square'),90);say('Access granted. The door stays open for '+KR_OPEN_T+' seconds.')}
+ if(cnt(st.card)<1)return say('This reader needs a '+ITEMS[st.card].n+'.');st.open=1;st.t=0;if(window.BPHandAnim)BPHandAnim.play('insert');const i=ALLC.indexOf(st.col);if(i>=0)ALLC.splice(i,1);st.lamp.material.color.setHex(0x30ff60);blip(880,.05,'square');setTimeout(()=>blip(1180,.05,'square'),90);say('Access granted. The door stays open for '+KR_OPEN_T+' seconds.')}
 function keyRoomTick(dt){for(const st of KROOMS){const want=st.open?2.05:0;st.lift+=(want-st.lift)*Math.min(1,dt*3);st.door.position.y=st.y+st.lift;
   if(st.open&&(st.t+=dt)>=KR_OPEN_T){const c=st.col,inside=P.x>c.x0-.4&&P.x<c.x1+.4&&P.z>c.z0-.4&&P.z<c.z1+.4;if(inside)continue;st.open=0;st.powered=false;ALLC.push(st.col);st.lamp.material.color.setHex(0xff2a2a);say('The keycard door slams shut. The fuse burned out.')}}}
 // ----- traders -----
@@ -58027,7 +58544,7 @@ function fillInst(geo,count,seed,test,opt){
    for(let j=0;j<arr.length;j++)m.setMatrixAt(j,arr[j]);
    m.instanceMatrix.needsUpdate=true;m.frustumCulled=false;scene.add(m);
    const gx=i%GZ,gz=(i/GZ)|0,cx=-B+(gx+.5)*cell,cz=-B+(gz+.5)*cell;
-   INST_CHUNKS.push({m,cx,cz,r2:(maxD+cell*.55)**2,n0:arr.length,fol:mat===mGrass||mat===mGrassDry||mat===mFoliage});
+   INST_CHUNKS.push({m,cx,cz,r2:(maxD+cell*.55)**2,n0:arr.length,fol:mat===mGrass||mat===mGrassDry||mat===mFoliage});if(window.BPNatLOD)BPNatLOD.wrapInst(INST_CHUNKS[INST_CHUNKS.length-1]);
   }
   return n;
 }
@@ -58785,13 +59302,13 @@ function campTick(dt,pc){
  }
 }
 initRaiderCamps();
-function cullTick(dt){if((nearT-=dt)<=0){nearT=.1;NEAR.length=0;for(const o of things){const dx=o.position.x-P.x,dz=o.position.z-P.z;if(dx*dx+dz*dz<256)NEAR.push(o)}}
+function cullTick(dt){if(window.BPNatLOD)BPNatLOD.tick(cam,things,dt);if((nearT-=dt)<=0){nearT=.1;NEAR.length=0;for(const o of things){const dx=o.position.x-P.x,dz=o.position.z-P.z;if(dx*dx+dz*dz<256)NEAR.push(o)}}
  if((cullT-=dt)>0)return;cullT=.25;for(const o of things){const k=o.userData.k;if(k==='tree'||k==='rock'||k==='bush'||k==='hemp'||k==='junk'||k==='barrel'||k==='sulfur'||k==='ore'||k==='crate'||k==='drop'||k==='recycler'){const dx=o.position.x-P.x,dz=o.position.z-P.z;o.visible=dx*dx+dz*dz<(LOW?8100:25600)}}
  for(const c of INST_CHUNKS){const dx=c.cx-P.x,dz=c.cz-P.z;c.m.visible=dx*dx+dz*dz<(LOW&&c.fol?c.r2*.36:c.r2)}
  for(const a of DE)if(a.m){const dx=a.x-P.x,dz=a.z-P.z;a.m.visible=dx*dx+dz*dz<22500}
  for(const a of WV)if(a.m){const dx=a.x-P.x,dz=a.z-P.z;a.m.visible=dx*dx+dz*dz<22500}
  for(const lg of LOGS){const dx=lg.position.x-P.x,dz=lg.position.z-P.z;lg.visible=dx*dx+dz*dz<22500}
- for(const m of MONS)m.g.visible=Math.hypot(m.x-P.x,m.z-P.z)<m.r+185}
+ for(const m of MONS)m.g.visible=Math.hypot(m.x-P.x,m.z-P.z)<m.r+260}
 
 function trapTick(dt){
   for(let i=devs.length-1;i>=0;i--){const d=devs[i];if(d.ttl&&age-d.born>d.ttl)killDev(d)}
@@ -60949,6 +61466,8 @@ Object.assign(ITM,{
  road_sign:bld(b=>{b.cyl(.2,.2,.02,8,0,.02,0,0xc8281e,[1.5708,0,0]);b.cyl(.18,.18,.022,8,0,.02,0,0xd83a2e,[1.5708,0,0]);b.box(.22,.06,.006,0,.02,.012,0xffffff);b.cyl(.012,.012,.03,8,0,.13,.0,0x9aa0a6,[1.5708,0,0]);b.cyl(.012,.012,.03,8,0,-.09,.0,0x9aa0a6,[1.5708,0,0]);b.box(.04,.26,.012,0,-.2,-.015,0x8a9096)}),
  bandage:bld(b=>{b.cyl(.09,.09,.13,22,0,.065,0,0xf2eee6,[0,0,1.5708]);b.cyl(.035,.035,.135,14,0,.065,0,0xd8d2c6,[0,0,1.5708]);b.box(.13,.004,.14,.0,.002,.13,0xf2eee6,[0,0,0],.5);b.box(.03,.09,.004,.0,.065,.091,0xc82a2a);b.box(.09,.03,.004,.0,.065,.091,0xc82a2a);b.box(.02,.135,.02,.05,.06,0,0xd8b88a)})
 });
+// Jim's items2 last: after the powder/charcoal redefine above and the BPAnimals/BPFarming overrides (held jug + icoJug stay on BPFarming)
+if(window.BPItems2)for(const id of BPItems2.ids){ITM[id]=()=>BPItems2.build(id);delete IC[id]}
 
 const DROPS = [];
 const PICKFX = [];
@@ -61398,7 +61917,7 @@ function fpAnimate(dt,wAmt){const H=FP.H;if(!H||!vmId||!H.parent){FP.unq=null;re
   else if(wAmt>1.15)st='sprint';else if(wAmt>.08)st='walk';
  }
  if(f>=0)t=f*B.durFor(st,id,it);
- H.userData.anim(st,t,id,it);FP.st=st;FP.t=t;fpForearms(H);
+ H.userData.anim(st,t,id,it);if(window.BPHandAnim)st=BPHandAnim.apply(H,dt,id,it,st,swing>0&&swingKind==='use'?1-swing/(swingD||.4):-1)||st;FP.st=st;FP.t=t;fpForearms(H);
  if(FP.gun){H.position.set(0,0,0);H.rotation.set(0,0,0);H.updateMatrixWorld(true);const v=FP.v||(FP.v=new T.Vector3());v.setFromMatrixPosition(H.userData.R.userData.sockets[H.userData.grip.socket].matrixWorld);H.worldToLocal(v);H.position.set(-v.x,-v.y,-v.z)}
  else{H.position.set((VK-1)*.2+swX,swY,0);H.rotation.set(swY*.65,-swX*.65,0);
   if(id==="chainsaw"||id==="jackhammer"){const run=(fireHeld||swing>0)&&!open,jt=run?(id==="jackhammer"?.011:.007):.0015;H.position.x+=(Math.random()-.5)*jt;H.position.y+=(Math.random()-.5)*jt;H.position.z+=(Math.random()-.5)*jt*.6;
@@ -61645,7 +62164,7 @@ function fire(){const s=gunOf();if(!s||dead||open||chOpen||attOpen||fireCd>0||re
  for(let p=0;p<g.pellets;p++){const yw=yaw+(Math.random()-.5)*2*effSpread,pt=pitch+(Math.random()-.5)*2*effSpread,cp=Math.cos(pt),dx=-Math.sin(yw)*cp,dy=Math.sin(pt),dz=-Math.cos(yw)*cp;
   ray.set(new T.Vector3(ox,oy,oz),new T.Vector3(dx,dy,dz));ray.far=g.range;
   let ho=null,hd=g.range,hp1=null,ho2=null,hd2=0,hp2=null;
-  for(const h of ray.intersectObjects(cands,true)){let o=h.object;while(o&&!o.userData.k)o=o.parent;if(!o||o.userData.k==='bush'||o.userData.k==='hemp'||o.userData.k==='drop'||(o.userData.a&&o.userData.a.hp<=0)||(o.userData.k==='barrel'&&o.userData.uses!==undefined&&o.userData.uses<=0))continue;
+  for(const h of ray.intersectObjects(cands,true)){let o=h.object;while(o&&!o.userData.k)o=o.parent;if(!o||o.userData.k==='item'||o.userData.k==='bush'||o.userData.k==='hemp'||o.userData.k==='drop'||(o.userData.a&&o.userData.a.hp<=0)||(o.userData.k==='barrel'&&o.userData.uses!==undefined&&o.userData.uses<=0))continue;
    if(!ho){ho=o;hd=h.distance;hp1=h.point;if(at!=='ammo_ap'||!ho.userData.a)break}else if(o!==ho&&o.userData.a){ho2=o;hd2=h.distance;hp2=h.point;break}}
   let end=hd;const lim=ho2?hd2:hd,bd=blockDist(ox,oy,oz,dx,dy,dz,lim);
   if(bd<lim){if(bd<hd){ho=null;ho2=null;hd=bd;end=bd}else{ho2=null;end=bd}}else end=lim;
@@ -62025,7 +62544,7 @@ window.__bp.colCheck=()=>{
 window.__bp.grade=()=>{let bad=0,n=0,worst=0,top=null;const sample=typeof Hg==='function'?Hg:H;for(const [k,f] of FD){const parts=String(k).split(',');if(parts.length!==2)continue;const x=+parts[0]*C,z=+parts[1]*C;for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const sx=x+i*.9,sz=z+j*.9,h=sample(sx,sz);n++;const over=h-(f.y-.02);if(over>.04){bad++;if(over>worst){worst=over;top={k,sx:+sx.toFixed(1),sz:+sz.toFixed(1),h:+h.toFixed(2),y:+f.y.toFixed(2),over:+over.toFixed(2)}}}}}return{bad,n,worst:+worst.toFixed(2),grass:GRASSN,shrubs:SHRUBN,forest:FOREST}};
 let last=performance.now();
 let rafId=0;
-function loop(n){if(gen!==GEN)return;const rawDt=(n-last)/1000,dt=Math.max(0,Math.min(.1,rawDt))||0;last=n;if(!window.__bpPause&&!window.__bpPortrait){update(dt);hudT+=dt;if(hudT>=.08){hudT=0;hud()}adaptRes(rawDt);ren.render(scene,cam)}else if(window.__bpSnap){window.__bpSnap=0;update(.016);hud();ren.render(scene,cam)}rafId=requestAnimationFrame(loop)}
+function loop(n){if(gen!==GEN)return;const rawDt=(n-last)/1000,dt=Math.max(0,Math.min(.1,rawDt))||0;last=n;if(!window.__bpPause&&!window.__bpPortrait){update(dt);hudT+=dt;if(hudT>=.08){hudT=0;hud()}adaptRes(rawDt);if(window.BPManLOD)BPManLOD.tick(cam);if(window.BPMonLOD)BPMonLOD.tick(cam);ren.render(scene,cam)}else if(window.__bpSnap){window.__bpSnap=0;update(.016);hud();ren.render(scene,cam)}rafId=requestAnimationFrame(loop)}
 rafId=requestAnimationFrame(loop);
 return {setGather:v=>{GATHER=v},getGather:()=>GATHER,getDifficulty:()=>DIFFK,difficulties:Object.keys(DIFFS),setDifficulty:k=>{if(!DIFFS[k])return DIFFK;DIFFK=k;DF=DIFFS[k];CAMP_RESPAWN=DF.campResp;for(const c of RCAMPS)if(c.reinforceT>CAMP_RESPAWN)c.reinforceT=CAMP_RESPAWN;persist('manual');say('Difficulty: '+DF.n+'. Raids, camps and settlers use it from now on.');return DIFFK},cheats:()=>toggleCheat(),setPace:v=>setPace(v),getPace:()=>pace,paces:PACES,getClaimName:()=>claimName,setClaimName:nm=>{claimName=String(nm||'').trim()||claimName;persist('manual');return claimName},getSlotId:()=>slotId,setSlotId:id=>{if(id)slotId=id;return slotId},saveNow:(kind)=>{persist(kind||'manual');say('Saved claim: '+claimName+'.');return snapshot()},saveAsNew:(nm)=>{slotId='slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);if(nm)claimName=String(nm).trim()||claimName;persist('manual');say('Saved new slot: '+claimName+'.');return snapshot()},getSnapshot:nm=>snapshot(nm),exportSave:()=>{persist('manual');return JSON.stringify(snapshot())},lock:()=>lookLock(true),destroy(){try{if(document.pointerLockElement===cv)document.exitPointerLock()}catch(e){}window.removeEventListener('resize',rs);window.removeEventListener('blur',onBlurClear);document.removeEventListener('visibilitychange',onVis);window.removeEventListener('pointermove',tipGuard);window.removeEventListener('pointerdown',tipGuard);window.removeEventListener('blur',tipGuard);document.removeEventListener('mouseleave',tipGuard);document.removeEventListener('visibilitychange',tipGuard);if(GEN===gen)GEN++;cancelAnimationFrame(rafId);try{ren.dispose();ren.forceContextLoss()}catch(e){}window.__controlsTest=undefined;window.__bp=undefined;root.replaceChildren()}};
 

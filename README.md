@@ -1,42 +1,64 @@
 # Blackpine
 
-Wilderness survival in the browser. Gather, build a claim, and hold your tool cupboard through the raid nights.
+Wilderness survival in the browser. Gather, build a claim, farm, crack keycard rooms, and hold your tool cupboard through the raid nights.
 
-<p>
-  <a href="https://htmlpreview.github.io/?https://github.com/85b9gs5wvy-cmyk/blackpine/blob/main/play.html"><img alt="Play Blackpine" src="https://img.shields.io/badge/Play-Blackpine-c4552a?style=for-the-badge"></a>
-</p>
-
-Press **Play**, name a claim, then **Wake up**. On a phone, turn it sideways.
+Press **Wake up (New Claim)**, pick a name, day speed, gather rate, difficulty and starting loadout, or **Continue** your last claim. On a phone, turn it sideways.
 
 ## Controls
 
 | Key | Action |
 |---|---|
-| WASD / Shift | Move / sprint |
-| Mouse, E or click | Look, use, gather, fire |
-| R / T / Z | Reload / swap ammo / aim |
-| V / F | Attachments / light |
-| I or Tab | Bag |
-| M | Island map (scroll to zoom, double-click to pin) |
-| G (Shift+G) | Drop stack (drop one) |
+| WASD / arrows, Shift | Move, sprint |
+| Mouse / left click or E | Look, use, gather, fire |
+| Right mouse (hold) or Z (toggle) | Aim down sights |
+| R / T | Reload / swap ammo type |
+| V / F | Attachments / tactical light |
+| I or Tab | Bag and crafting |
+| M | Island map |
+| G (Shift+G) | Drop held stack (drop one) |
 | 1–6 | Hotbar |
-| F5 / F9 / Esc | Quick-save / quick-load / pause |
+| ` (backquote) | Cheat menu |
+| F5 / F9 | Quick-save / quick-load |
+| Esc | Close panels, then pause menu |
 
 ## The basics
 
-- **Start:** you wake with a Rock. Gather wood and stone, then craft a Stone Hatchet and Pickaxe.
-- **Progress:** find scrap in barrels, junk, and crates. Research blueprints and build Tier 1 to 3 workbenches to unlock guns, turrets, and explosives.
-- **Survive:** raiders hit on raid nights, and three raider camps guard loot chests. Settlers build their own bases, arm up, and fight too.
-- **World:** forests, meadows, autumn woods, and scrub, with rivers, bridges, roads, monuments, wildlife, and snow.
-- **Difficulty:** Easy, Medium, Hard, or Extreme, set per claim. Higher levels bring bigger raids and tougher raiders.
+- **Start:** gather wood and stone, craft tools, and place a tool cupboard to hold your claim.
+- **Crafting:** most crafting happens in the bag. Electrics, weapons, clothing and some parts need a workbench within about 8 m; guns, turrets and armour need a Tier 2 or Tier 3 bench. Some items are locked until you research them: spend scrap plus one copy of the item at a Research Table or Workbench.
+- **Furnace:** slots 1–3 take Metal Ore or Sulfur plus Wood or Low Grade Fuel (fuel burns 3x longer). Ore becomes Metal Fragments, Sulfur becomes Smelted Sulphur, and burning wood leaves Charcoal. Slots 4–6 are the output.
+- **Gunpowder:** 2 Smelted Sulphur + 2 Charcoal makes **5 Gunpowder**. No bench needed and the cost is fixed. Gunpowder goes into beancans, satchels and rockets.
 
-Full recipes are in [COMPONENTS.md](COMPONENTS.md).
+## Farming
 
-## Files
+- Get seeds (hemp, corn, pumpkin) by harvesting the wild crops that grow along the rivers.
+- Plant on open soil, or in a **Wooden Planter** (4 slots; you can stand on it).
+- A **Water Jug** holds 5 uses. Fill it at a river or lake, then water your plants. Each watering lets a plant grow one stage (about 40 s of play per stage, whatever the day speed), and a plant can hold 2 waterings. It is ripe at stage 3/3. You can also drink from the jug.
+- Harvest: pumpkins give 1–2 pumpkins and seeds, corn gives 2–3 cobs and seeds, hemp gives cloth, fiber and seeds.
+- Your planted crops and planters are saved with the claim.
 
-| File | What it is |
+## Keycard rooms
+
+Each of the monuments below has a locked keycard room. Put an **Electric Fuse** into its fuse box to power the reader, then swipe the right card. The door stays open for 45 s. The fuse burns out when the door shuts. The card is not used up.
+
+| Monument | Card |
 |---|---|
-| [play.html](play.html) | The whole game in one file (what Play opens) |
-| [index.html](index.html) | The split-file version (needs a local server) |
-| [blackpine.js](blackpine.js) / [blackpine.css](blackpine.css) | Game code and HUD styles |
-| [three.module.js](three.module.js) | Three.js r128 (MIT) |
+| Gas Station, Trading Post, Shop Row | Green |
+| Warehouse, Radio Tower, Lumber Mill | Blue |
+| Military Outpost | Red |
+
+Green cards come from supply crates, blue from military crates, red from elite crates.
+
+## Raid nights
+
+- Every 5th day (days 5, 10, 15 and so on) is a raid day. At dusk you get a warning with the wave number. After dark the crew comes for your tool cupboard, or your bedroll if you have no cupboard. At dawn they fall back.
+- Waves get bigger each time. Difficulty (Easy, Medium, Hard, Extreme) scales the size, toughness and gear. Your island rating (scavenge, hunt, build, blood) feeds the heat.
+- On ordinary nights a few raiders still prowl. Raider camps guard loot. AI settlers claim a cupboard, build their own bases, arm up, and fight too.
+
+## Cheats and low graphics
+
+- Press ` or the **Cheats** button. The game pauses while the menu is open. Turn **Cheats: ON** to unlock God mode, Infinite needs, Peaceful, Free crafting, Fly, Super speed, item kits, teleports, time and raid controls, weather, spawns and gather rate.
+- **Low graphics:** add `?low=1` to the URL, or toggle it in the cheat menu (cheats must be on). It lowers resolution, turns off shadows, and uses lighter models.
+
+## Saving
+
+The game autosaves as you play (and when signed in, it also syncs to the cloud). Press F5 to quick-save and F9 to load the latest save. The pause menu has Save Claim Now, Save As New Slot and Load / Manage Saves. Saves can be imported as `.json`.

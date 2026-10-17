@@ -51217,7 +51217,7 @@ function hempGeo(seed){
  for(let s=0;s<stalks.length;s++){
   const [sx,sz,sh,rx,rz]=stalks[s];
   const SM=M4(sx,sh*.46,sz,rx,seed+s,rz,.95,sh,.95);bakeGeo(gBranch,SM,0x48782c,acc,2);
-  for(let b=0;b<4;b++){const ba=seed+s*2.1+b*2.094,br=b?.045:0,tl=b?.38:0;bakeGeo(gHempBud,M4(sx+Math.cos(ba)*br,sh*(b?.9:.95),sz+Math.sin(ba)*br,rx+Math.sin(ba)*tl,ba,rz-Math.cos(ba)*tl,b?.05:.06,b?.15:.21,b?.05:.06),b%2?0x8a9a3a:0x9ab04a,acc,3)}
+  /*jim-plants7 hemp crown*/for(let b=0;b<3;b++){const ba=seed+s*2.1+b*2.094;bakeGeo(gBlade,M4(sx+Math.cos(ba)*.02,sh*.9,sz+Math.sin(ba)*.02,rx+Math.sin(ba)*.32,ba,rz-Math.cos(ba)*.32,1.1,.42,1),b%2?0x3f7f2c:0x4f9236,acc,2)}
   for(let k=0;k<4;k++){
    const h=sh*(.28+k*.17),sc=.36+(3-k)*.08;
    const at=new T.Vector3(0,h/sh-.46,0).applyMatrix4(SM),el=.42+k*.12;
@@ -52190,13 +52190,30 @@ function tierDetail(b,bx){const t=b.t,p=b.p,S={wood:{seam:0x4a3622,trim:0x8f6e46
   if(t==='hq')for(const x of[-1,0,1])bx(.1,.07,3.1,x,3.3,0,S.bolt);
  }}
 const DORD=['door','metal_door','hq_door'],DHP={door:200,metal_door:450,hq_door:800,barricade:260};
+/* === JESSICA FIX START: hammer repair === */
+// Hammer repair: a piece (all of its ALLC rects) or door below max HP is repaired to full in one press, like an upgrade.
+// Cost = half of that tier's cost x the missing HP fraction, rounded up per material (wood tier: the build recipe; higher tiers: upCost; doors: their recipe).
+// Not allowed inside a tool cupboard zone you are not on (same rule as building). Full-HP pieces fall through to the normal upgrade.
+function jfRepInfo(r){let hp=0,mx=0,base=null,name='',x=0,z=0,rects=null;
+ if(r._door){const d=r.d;hp=d.hp||0;mx=d.maxHp||0;base=DV[d.t]&&DV[d.t][2];name=NAMES[d.t]||'Door';x=d.x;z=d.z}
+ else{rects=ALLC.filter(c=>c.piece&&c.mesh===r.m&&c.hp>0);for(const c of rects){hp+=c.hp;mx+=c.maxHp||0}base=r.t==='wood'?{wood:PT[r.p][2]}:upCost(r.p,r.t);name=TIER[r.t].n+' '+PT[r.p][0];x=r.m.position.x;z=r.m.position.z}
+ if(!base||!(mx>0)||hp>=mx-.5)return null;
+ const fr=Math.min(1,(mx-hp)/mx),cost={};for(const k in base)cost[k]=Math.max(1,Math.ceil(base[k]*.5*fr));
+ const tc=tcCovering(x,z),blocked=!!(tc&&tc.owner!=='you');
+ const label=blocked?('Repair '+name+': blocked. Their tool cupboard holds this ground.'):('Repair '+name+' ('+Math.round(hp)+'/'+Math.round(mx)+'): '+Object.keys(cost).map(k=>cost[k]+' '+ITEMS[k].n+' ('+cnt(k)+')').join(', '));
+ return{hp,mx,cost,name,blocked,rects,label}}
+function jfRepair(r,q){if(q.blocked){say('Building blocked. You can only repair inside your own tool cupboard zone.');return true}
+ if(!ch('free')){const lack=Object.keys(q.cost).filter(k=>cnt(k)<q.cost[k]);if(lack.length){say('Need '+lack.map(k=>(q.cost[k]-cnt(k))+' more '+ITEMS[k].n.toLowerCase()).join(' and ')+' to repair the '+q.name.toLowerCase()+'.');return true}for(const k in q.cost)take(k,q.cost[k])}
+ let px,py,pz;if(r._door){const d=r.d;d.hp=d.maxHp;wbPoke(d);px=d.x;py=(d.y||0)+1.1;pz=d.z}else{for(const c of q.rects)c.hp=c.maxHp;if(q.rects[0]){wbPoke(q.rects[0]);if(typeof wallDmg==='function')wallDmg(q.rects[0],0)}px=r.m.position.x;py=r.m.position.y+(r.p==='foundation'?.4:r.p==='roof'?3:1.4);pz=r.m.position.z}
+ startSwing('hammer',true,.34);puffAt(px,py,pz);blip(300,.08,'square');blip(140,.06,'triangle');say(q.name+' repaired ('+Math.round(q.mx)+'/'+Math.round(q.mx)+').');return true}
+/* === JESSICA FIX END === */
 function hammerTarget(){ray.setFromCamera({x:0,y:0},cam);const ms=[];for(let i=PCS.length-1;i>=0;i--){const r=PCS[i];if(!r.m.parent){PCS.splice(i,1);continue}if(r.owner==='you')ms.push(r.m)}for(const d of devs)if(!d._gone&&d.owner==='you'&&isDoor(d.t)&&d.m&&d.m.parent)ms.push(d.m);if(!ms.length)return null;const h=ray.intersectObjects(ms,true);for(const x of h){let o=x.object;while(o&&ms.indexOf(o)<0)o=o.parent;if(o){const r=PCS.find(q=>q.m===o);if(r)return r;const d=devs.find(q=>q.m===o&&isDoor(q.t));if(d)return{_door:1,d}}}return null}
-function hammerLabel(){const r=hammerTarget();if(!r)return'Hammer: aim at a wall, floor, roof or door you built';if(r._door){const d=r.d,nt=DORD[DORD.indexOf(d.t)+1];if(!nt)return NAMES[d.t]+' (fully upgraded)';const c=DV[nt][2];return'Upgrade to '+NAMES[nt]+': '+Object.keys(c).map(k=>c[k]+' '+ITEMS[k].n+' ('+cnt(k)+')').join(', ')}const nm=PT[r.p][0],nt=TORD[TORD.indexOf(r.t)+1];if(!nt)return TIER[r.t].n+' '+nm+' (fully upgraded)';const c=upCost(r.p,nt);return'Upgrade '+nm+' to '+TIER[nt].n+': '+Object.keys(c).map(k=>c[k]+' '+ITEMS[k].n+' ('+cnt(k)+')').join(', ')}
-function upgradeDoor(d,nt,quiet){const it=ITEMS[nt];if(!it)return;const old=d.m,m=mk(it,null,(old.position.x*7+old.position.z*13)|0);m.position.copy(old.position);m.rotation.copy(old.rotation);Object.assign(m.userData,{k:'dev',d});scene.add(m);scene.remove(old);const ti=things.indexOf(old);if(ti>=0)things[ti]=m;else things.push(m);d.m=m;d.t=nt;d.hp=d.maxHp=DHP[nt]||450;if(!quiet){startSwing('hammer',true,.34);RT.build+=.6;bumpHeat(.03);puffAt(old.position.x,old.position.y+1.1,old.position.z);blip(nt==='hq_door'?520:360,.12,'square');say('Door upgraded to '+NAMES[nt]+'.')}}
+function hammerLabel(){const r=hammerTarget();if(!r)return'Hammer: aim at a wall, floor, roof or door you built';/* === JESSICA FIX START: hammer repair === */{const q=jfRepInfo(r);if(q)return q.label}/* === JESSICA FIX END === */if(r._door){const d=r.d,nt=DORD[DORD.indexOf(d.t)+1];if(!nt)return NAMES[d.t]+' (fully upgraded)';const c=DV[nt][2];return'Upgrade to '+NAMES[nt]+': '+Object.keys(c).map(k=>c[k]+' '+ITEMS[k].n+' ('+cnt(k)+')').join(', ')}const nm=PT[r.p][0],nt=TORD[TORD.indexOf(r.t)+1];if(!nt)return TIER[r.t].n+' '+nm+' (fully upgraded)';const c=upCost(r.p,nt);return'Upgrade '+nm+' to '+TIER[nt].n+': '+Object.keys(c).map(k=>c[k]+' '+ITEMS[k].n+' ('+cnt(k)+')').join(', ')}
+function upgradeDoor(d,nt,quiet){const it=ITEMS[nt];if(!it)return;const old=d.m,m=mk(it,null,(old.position.x*7+old.position.z*13)|0);m.position.copy(old.position);m.rotation.copy(old.rotation);Object.assign(m.userData,{k:'dev',d});scene.add(m);scene.remove(old);const ti=things.indexOf(old);if(ti>=0)things[ti]=m;else things.push(m);d.m=m;d.t=nt;d.hp=d.maxHp=DHP[nt]||450;if(!REPLAY&&d.owner==='you')fredDoorLog(d,nt);if(!quiet){startSwing('hammer',true,.34);RT.build+=.6;bumpHeat(.03);puffAt(old.position.x,old.position.y+1.1,old.position.z);blip(nt==='hq_door'?520:360,.12,'square');say('Door upgraded to '+NAMES[nt]+'.')}}
 function upgradePiece(r,nt,quiet){const it=ITEMS[nt+'_'+r.p];if(!it)return;const old=r.m,m=mk(it,null,(old.position.x*7+old.position.z*13)|0);m.position.copy(old.position);m.rotation.copy(old.rotation);scene.add(m);scene.remove(old);for(const c of ALLC)if(c.mesh===old){c.mesh=m;c.tier=nt;c.hp=c.maxHp=HPT[nt]}r.m=m;r.t=nt;
  for(const e of BLOG)if(e.g&&e.g.k===r.k&&e.g.p===r.p)e.id=nt+'_'+r.p;
  if(!quiet){startSwing('hammer',true,.34);RT.build+=.6;bumpHeat(.03);puffAt(old.position.x,old.position.y+(r.p==='foundation'?.4:r.p==='roof'?3:1.4),old.position.z);blip(nt==='hq'?520:nt==='metal'?340:200,.12,'square');blip(120,.08,'sawtooth');say(PT[r.p][0]+' upgraded to '+TIER[nt].n+'.')}}
-function hammerAct(){const r=hammerTarget();if(!r)return false;if(r._door){const d=r.d,nt=DORD[DORD.indexOf(d.t)+1];if(!nt){say('That door is already Armored HQ Metal.');return true}const c=DV[nt][2];if(!ch('free')){const lack=Object.keys(c).filter(k=>cnt(k)<c[k]);if(lack.length){say('Need '+lack.map(k=>(c[k]-cnt(k))+' more '+ITEMS[k].n.toLowerCase()).join(' and ')+' for '+NAMES[nt]+'.');return true}for(const k in c)take(k,c[k])}upgradeDoor(d,nt);return true}const nt=TORD[TORD.indexOf(r.t)+1];if(!nt){say('That '+PT[r.p][0].toLowerCase()+' is already HQ Metal. Nothing stronger.');return true}
+function hammerAct(){const r=hammerTarget();if(!r)return false;/* === JESSICA FIX START: hammer repair === */{const q=jfRepInfo(r);if(q)return jfRepair(r,q)}/* === JESSICA FIX END === */if(r._door){const d=r.d,nt=DORD[DORD.indexOf(d.t)+1];if(!nt){say('That door is already Armored HQ Metal.');return true}const c=DV[nt][2];if(!ch('free')){const lack=Object.keys(c).filter(k=>cnt(k)<c[k]);if(lack.length){say('Need '+lack.map(k=>(c[k]-cnt(k))+' more '+ITEMS[k].n.toLowerCase()).join(' and ')+' for '+NAMES[nt]+'.');return true}for(const k in c)take(k,c[k])}upgradeDoor(d,nt);return true}const nt=TORD[TORD.indexOf(r.t)+1];if(!nt){say('That '+PT[r.p][0].toLowerCase()+' is already HQ Metal. Nothing stronger.');return true}
  const c=upCost(r.p,nt);if(!ch('free')){const lack=Object.keys(c).filter(k=>cnt(k)<c[k]);if(lack.length){say('Need '+lack.map(k=>(c[k]-cnt(k))+' more '+ITEMS[k].n.toLowerCase()).join(' and ')+' for '+TIER[nt].n+'.');return true}for(const k in c)take(k,c[k])}
  upgradePiece(r,nt);return true}
 const PT={foundation:['Foundation','⬜',30,'A 3 m base. Build these first; the first can go anywhere flat and dry.'],wall:['Wall','🧱',20,'Snaps to a foundation edge.'],doorway:['Doorway','🚪',20,'A wall with a gap. Add a door.'],window:['Window Wall','🪟',20,'A wall with an opening.'],roof:['Roof','🔺',20,'Covers a foundation cell. Sheltered cells stay warmer.'],stairs:['Stairs','🪜',25,'Climbs one floor in the direction you face. Leave the roof above it open.']};
@@ -52310,7 +52327,15 @@ function P(par){return{
  cone:(r,h,x,y,z,c,p,rx,ry,rz)=>{const m=new T.Mesh(new T.ConeGeometry(r,h,7),typeof c==='object'?c:M(c));m.position.set(x,y,z);m.rotation.set(rx||0,ry||0,rz||0);(p||par).add(m);return m},
  tor:(r,t,x,y,z,c,p,rx,ry)=>{const m=new T.Mesh(new T.TorusGeometry(r,t,6,14),typeof c==='object'?c:M(c));m.position.set(x,y,z);m.rotation.set(rx||0,ry||0,0);(p||par).add(m);return m}}}
 const piv=(par,x,y,z)=>{const q=new T.Group();q.position.set(x,y,z);par.add(q);return q};
+/*jim-plants7 fan geo*/const fanGeo=parts=>{const P=[],N=[],m=new T.Matrix4(),qq=new T.Quaternion(),e=new T.Euler(),one=new T.Vector3(1,1,1),v=new T.Vector3();for(const[w,hh,d,x,y,z,rx,ry,rz]of parts){const b=new T.BoxGeometry(w,hh,d).toNonIndexed();m.compose(v.set(x,y,z),qq.setFromEuler(e.set(rx,ry,rz)),one);b.applyMatrix4(m);for(const a of b.attributes.position.array)P.push(a);for(const a of b.attributes.normal.array)N.push(a);b.dispose()}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(P,3));g.setAttribute('normal',new T.Float32BufferAttribute(N,3));return g}; // several leaflet boxes -> one mesh (1 draw call per fan)
 const rng=s=>()=>(s=(s*16807)%2147483647)/2147483647;
+/*jim-crops7 merge*/const mergeGeos=(list,rel)=>{const P=[],N=[],v=new T.Vector3(),nm=new T.Matrix3();for(const[geo,m]of list){const a=geo.index?geo.toNonIndexed():geo,p=a.attributes.position,n=a.attributes.normal;nm.getNormalMatrix(m);for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(m);P.push(v.x,v.y,v.z);if(n){v.fromBufferAttribute(n,i).applyMatrix3(nm).normalize();N.push(v.x,v.y,v.z)}else N.push(0,1,0)}}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(P,3));g.setAttribute('normal',new T.Float32BufferAttribute(N,3));return g}; // any BufferGeometry list [geo, matrix] -> one non-indexed geometry
+const mergeCrop=(g,sw)=>{g.updateMatrixWorld(true);const A=new Set([g,...sw]),G=new Map();g.traverse(m=>{if(!m.isMesh||m.userData.part||m.material.transparent)return;let a=m.parent;while(!A.has(a))a=a.parent;const k=a.uuid+'|'+m.material.uuid;let q=G.get(k);if(!q){q={a,mat:m.material,ms:[]};G.set(k,q)}q.ms.push(m)});
+ for(const q of G.values()){if(q.ms.length<2)continue;const inv=new T.Matrix4().copy(q.a.matrixWorld).invert();const M1=new T.Mesh(mergeGeos(q.ms.map(m=>[m.geometry,new T.Matrix4().multiplyMatrices(inv,m.matrixWorld)])),q.mat);for(const m of q.ms)m.parent.remove(m);q.a.add(M1)}return g}; // one mesh per (sway anchor, material); tagged parts kept
+/*jim-plants7 pumpkin leaf geo*/let _plg=null;const pumpLeafGeo=()=>{if(_plg)return _plg;const S=10,cz=.45,R=.5,V=[],I=[];// cupped 5-lobed leaf, base (petiole) at origin, tip toward +z, length ~1; two-sided (top + underside)
+ for(const side of[0,1]){const o=V.length/3,dy=side?-.006:0;V.push(0,dy,cz);for(const f of[.55,1])for(let i=0;i<S;i++){const ph=i/S*Math.PI*2,c=Math.cos(ph),rr=R*(.84+.16*Math.cos(5*ph))*(1-.3*Math.pow(Math.max(0,-c),6))*f;V.push(Math.sin(ph)*rr,.17*(rr/R)*(rr/R)+dy,cz+c*rr)}
+  const tri=(a,b,d)=>side?I.push(o+a,o+d,o+b):I.push(o+a,o+b,o+d);for(let i=0;i<S;i++){const j=(i+1)%S;tri(0,1+i,1+j);tri(1+i,1+S+i,1+S+j);tri(1+i,1+S+j,1+j)}}
+ _plg=new T.BufferGeometry();_plg.setAttribute('position',new T.Float32BufferAttribute(V,3));_plg.setIndex(I);_plg.computeVertexNormals();return _plg};
 
 // stem segments: each a pivot so sway() bends progressively
 function stalk(par,p,h,r,c,n,swayers){let cur=par;const seg=h/n;for(let i=0;i<n;i++){const q=piv(cur,0,i?seg:0,0);p.cyl(r*(1-i/n*.5),r*(1-(i+1)/n*.5),seg,0,seg/2,0,c,q);swayers.push(q);cur=q}return piv(cur,0,seg,0)}
@@ -52325,10 +52350,12 @@ function mkCrop(type,stage,wild){type=H[type]?type:'hemp';stage=Math.max(0,Math.
  if(type==='hemp'){const top=stalk(g,p,h,.012+stage*.006,C.stem,3+stage,sw);
   const nodes=2+stage*2;for(let i=0;i<nodes;i++){const y=h*(.15+.8*i/nodes),seg=sw[Math.min(sw.length-1,Math.floor(y/(h/sw.length)))],ly=y-seg.getWorldPosition?0:0;
    for(let k=0;k<(stage?2:1);k++){const ang=i*2.4+k*Math.PI+(wild?r()-.5:0),q=piv(g,0,y,0);q.rotation.y=ang;
-    for(let f=0;f<(stage?7:3);f++){const fa=(f-(stage?3:1))*.35,l=p.box(.035,.008,.1+stage*.07*(1-Math.abs(fa)),0,0,0,lc,q);l.position.set(Math.sin(fa)*.06,0,Math.cos(fa)*(.06+stage*.035));l.rotation.set(-.35-(wild?r()*.3:0),fa,0)}}}
-  if(stage>=2){const n=stage===3?6:3;for(let i=0;i<n;i++){const y=h*(.55+.45*i/n),a=i*2.1;p.cone(.03+stage*.01,.08+stage*.04,Math.sin(a)*.08,y,Math.cos(a)*.08,stage===3?C.hempBud:C.leafD);}
-   p.cone(.045+stage*.015,.16+stage*.05,0,(.16+stage*.05)/2-.02,0,stage===3?C.hempBud:C.leafD,top).userData.part='topBud';
-   if(stage===3)for(let i=0;i<14;i++){const a=i*1.7,y=h*(.6+.4*r());p.sph(.012,Math.sin(a)*.09,y,Math.cos(a)*.09,C.hair)}}}
+    {/*jim-plants7 node fans*/const pp=[];for(let f=0;f<(stage?7:3);f++){const fa=(f-(stage?3:1))*.35;pp.push([.035,.008,.1+stage*.07*(1-Math.abs(fa)),Math.sin(fa)*.06,0,Math.cos(fa)*(.06+stage*.035),-.35-(wild?r()*.3:0),fa,0])}q.add(new T.Mesh(fanGeo(pp),M(lc)))}}}
+  if(stage>=2){/*jim-plants7b hemp tops*/const fan=(par,y,a,len,tilt,c,nl)=>{const q=piv(par,0,y,0);q.rotation.y=a;const pp=[],e=new T.Euler();for(let f=0;f<nl;f++){const fa=(f-(nl-1)/2)*.5,ll=len*(1-Math.abs(fa)*.45);e.set(-tilt-Math.abs(fa)*.25,fa,0);const v=new T.Vector3(0,0,ll*.5).applyEuler(e);pp.push([.026,.007,ll,v.x,v.y,v.z,e.x,e.y,0])}q.add(new T.Mesh(fanGeo(pp),M(c)));return q};
+   const nc=stage===3?3:2;for(let i=0;i<nc;i++)fan(g,h*(.62+.3*i/nc),i*2.4+.7,.07+stage*.025,.95,i%2?C.leafD:lc,3);
+   for(let j=0;j<4;j++)fan(top,-.02,j*1.571+.4,.08+stage*.03,1.15,j%2?C.leafD:lc,3);
+   {const tl=.07+stage*.03,tb=p.box(.026,.008,tl,0,tl/2,0,lc,top,-Math.PI/2+.08);tb.userData.part='topBud'}
+   if(stage===3)for(let i=0;i<6;i++){const a=i*2.1,y=h*(.72+.26*r());p.sph(.011,Math.sin(a)*.045,y,Math.cos(a)*.045,C.hair)}}}
  else if(type==='corn'){const top=stalk(g,p,h,.015+stage*.008,C.husk,3+stage,sw);
   const nl=2+stage*2;for(let i=0;i<nl;i++){const sg=sw[Math.min(sw.length-1,i%sw.length)];leaf(sg,p,.18+stage*.22,.05+stage*.015,.16,i*2.6+(wild?r():0),-.5-(wild?r()*.4:0),lc)}
   if(stage>=2){for(let i=0;i<6;i++){const q=piv(top,0,0,0);q.rotation.set(-.4,i*1.05,0);p.cyl(.004,.002,.25,0,.12,0,C.tassel,q).userData.part='tassel'}}
@@ -52336,11 +52363,12 @@ function mkCrop(type,stage,wild){type=H[type]?type:'hemp';stage=Math.max(0,Math.
    p.cyl(.03,.045,.24,0,.13,.03,C.husk,q,.15);if(stage===3){p.cyl(.032,.038,.2,0,.15,.07,C.corn,q,.15);for(let k=0;k<3;k++)p.box(.08,.008,.22,Math.sin(k*2)*.03,.12,.05,C.husk,q,.15,k*2.1,0);p.cyl(.003,.006,.08,0,.3,.11,C.silk,q,.15)}}}}
  else{ // pumpkin: vine sprawl on ground, big leaves, fruit at ready
   const vines=1+stage;for(let i=0;i<vines;i++){const q=piv(g,0,.03,0);q.rotation.y=i*2.2+(wild?r():0);sw.push(q);const len=.15+stage*.35;p.cyl(.01,.012,len,0,0,len/2,C.vine,q,Math.PI/2);
-   const nlv=1+stage*2;for(let k=0;k<nlv;k++){const z=len*(k+1)/(nlv+1),lq=piv(q,0,0,z);lq.rotation.y=(k%2?1:-1)*.8;const s=.06+stage*.05;p.cyl(.004,.004,h*.8,0,h*.4,0,C.vine,lq);
-    const L=p.cyl(s,s*.9,.01,0,h*.8,s*.4,lc,lq,-.5,0,0,7);L.scale.z=.85;sw.push(lq)}
+   const nlv=1+stage*2;for(let k=0;k<nlv;k++){const z=len*(k+1)/(nlv+1),lq=piv(q,0,0,z);lq.rotation.y=(k%2?1:-1)*.8;const s=.06+stage*.05,hp=.04+stage*.035;/*jim-plants7 pumpkin leaves*/p.cyl(.004,.005,Math.hypot(hp,hp*.5),0,hp/2,hp*.25,C.vine,lq,Math.atan2(hp*.5,hp),0,0,5);
+    const L=new T.Mesh(pumpLeafGeo(),M(lc));L.position.set(0,hp,hp*.5);L.scale.setScalar(s*2);L.rotation.set(-.22-.12*(k%3),0,(k%2?1:-1)*.2);lq.add(L);/*jim-crops7 leaf pivots*/}
    if(stage>=2)p.tor(.03,.004,.05,.04,len*.7,C.vine,q,Math.PI/2)}
   if(stage>=1){const fs=stage===1?.035:stage===2?.12:.26,n=stage===3?(wild?1:2):1;for(let i=0;i<n;i++){const a=i*2.6+.4,d=.25+stage*.08,x=Math.sin(a)*d,z=Math.cos(a)*d,col=stage===3?C.pumpkin:stage===2?C.pumpkinY:C.leafY;
    for(let k=0;k<8;k++){const kk=k/8*Math.PI*2;p.sph(fs*.55,x+Math.sin(kk)*fs*.42,fs*.62,z+Math.cos(kk)*fs*.42,col,g,.7,1.05,.7)}p.sph(fs*.75,x,fs*.72,z,col,g,1,.95,1);p.cyl(fs*.08,fs*.12,fs*.3,x,fs*1.3,z,C.vine,g,.2)}}}
+ mergeCrop(g,sw);/*jim-crops7 mkCrop merge*/
  u.k=wild?'wildcrop':'crop';u.type=type;u.stage=stage;u.rad=[.12,.22,.35,.4][stage]*(type==='pumpkin'?1.6:1);u.height=h;u.ready=stage===3;u.sw=sw;
  if(wild){u.uses=1;g.rotation.y=r()*6.28;g.rotation.z=(r()-.5)*.12}
  u.yield={hemp:{cloth:[0,0,4,10][stage],seed:stage===3?2:0},pumpkin:{pumpkin:stage===3?(wild?1:2):0,seed:stage===3?3:0},corn:{corn:stage===3?2:0,seed:stage===3?2:0}}[type];
@@ -52660,12 +52688,34 @@ function instKind(geo){geo.computeBoundingBox();const b=geo.boundingBox,h=b.max.
 function wrapInst(c){if(!c||!c.m||!c.m.isInstancedMesh||c.bpNat)return null;const m=c.m;if(m.material.transparent||triN(m.geometry)<=16)return null;
  const n=c.n0||m.count,src=new Float32Array(m.instanceMatrix.array.subarray(0,n*16)),xs=new Float32Array(n),zs=new Float32Array(n);for(let i=0;i<n;i++){xs[i]=src[i*16+12];zs[i]=src[i*16+14]}
  const e={c,m,n,src,xs,zs,kind:instKind(m.geometry),lo:null,ul:null,lx:1e9,lz:1e9,dirty:true,counts:[n,0,0]};c.bpNat=e;INST.push(e);return e}
-function instBuild(e){const m=e.m;const mk=l=>{const g=cachedGeo(m.geometry,m.material,e.kind,l);const im=new T.InstancedMesh(g||m.geometry,VMAT(),e.n);im.count=0;im.frustumCulled=false;im.castShadow=m.castShadow;im.receiveShadow=m.receiveShadow;im.name='natlod_'+l;im.raycast=NOHIT;im.userData.bpNat=l;m.add(im);return im};
- e.lo=mk('low');e.ul=mk('ultra');return 1}
+// b7 far chunks: low/ultra instances of every chunk sharing one source geometry go into ONE InstancedMesh per level (GRP), so the
+// far forest costs ~1 call per (geometry, level) instead of 1 per (chunk, level). Each chunk keeps compact private arrays (loA/ulA);
+// a dirty group is re-packed from its chunks that are near AND frustum-visible (Jessica's jpChunks sets chunk.visible each frame;
+// the old per-chunk child IMs inherited that) and only the used part is uploaded. The visibility check runs in scene.onBeforeRender,
+// i.e. after jpChunks and before three uploads/draws, so there is no one-frame lag when turning.
+const GRP=new Map();
+function grpFor(e,l){const m=e.m,g=cachedGeo(m.geometry,m.material,e.kind,l)||m.geometry,key=g.uuid+'|'+l;let G=GRP.get(key);if(G)return G;
+ let cap=0;for(const q of INST)if(q.m.geometry===m.geometry&&q.m.material===m.material&&q.kind===e.kind)cap+=q.n;
+ const im=new T.InstancedMesh(g,VMAT(),Math.max(1,cap));im.count=0;im.visible=false;im.frustumCulled=false;im.castShadow=m.castShadow;im.receiveShadow=m.receiveShadow;im.name='natlod_'+l;im.raycast=NOHIT;im.userData.bpNat=l;im.matrixAutoUpdate=false;m.parent.add(im);
+ G={im,l,li:l==='low'?1:2,members:[],dirty:true,last:0};GRP.set(key,G);hookScene(m.parent);return G}
+// per-cell cull, every render of the main camera: a cell's far instances are packed only if the cell is near (distance), its
+// instance bounds (Jessica's c._jpB when present, else our own) intersect the camera frustum, and it starts within cam.far.
+let hooked=null,MAINCAM=null;const _fr=new T.Frustum(),_pm=new T.Matrix4();
+function cellB(e){if(e._nb)return e._nb;if(e.c._jpB)return e._nb=e.c._jpB;const a=e.src;let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9,z0=1e9,z1=-1e9,sc=1;
+ for(let i=0;i<e.n;i++){const o=i*16,x=a[o+12],y=a[o+13],z=a[o+14];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;if(z<z0)z0=z;if(z>z1)z1=z;const k=Math.hypot(a[o],a[o+1],a[o+2]);if(k>sc)sc=k}
+ const g=e.m.geometry;if(!g.boundingSphere)g.computeBoundingSphere();const gr=(g.boundingSphere.radius+g.boundingSphere.center.length())*sc;
+ return e._nb=new T.Sphere(new T.Vector3((x0+x1)/2,(y0+y1)/2,(z0+z1)/2),Math.hypot(x1-x0,y1-y0,z1-z0)/2+gr)}
+function visSync(cam){if(!cam||cam!==MAINCAM||!GRP.size)return;cam.updateMatrixWorld();_pm.multiplyMatrices(cam.projectionMatrix,cam.matrixWorldInverse);_fr.setFromProjectionMatrix(_pm);const cp=cam.position,far=cam.far;
+ for(const e of INST){if(!e.gl)continue;let v=!!e.m.parent&&near(e);if(v){const b=cellB(e);v=b.center.distanceTo(cp)-b.radius<far&&_fr.intersectsSphere(b)}e._v=v;if(v!==!!e._inc){e.gl[0].dirty=e.gl[1].dirty=true}}flushGroups()}
+function hookScene(sc){if(hooked||!sc||!sc.isScene)return;hooked=sc;const prev=sc.onBeforeRender;sc.onBeforeRender=function(r,s2,cam){visSync(cam);return prev.apply(this,arguments)}}
+function instBuild(e){if(!e.m.parent)return 0;const a=grpFor(e,'low'),b=grpFor(e,'ultra');e.gl=[a,b];a.members.push(e);b.members.push(e);e.lo=a.im;e.ul=b.im;e.loA=new Float32Array(e.n*16);e.ulA=new Float32Array(e.n*16);return 1}
+function flushGroups(){for(const G of GRP.values()){if(!G.dirty)continue;G.dirty=false;const arr=G.im.instanceMatrix.array;let o=0;
+  for(const e of G.members){const inc=!!e._v&&near(e)&&!!e.m.parent;e._inc=inc;const c=e.counts[G.li];if(!inc||!c)continue;arr.set((G.li===1?e.loA:e.ulA).subarray(0,c*16),o*16);o+=c}
+  G.im.count=o;G.im.visible=o>0;if(o||G.last){const im=G.im.instanceMatrix;im.updateRange.offset=0;im.updateRange.count=Math.max(o,1)*16;im.needsUpdate=true}G.last=o}}
 function instUpdate(e,px,pz){const D=CFG.inst[e.kind],d1=LOWF?0:D[0]*D[0],d2=D[1]*D[1],keep=LOWF&&e.c.fol?Math.ceil(e.n*.3):e.n;
- const A=[e.m.instanceMatrix.array,e.lo.instanceMatrix.array,e.ul.instanceMatrix.array],N=[0,0,0],src=e.src;
+ const A=[e.m.instanceMatrix.array,e.loA,e.ulA],N=[0,0,0],src=e.src;
  for(let i=0;i<keep;i++){const dx=e.xs[i]-px,dz=e.zs[i]-pz,d=dx*dx+dz*dz,l=d<d1?0:d<d2?1:2;A[l].set(src.subarray(i*16,i*16+16),N[l]*16);N[l]++}
- e.m.count=N[0];if(e.m.userData._lm===undefined)e.m.userData._lm=e.m.layers.mask;e.m.layers.mask=N[0]?e.m.userData._lm:0;e.lo.count=N[1];e.ul.count=N[2];e.lo.visible=N[1]>0;e.ul.visible=N[2]>0;const P=e.counts||[0,0,0],ms=[e.m,e.lo,e.ul];for(let l=0;l<3;l++){if(!N[l]&&!P[l])continue;const im=ms[l].instanceMatrix;im.updateRange.offset=0;im.updateRange.count=Math.max(N[l],1)*16;im.needsUpdate=true}/* upload only the used part, skip empty levels (r128 otherwise re-sends the whole buffer) */e.counts=N;e.lx=px;e.lz=pz;e.dirty=false}
+ e.m.count=N[0];if(e.m.userData._lm===undefined)e.m.userData._lm=e.m.layers.mask;e.m.layers.mask=N[0]?e.m.userData._lm:0;const P=e.counts||[0,0,0];if(N[0]||P[0]){const im=e.m.instanceMatrix;im.updateRange.offset=0;im.updateRange.count=Math.max(N[0],1)*16;im.needsUpdate=true}if(N[1]||P[1])e.gl[0].dirty=true;if(N[2]||P[2])e.gl[1].dirty=true;/* upload only the used part, skip empty levels (r128 otherwise re-sends the whole buffer) */e.counts=N;e.lx=px;e.lz=pz;e.dirty=false}
 // ================= harvestable objects =================
 const KINDS={tree:1,rock:1,bush:1,hemp:1,ore:1,sulfur:1};const OBJ=[];let scanI=0,objT=0;const SEEN=new WeakSet();
 function register(o){if(SEEN.has(o))return;SEEN.add(o);const k=o.userData.k;const lod=o.children.find(c=>c.isLOD);
@@ -52699,7 +52749,7 @@ const Q=[];const QS=new Set();const _v=new T.Vector3();let lastT=0,stat={builds:
 // time budget: CFG.budgetMs per tick (performance.now), first job always runs. Big camera jump (> CFG.jump m since the last tick:
 // teleport, respawn) or a view-distance change (cam.far moved > CFG.farTol) -> one synchronous re-pass (rewarm) instead of a
 // many-frame trickle: every chunk re-partitioned, object builds nearest-first capped at CFG.rewarmMs, the rest queued.
-function tick(cam,things,dt){const t0=now();const p=cam.getWorldPosition?cam.getWorldPosition(_v):cam.position,px=p.x,pz=p.z;let jobs=0;
+function tick(cam,things,dt){const t0=now();MAINCAM=cam;const p=cam.getWorldPosition?cam.getWorldPosition(_v):cam.position,px=p.x,pz=p.z;let jobs=0;
  {const dx=px-lpx,dz=pz-lpz,f=cam.far||0,J=CFG.jump;if(lfar!==lfar)lfar=f;if(f!==fseen){fseen=f;farT=t0}/* view-distance change: wait until the slider has been still for CFG.settleMs (no hitch per drag step); teleport = immediate */if(lpx===lpx&&(dx*dx+dz*dz>J*J||(t0-farT>=CFG.settleMs&&Math.abs(f-lfar)>lfar*CFG.farTol))){pass(cam,things,CFG.rewarmMs);stat.rewarms++;stat.ms=now()-t0;return stat}lpx=px;lpz=pz}
 const B=CFG.budgetMs,over=()=>jobs>0&&now()-t0>B;
  if(things){const n=Math.min(things.length,CFG.scanPerTick);for(let i=0;i<n;i++){if(scanI>=things.length)scanI=0;const o=things[scanI++];if(o&&o.userData&&KINDS[o.userData.k]&&!SEEN.has(o))register(o)}}
@@ -52711,17 +52761,17 @@ const B=CFG.budgetMs,over=()=>jobs>0&&now()-t0>B;
  const step2=CFG.step*CFG.step;let cand=null;
  for(const e of INST){if(!near(e)||!e.m.parent)continue;const dx=e.lx-px,dz=e.lz-pz;if(e.dirty||dx*dx+dz*dz>step2)(cand||(cand=[])).push(e)}
  if(cand){if(cand.length>1){for(const e of cand){const dx=e.c.cx-px,dz=e.c.cz-pz;e._d=dx*dx+dz*dz}cand.sort((a,b)=>a._d-b._d)}
-  for(const e of cand){if(over())break;if(!e.lo){instBuild(e);jobs++}instUpdate(e,px,pz);jobs++;stat.instUpdates++}}
- stat.ms=now()-t0;return stat}
+  for(const e of cand){if(over())break;if(!e.lo){if(!instBuild(e))continue;jobs++}instUpdate(e,px,pz);jobs++;stat.instUpdates++}}
+ flushGroups();stat.ms=now()-t0;return stat}
 // load-time warm-up (replaces Jessica's item 81): register every harvestable, build every instanced chunk's low/ultra (geometry is
 // cached per source geometry, so ~20 unique builds) and partition all of them, and build the levels the objects within buildR want
 // now, all unbudgeted. Call once after the world exists and before the first frame. Returns {ms, builds, chunks}.
-function warm(cam,things){return pass(cam,things,Infinity)}
+function warm(cam,things){MAINCAM=cam;return pass(cam,things,Infinity)}
 // rewarm: the same full pass on demand (teleport / respawn / settings), object builds capped at CFG.rewarmMs; tick calls it itself
 function rewarm(cam,things,capMs){return pass(cam,things,capMs===undefined?CFG.rewarmMs:capMs)}
 function pass(cam,things,capMs){const t0=now(),p=cam.getWorldPosition?cam.getWorldPosition(new T.Vector3()):cam.position;let nb=0;
  if(things)for(const o of things)if(o&&o.userData&&KINDS[o.userData.k]&&!SEEN.has(o))register(o);
- {const R=(cam.far||300)+40,R2=R*R;for(const e of INST){const dx=(e.c.cx===undefined?e.lx:e.c.cx)-p.x,dz=(e.c.cz===undefined?e.lz:e.c.cz)-p.z;if(capMs<Infinity&&dx*dx+dz*dz>R2){e.dirty=true;continue}/* rewarm: only chunks within view; the rest catch up in tick when near */if(!e.lo)instBuild(e);instUpdate(e,p.x,p.z)}}
+ {const R=(cam.far||300)+40,R2=R*R;for(const e of INST){const dx=(e.c.cx===undefined?e.lx:e.c.cx)-p.x,dz=(e.c.cz===undefined?e.lz:e.c.cz)-p.z;if(capMs<Infinity&&dx*dx+dz*dz>R2){e.dirty=true;continue}/* rewarm: only chunks within view; the rest catch up in tick when near */if(!e.lo&&!instBuild(e))continue;instUpdate(e,p.x,p.z)}flushGroups()}
  const BR=CFG.buildR*CFG.buildR,todo=[];Q.length=0;QS.clear();
  for(const o of OBJ){const L=o.userData.bpNat,dx=o.position.x-p.x,dz=o.position.z-p.z,d=dx*dx+dz*dz;if(d>BR)continue;const w=objLevelFor(o,p.x,p.z);L.want=w;if(w!=='high'&&!L.built[w]){o._bpD=d;todo.push(o)}else objShow(o,w)}
  if(todo.length){if(capMs<Infinity)todo.sort((a,b)=>a._bpD-b._bpD);const tb=now();
@@ -52730,8 +52780,8 @@ function pass(cam,things,capMs){const t0=now(),p=cam.getWorldPosition?cam.getWor
 function setLow(on){LOWF=!!on;for(const e of INST)e.dirty=true;for(const o of OBJ){const L=o.userData.bpNat;if(L.lod&&L.low){const lv=L.lod.levels.find(q=>q.object===L.low);lv.distance=LOWF?0:CFG[L.k].low;sortLod(L.lod)}}objT=0}
 function stats(){let it=[0,0,0],tr=[0,0,0];for(const e of INST){for(let l=0;l<3;l++){it[l]+=e.counts[l];const g=[e.m,e.lo,e.ul][l];if(g)tr[l]+=e.counts[l]*triN(g.geometry)}}
  const ob={};for(const o of OBJ){const L=o.userData.bpNat;const e=ob[L.k]||(ob[L.k]={n:0,low:0,ultra:0});e.n++;if(L.built.low)e.low++;if(L.built.ultra)e.ultra++}return{inst:INST.length,instances:it,instTris:tr,objects:ob,queued:Q.length,last:stat}}
-(typeof window!=='undefined'?window:root).BPNatLOD={tick,warm,rewarm,wrapInst,setLow,get low(){return LOWF},CFG,stats,material:VMAT,_objBuild:objBuild,_register:register,_inst:INST,_obj:OBJ};
-})(typeof window!=='undefined'&&window.THREE?window:(typeof T!=='undefined'&&T.Mesh?{T}:globalThis));// inlined in bootSurvival this picks up the game's T// inlined in bootSurvival this picks up the game's T
+(typeof window!=='undefined'?window:root).BPNatLOD={tick,warm,rewarm,wrapInst,setLow,get low(){return LOWF},CFG,stats,material:VMAT,_objBuild:objBuild,_register:register,_inst:INST,_obj:OBJ,_grp:GRP};
+})(typeof window!=='undefined'&&window.THREE?window:(typeof T!=='undefined'&&T.Mesh?{T}:globalThis));// inlined in bootSurvival this picks up the game's T
 
 // ===== Jim's extra use poses (BPHandAnim) =====
 const BPJHA={T,THREE:T};
@@ -52844,7 +52894,7 @@ function plantInPlanter(kind,fx,fz){let best=null,bd=2.2;const tx=P.x+fx*1.6,tz=
  say(ITEMS[sid].n+' planted in the planter ('+pl.slots.filter(Boolean).length+'/4). Water it with a Water Jug.');blip(220,.05,'triangle');return 1}
 // ----- crops -----
 const CROPS=[],CROP_STAGE_T=40;var CROPGEO={};
-function cropStageMesh(kind,st,wild){const key=kind+st+(wild?'w':'');if(!CROPGEO[key])CROPGEO[key]=jimBake(BPFarming.mkCrop(kind,st,!!wild));return CROPGEO[key].clone()}
+function cropStageMesh(kind,st,wild){const key=kind+st+(wild?'w':'');if(!CROPGEO[key]){CROPGEO[key]=jimBake(BPFarming.mkCrop(kind,st,!!wild));/*jim-plants7 matte crop bake*/const vm=window.BPNatLOD&&BPNatLOD.material&&BPNatLOD.material();if(vm&&typeof mGun!=='undefined')CROPGEO[key].traverse(c=>{if(c.isMesh&&c.material===mGun)c.material=vm})}return CROPGEO[key].clone()}
 function mkCrop(kind,stage,wild){const g=new T.Group(),u=g.userData;u.k='crop';u.crop=kind;u.stage=stage;u.wild=!!wild;u.water=0;u.grow=0;u.uses=1;u.rad=kind==='corn'?.3:.45;u.st=[];
  for(let st=0;st<4;st++){const m=wild&&st<3?new T.Group():cropStageMesh(kind,st,wild);m.visible=st===stage;g.add(m);u.st.push(m)}
  const wet=new T.Mesh(new T.CircleGeometry(.4,16),new T.MeshLambertMaterial({color:0x241810,transparent:true,opacity:.55}));wet.rotation.x=-Math.PI/2;wet.position.y=.06;wet.visible=false;g.add(wet);u.wet=wet;
@@ -52908,7 +52958,7 @@ const G=(x,z,ft)=>{if(ft===undefined)ft=P.y-1.7;let y=H(x,z);
  }
  if(f){
   if(ft>=f.y-2.4)y=Math.max(y,f.y);
-  for(let L=0;L<6;L++){const b=f.y+FH*L;if(RF.has(key(fcx,fcz,L))&&b+FH<=ft+.75)y=Math.max(y,b+FH);const s=STR.get(key(fcx,fcz,L));if(s&&ft>=b-.75&&ft<=b+FH+.75)y=Math.max(y,b+FH*Math.max(0,Math.min(1,.5+((x-fcx*C)*s.dx+(z-fcz*C)*s.dz)/C)))}
+  for(let L=0;L<6;L++){const b=f.y+FH*L;if(RF.has(key(fcx,fcz,L))&&b+FH<=ft+.75)y=Math.max(y,b+FH);const s=STR.get(key(fcx,fcz,L));if(s&&ft>=b-.75&&ft<=b+FH+.75){const sh=b+FH*Math.max(0,Math.min(1,.5+((x-fcx*C)*s.dx+(z-fcz*C)*s.dz)/C));/* jim stairs7: player can't pop onto a flight from behind/side */if(!PGM||ft>=sh-.62)y=Math.max(y,sh)}}
  }
  for(let i=0;i<DECKS.length;i++){
   const c=DECKS[i];
@@ -53182,7 +53232,7 @@ function flushTerrain(){if(!terrDirty||!terrMesh)return;terrDirty=0;const g=terr
 function reseatFoundations(){for(const [k,f] of FD){const parts=String(k).split(',');if(parts.length!==2)continue;seatFoundation(+parts[0]*C,+parts[1]*C,f.y)}flushTerrain()}
 function onFound(x,z){const cx=Math.round(x/C),cz=Math.round(z/C);return FD.has(key(cx,cz))&&Math.hypot(x-cx*C,z-cz*C)<1.55}
 function onPlan(x,z,pad){const m=pad==null?1.8:pad;for(const n of NP){const p=n.plan;if(!p||p.cx==null)continue;if(x>=(p.cx-1)*C-m&&x<=(p.cx+p.w)*C+m&&z>=(p.cz-1)*C-m&&z<=(p.cz+p.d)*C+m)return true}return false}
-function construct(it,g,npc){const m=mk(it,null,(g.x*7+g.z*13)|0);m.position.set(g.x,g.y,g.z);m.rotation.y=g.rot||0;scene.add(m);noteBuild(it,g,npc);if(it.bd)PCS.push({m,p:it.bd.p,t:it.bd.t,k:g.k,owner:npc?'npc':'you'});
+function construct(it,g,npc){if(REPLAY&&!npc&&it.dv&&isDoor(it.dv)&&!g.upDoor&&g.k!=null){const w=WL.get(g.k);if(w&&w.door&&w.doorDev&&!w.doorDev._gone&&w.doorDev.owner==='you'){if(DORD.indexOf(it.dv)>DORD.indexOf(w.doorDev.t))upgradeDoor(w.doorDev,it.dv,true);return}}const m=mk(it,null,(g.x*7+g.z*13)|0);m.position.set(g.x,g.y,g.z);m.rotation.y=g.rot||0;scene.add(m);noteBuild(it,g,npc);if(it.bd)PCS.push({m,p:it.bd.p,t:it.bd.t,k:g.k,owner:npc?'npc':'you'});
  if(it.bd){const p=g.p;if(p==='foundation'){FD.set(g.k,{y:g.y});seatFoundation(g.x,g.z,g.y);if(!npc)flushTerrain();clearNodes(g.x,g.z,2.3);ALLC.push({x0:g.x-1.5,x1:g.x+1.5,z0:g.z-1.5,z1:g.z+1.5,y:g.y-2.6,top:g.y,found:1})}else if(p==='roof')RF.set(g.k,1);else if(p==='stairs')STR.set(g.k,{dx:g.dx,dz:g.dz});
   else{WL.set(g.k,{p});const rs=p==='doorway'?[rect(g.x,g.z,.9,g.rot,-1.05),rect(g.x,g.z,.9,g.rot,1.05)]:[rect(g.x,g.z,3,g.rot,0)];for(const r of rs){r.y=g.y;r.h=3.0;r.piece=1;if(p==='window'){r.winWall=1;r.wx=g.x;r.wz=g.z}r.mesh=m;r.wk=g.k;r.owner=npc?'npc':'you';r.tier=it.bd.t;r.born=age;r.hp=r.maxHp=(HPT[it.bd.t]||140);ALLC.push(r)}}return}
  if(g.upDoor){upgradeDoor(g.upDoor,it.dv,REPLAY||npc);scene.remove(m);return}
@@ -53208,7 +53258,7 @@ function devAct(o){const d=o.userData.d;
  if(d.t==='tc'){if(d.owner!=='you')return say('Locked. You are not on this tool cupboard.');curBox=d;open=true;tab='bag';pick=null;render();lookLock(false);return say('Tool cupboard open. Keep it fed, or the base starts to rot.')}
  if(WB_TIERS[d.t]){curBox=null;open=true;tab='craft';pick=null;render();lookLock(false);return say(NAMES[d.t]+': craft here, or research blueprints for 2x scrap.')}
  if(d.t==='research'){curBox=null;open=true;tab='research';pick=null;render();lookLock(false);return say('Research Table: spend scrap and an item to learn its blueprint.')}
- if(isDoor(d.t)){d.open=!d.open;blip(d.t==='hq_door'?180:d.t==='metal_door'?260:320,.05,'triangle');return say(d.open?(NAMES[d.t]+' opened.'):(NAMES[d.t]+' closed.'))}
+ /* === JESSICA FIX START: door owner === */if(isDoor(d.t)&&d.owner&&d.owner!=='you'){blip(150,.04,'square');return say('Locked. This '+(NAMES[d.t]||'door')+' belongs to a settler.')}/* === JESSICA FIX END === */if(isDoor(d.t)){d.open=!d.open;blip(d.t==='hq_door'?180:d.t==='metal_door'?260:320,.05,'triangle');return say(d.open?(NAMES[d.t]+' opened.'):(NAMES[d.t]+' closed.'))}
  if(tool('wire')){if(!wf){wf=d;return say('Wire started at '+NAMES[d.t]+'. Aim at another device and press Use.')}
   if(wf===d){wf=null;return say('Wire cancelled.')}
   if(Math.hypot(wf.x-d.x,wf.z-d.z)>30){wf=null;return say('Too far. Wires reach 30 m.')}
@@ -53216,8 +53266,8 @@ function devAct(o){const d=o.userData.d;
   if(ex>=0){scene.remove(wires[ex].l);wires.splice(ex,1);say('Wire removed.')}else{addWire(wf,d);say('Connected '+NAMES[wf.t]+' to '+NAMES[d.t]+'.')}wf=null;return}
  if(d.t==='switch'){d.on=!d.on;return say('Switch '+(d.on?'on: current flows.':'off: circuit broken.'))}
  say(plabel(o))}
-function plabel(o){const k=o.userData.k;if(k==='crop'){const u=o.userData,nm=u.crop[0].toUpperCase()+u.crop.slice(1);return u.stage>=3?'Harvest '+nm:(SL[sel]&&SL[sel].id==='water_jug'?'Water ':'')+nm+' sprout ('+u.stage+'/3'+(u.water>0?', watered':'')+')'}if(k==='kfuse')return o.userData.room.powered?'Fuse box (powered)':'Insert fuse';if(k==='kread')return o.userData.room.open?'Door open':'Swipe '+ITEMS[o.userData.room.card].n;if(k==='trader')return'Trade with '+TRADE_STOCK[o.userData.role].n;if(k==='crate')return'Open '+o.userData.nm;if(k==='drop')return'Pick up '+(ITEMS[o.userData.item]?ITEMS[o.userData.item].n:'meat')+(o.userData.n>1?' ×'+o.userData.n:'');if(k==='settler')return(o.userData.a&&o.userData.a.aggro>0)?'Fight settler':'Attack settler';if(k!=='dev')return{tree:'Gather wood',rock:'Gather stone',bush:'Pick berries & fiber',hemp:'Pick wild hemp (Cloth & Plant Fiber)',junk:'Search junk pile',recycler:'Use Recycler',barrel:'Break barrel (needs a tool)',sulfur:'Mine sulfur',ore:'Mine ore',deer:'Hunt deer',wolf:'Fight wolf',raider:'Fight raider',bear:'Fight bear',boar:'Hunt boar',rabbit:'Hunt rabbit'}[k]||(typeof k==='string'&&k?k[0].toUpperCase()+k.slice(1):'Use');
- const d=o.userData.d,n=NAMES[d.t]||String(d.t||'device').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());if(isBox(d.t)||isInd(d.t))return'Open '+n;if(d.t==='water_collector')return'Drink from Water Collector ('+Math.floor(d.water||0)+'/100)';if(d.t==='tc')return d.owner==='you'?'Open tool cupboard':'Locked tool cupboard';if(isDoor(d.t))return(d.open?'Close ':'Open ')+n;if(d.t==='switch')return n+' ('+(d.on?'on':'off')+') — toggle';
+function plabel(o){const k=o.userData.k;if(k==='crop'){const u=o.userData,nm=u.crop[0].toUpperCase()+u.crop.slice(1);return u.stage>=3?'Harvest '+nm:(SL[sel]&&SL[sel].id==='water_jug'?'Water ':'')+nm+' sprout ('+u.stage+'/3'+(u.water>0?', watered':'')+')'}if(k==='kfuse')return o.userData.room.powered?'Fuse box (powered)':'Insert fuse';if(k==='kread')return o.userData.room.open?'Door open':'Swipe '+ITEMS[o.userData.room.card].n;if(k==='trader')return'Trade with '+TRADE_STOCK[o.userData.role].n;if(k==='crate')return'Open '+o.userData.nm;if(k==='drop')return'Pick up '+(ITEMS[o.userData.item]?ITEMS[o.userData.item].n:'meat')+(o.userData.n>1?' ×'+o.userData.n:'');if(k==='settler')return(o.userData.a&&o.userData.a.aggro>0)?'Fight settler':'Attack settler';if(k!=='dev')return{tree:'Gather wood',rock:'Gather stone',bush:'Pick berries & fiber',hemp:'Pick wild hemp (Cloth & Plant Fiber)',junk:'Search junk pile',recycler:'Use Recycler',barrel:'Break barrel (needs a tool)',sulfur:'Mine sulfur',ore:'Mine ore',deer:'Hunt deer',wolf:'Fight wolf',raider:'Fight raider',bear:'Fight bear',boar:'Hunt boar',rabbit:'Hunt rabbit',oilDeposit:'Oil deposit'}[k]||(typeof k==='string'&&k?(k[0].toUpperCase()+k.slice(1)).replace(/([a-z])([A-Z])/g,(m,a,b)=>a+' '+b.toLowerCase()):'Use');
+ const d=o.userData.d,n=NAMES[d.t]||String(d.t||'device').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());if(isBox(d.t)||isInd(d.t))return'Open '+n;if(d.t==='water_collector')return'Drink from Water Collector ('+Math.floor(d.water||0)+'/100)';if(d.t==='tc')return d.owner==='you'?'Open tool cupboard':'Locked tool cupboard';/* === JESSICA FIX START: door owner === */if(isDoor(d.t)&&d.owner&&d.owner!=='you')return'Locked '+n;/* === JESSICA FIX END === */if(isDoor(d.t))return(d.open?'Close ':'Open ')+n;if(d.t==='switch')return n+' ('+(d.on?'on':'off')+') — toggle';
  if(d.t==='turret'&&d.pw<.45)return n+' — needs power';if(WB_TIERS[d.t])return n+' — craft or research here';if(d.t==='research')return 'Use Research Table';if(d.t==='spike'||d.t==='snap')return n;if(d.t==='battery')return n+' '+Math.round(d.ch)+'/'+BCAP;if(d.out)return n+' '+d.out.toFixed(0)+' W';if(d.use)return n+' '+Math.round(d.use*d.pw)+'/'+d.use+' W';return n}
 function power(dt){tg=tu=tb=0;const p=devs.map((_,i)=>i),f=i=>p[i]===i?i:(p[i]=f(p[i]));
  for(const w of wires){if((w.a.t==='switch'&&!w.a.on)||(w.b.t==='switch'&&!w.b.on))continue;p[f(w.a.i)]=f(w.b.i)}
@@ -53320,7 +53370,8 @@ function slideStep(dx,dz){let ft=P.y-1.7;SFT=ft;const dist=Math.hypot(dx,dz);if(
   {const g=G(P.x,P.z,ft);if(g>ft&&g-ft<=.62)ft=g}
   touchPosts(P,RAD);touchStaticGrid(P,RAD,ft);touchNearProps(P,RAD,ft,NEAR);buildOverlap(ft);
  }SFT=ft}
-function groundMove(dx,dz,dt,mv){slideStep(dx,dz);const gy=Math.max(G(P.x,P.z,SFT),-2.9)+1.7+Math.sin(age*9)*.04*(mv||0);if(gy<P.y-.85)P.y=Math.max(gy,P.y-16*dt);else{P.y+=(gy-P.y)*Math.min(1,dt*18);if(P.y<gy-.3)P.y=gy-.3}collide()}
+var PGM=0;/* jim stairs7: 1 while the player's groundMove runs (stair guard in G is player-only; var: hoisted, G runs earlier) */
+function groundMove(dx,dz,dt,mv){PGM=1;slideStep(dx,dz);const g0=G(P.x,P.z,SFT);PGM=0;const gy=Math.max(g0,-2.9)+1.7+Math.sin(age*9)*.04*(mv||0);if(gy<P.y-.85)P.y=Math.max(gy,P.y-16*dt);else{P.y+=(gy-P.y)*Math.min(1,dt*18);if(P.y<gy-.3)P.y=gy-.3}collide()}
 function collide(){const feet=P.y-1.7;
  touchPosts(P,RAD);touchStaticGrid(P,RAD,feet);touchNearProps(P,RAD,feet,NEAR);buildOverlap();
  if(H(P.x,P.z)<-1.2){P.x=LP.x;P.z=LP.z}else{LP.x=P.x;LP.z=P.z}}
@@ -54696,7 +54747,7 @@ function jcgQuery(x0,z0,x1,z1,b){const s=jcg(),inv=s.inv,ix0=Math.floor(x0*inv),
  if(!b)for(let i=1;i<n;i++){const v=out[i];let j=i-1;while(j>=0&&out[j]>v){out[j+1]=out[j];j--}out[j+1]=v}
  return n}
 // === JESSICA PERF END ===
-function col(o,ownerN){const rad=.36;/* === JESSICA PERF START: grid candidates === */const jn=jcgQuery(o.x-rad-1.2,o.z-rad-1.2,o.x+rad+1.2,o.z+rad+1.2,0),JI=jcg.s.out,jN=jn<0?ALLC.length:jn;for(let pass=0;pass<2;pass++)for(let j=0;j<jN;j++){const c=ALLC[jn<0?j:JI[j]];/* === JESSICA PERF END === */if(c.ramp)continue;if(c.d&&(c.d.open||c.d._gone||c.devBody))continue;if(c.found){if(c.top-o.y<=2.35)continue}else{const ch=c.h||2.85;if(c.y!==undefined&&(o.y>=c.y+ch-.22||o.y<c.y-(c.rail?1.9:2.2)))continue}const nx=Math.max(c.x0,Math.min(c.x1,o.x)),nz=Math.max(c.z0,Math.min(c.z1,o.z)),dx=o.x-nx,dz=o.z-nz,d=Math.hypot(dx,dz);if(d>=rad)continue;if(d>1e-4){o.x=nx+dx/d*rad;o.z=nz+dz/d*rad}else{const a=o.x-c.x0,b=c.x1-o.x,e=o.z-c.z0,f=c.z1-o.z,m=Math.min(a,b,e,f);if(m===a)o.x=c.x0-rad;else if(m===b)o.x=c.x1+rad;else if(m===e)o.z=c.z0-rad;else o.z=c.z1+rad}}
+function col(o,ownerN){const rad=.36;/* === JESSICA PERF START: grid candidates === */let jn=jcgQuery(o.x-rad-1.2,o.z-rad-1.2,o.x+rad+1.2,o.z+rad+1.2,0),jN=jn<0?ALLC.length:jn;const JI=jcg.s.out,jsx=o.x,jsz=o.z;for(let jr=0;jr<2;jr++){for(let pass=0;pass<2;pass++)for(let j=0;j<jN;j++){const c=ALLC[jn<0?j:JI[j]];/* === JESSICA PERF END === */if(c.ramp)continue;if(c.d&&(c.d.open||c.d._gone||c.devBody))continue;if(c.found){if(c.top-o.y<=2.35)continue}else{const ch=c.h||2.85;if(c.y!==undefined&&(o.y>=c.y+ch-.22||o.y<c.y-(c.rail?1.9:2.2)))continue}const nx=Math.max(c.x0,Math.min(c.x1,o.x)),nz=Math.max(c.z0,Math.min(c.z1,o.z)),dx=o.x-nx,dz=o.z-nz,d=Math.hypot(dx,dz);if(d>=rad)continue;if(d>1e-4){o.x=nx+dx/d*rad;o.z=nz+dz/d*rad}else{const a=o.x-c.x0,b=c.x1-o.x,e=o.z-c.z0,f=c.z1-o.z,m=Math.min(a,b,e,f);if(m===a)o.x=c.x0-rad;else if(m===b)o.x=c.x1+rad;else if(m===e)o.z=c.z0-rad;else o.z=c.z1+rad}}/* === JESSICA PERF START: pushed out of a big box beyond the candidate margin: redo with the full list (exactly the old result) === */if(jn<0||(Math.abs(o.x-jsx)<=1.2&&Math.abs(o.z-jsz)<=1.2))break;o.x=jsx;o.z=jsz;jn=-1;jN=ALLC.length}/* === JESSICA PERF END === */
  let pad=null,py=-1e9;/* === JESSICA PERF START: grid candidates === */for(let j=0;j<jN;j++){const c=ALLC[jn<0?j:JI[j]];/* === JESSICA PERF END === */if(!c.found||o.x<c.x0-.05||o.x>c.x1+.05||o.z<c.z0-.05||o.z>c.z1+.05)continue;if(c.top>=py&&c.top-o.y<=2.35&&o.y-c.top<1.2){py=c.top;pad=c}}if(pad&&pad.top>o.y+.04)o.y=pad.top;touchPosts(o,rad);touchStaticGrid(o,.28,o.y)}
 function touchPosts(o,rad){const posts=POSTS;if(!posts||!posts.length)return;for(let i=0;i<posts.length;i++){const p=posts[i];if(p.skip)continue;const dx=o.x-p.x,dz=o.z-p.z,d=Math.hypot(dx,dz),need=(rad||.4)+(p.r||.3);if(d<need&&d>1e-4){o.x=p.x+dx/d*need;o.z=p.z+dz/d*need}}}
 function openNearDoor(n,rad){if(!n||!n.bp)return;for(const e of devs){if(!isDoor(e.t)||e._gone||e.npc!==n)continue;const d=Math.hypot(e.x-n.x,e.z-n.z);if(d<rad){e.open=true;e.ac=age+6}else if(e.open&&d>3.2&&EN.some(r=>r.hp>0&&Math.hypot(r.x-e.x,r.z-e.z)<18)){e.open=false;e.ac=0}}}
@@ -54753,7 +54804,39 @@ function plan(n,tx,tz){
  if(out[out.length-1]!==raw[raw.length-1])out.push(raw[raw.length-1]);
  if(fullD>30)out.push([tx,tz]);
  return out}
-function go(n,tx,tz,sp,dt){if(n.cmp){const r=cmpGo(n,tx,tz);if(r){tx=r[0];tz=r[1];const l=cmpLocal(n.cmp,n.x,n.z);if(Math.abs(l[0])<2.4&&l[1]<-10.5&&l[1]>-27.5){n.pth=[];n.pT=null;return stepTo(n,tx,tz,sp,dt)}}}if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
+// === JESSICA FIX START: raiders route through compound gates ===
+// Raiders whose target stood inside a walled settler compound used plain plan(): its 30 m / 420-node A* never finds the gate on
+// the far side of the 35 m wall ring, and blkAt() makes every settler TC a 16 m no-go disc for raiders, which covers most of the
+// yard (TC sits at local (0,5.9)). So they slid along the wall nearest the target and stopped (Sally b6 retest item 7).
+// Now: outside -> round a corner if the wall is in the way -> 8 m in front of the gate -> straight down the gate lane -> target,
+// with that one compound's TC disc lifted for the raider. Leaving works the same way in reverse. A shut gate stays a door:
+// siege raiders already bash it (driveSiege bashIfStuck -> bash() includes compound gates); roaming raiders now hold at it and
+// bash it too. Walls are still never bashed. Settler shelter rule in raidFoe() is unchanged.
+const JF_CORN=[[23,23],[23,-23],[-23,23],[-23,-23]];
+function jfCmpOf(x,z){for(let i=0;i<CMPS.length;i++)if(cmpInside(CMPS[i],x,z))return CMPS[i];return null}
+function jfAround(l,A){if(!cmpCross(l,A))return A;let best=null,bd=1e9;
+ for(const c of JF_CORN){const d1=Math.hypot(c[0]-l[0],c[1]-l[1]);if(d1<1.2||cmpCross(l,c))continue;
+  if(!cmpCross(c,A)){const d=d1+Math.hypot(A[0]-c[0],A[1]-c[1]);if(d<bd){bd=d;best=c}}
+  else for(const c2 of JF_CORN){if(c2===c||cmpCross(c,c2)||cmpCross(c2,A))continue;const d=d1+Math.hypot(c2[0]-c[0],c2[1]-c[1])+Math.hypot(A[0]-c2[0],A[1]-c2[1]);if(d<bd){bd=d;best=c}}}
+ if(best)return best;const ax=Math.abs(l[0])>Math.abs(l[1]);return ax?[Math.sign(l[0])*23,l[1]]:[l[0],Math.sign(l[1])*23]}
+function jfRaidGate(n,tx,tz){const cT=jfCmpOf(tx,tz),cN=jfCmpOf(n.x,n.z);if(!cT&&!cN)return null;
+ if(cT&&cT===cN)return{cp:cT,w:[tx,tz]};// same yard: normal plan, minus this TC disc
+ const cp=cN||cT,l=cmpLocal(cp,n.x,n.z),W=(x,z)=>cmpTf(cp,x,z);
+ if(cN){// leaving (target outside, or inside another compound)
+  if(Math.abs(l[0])>1.3||l[1]>-11)return{cp,w:W(0,-12)};return{cp,w:W(0,-26),lane:1}}
+ const tl=cmpLocal(cp,tx,tz),lane=(Math.abs(l[0])<1.7&&l[1]>-27.5&&l[1]<-12)||(Math.abs(l[0])<2.2&&l[1]>-21&&l[1]<-12);
+ if(lane)return{cp,w:tl[1]<-11?[tx,tz]:W(0,-11),lane:1,inbound:1};
+ const w=jfAround(l,[0,-26]);return{cp,w:W(w[0],w[1])}}
+function jfRaidGo(n,r,sp,dt){const cp=r.cp,gd=cp.gd,shut=!!(gd&&!gd.open);if(n.stuck>2)n.stuck=2;// no clearRing hop through a shut gate
+ if(r.lane){const l=cmpLocal(cp,n.x,n.z);n.pth=[];n.pT=null;
+  if(shut&&l[1]>-21.5&&l[1]<-14){// at the shut gate: walk up to its middle, then break it like a door (bash() range is 2.35 m)
+   const f=cmpTf(cp,0,r.inbound?-18.4:-17.1);if(Math.hypot(f[0]-n.x,f[1]-n.z)>.45){const d=stepTo(n,f[0],f[1],sp,dt);if((n._mv||0)>.01)return d}
+   const g=cmpTf(cp,0,-17.75);n.m.rotation.y=Math.atan2(g[0]-n.x,g[1]-n.z);n._mv=0;if(!n.siege)bash(n,(n.heavy?22:15)*dt);return Math.hypot(r.w[0]-n.x,r.w[1]-n.z)}
+  /* === JESSICA FIX START: raider open gate pause === */if(!shut&&Math.abs(l[0])>1.1&&(r.inbound?(l[1]>-22.5&&l[1]<-17.2):(l[1]>-17.6&&l[1]<-12.8))){const c=cmpTf(cp,0,l[1]+(r.inbound?1.2:-1.2));return stepTo(n,c[0],c[1],sp,dt)}/* === JESSICA FIX END === */
+  return stepTo(n,r.w[0],r.w[1],sp,dt)}
+ const sv=n.tgtSettler;n._jfG=1;if(cp.n)n.tgtSettler=cp.n;try{return go(n,r.w[0],r.w[1],sp,dt)}finally{n._jfG=0;n.tgtSettler=sv}}
+// === JESSICA FIX END ===
+function go(n,tx,tz,sp,dt){/* === JESSICA FIX START: raiders route through compound gates === */if(n.k==='raider'&&!n.cmp&&!n._jfG){const jr=jfRaidGate(n,tx,tz);if(jr)return jfRaidGo(n,jr,sp,dt)}/* === JESSICA FIX END === */if(n.cmp){const r=cmpGo(n,tx,tz);if(r){tx=r[0];tz=r[1];const l=cmpLocal(n.cmp,n.x,n.z);if(Math.abs(l[0])<2.4&&l[1]<-10.5&&l[1]>-27.5){n.pth=[];n.pT=null;return stepTo(n,tx,tz,sp,dt)}}}if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
  while(n.pth.length&&Math.hypot(n.pth[0][0]-n.x,n.pth[0][1]-n.z)<.85)n.pth.shift();
  const w=n.pth.length?n.pth[0]:[tx,tz];return stepTo(n,w[0],w[1],sp,dt)}
 function gatherNode(n,kinds,flt){let farm=null,fd=1e9,b=null,bd=1e9;const list=resList();for(let i=0;i<list.length;i++){const o=list[i],k=o.userData.k;if(!kinds.includes(k)||(n.bad&&n.bad.has(o))||(flt&&!flt(o)))continue;const d=Math.hypot(o.position.x-n.x,o.position.z-n.z);if(o.userData.farm===n){if(d<fd){fd=d;farm=o}}else if(!o.userData.farm&&d<230&&d<bd&&!campDanger(n,o.position.x,o.position.z)){bd=d;b=o}}return farm||b}
@@ -55068,7 +55151,7 @@ function toGame(grp){const allc=[],decks=[];
 root.BPAIBase={mkAIBase,toWorld,toGame,gateToGame};
 })(BPJB);
 const BPAIBase=BPJB.BPAIBase;window.BPAIBase=BPAIBase;
-// Blackpine collision fixes by jim (collision_audit.md HIGH items). Export window.BPColFix = {mon(name,grp), recyclerSpot(m,a,ALLC), FIX}.
+// Blackpine collision fixes by jim (collision_audit.md HIGH items; b7 entries = MEDIUM doorway-approach items, build 7 re-audit). Export window.BPColFix = {mon(name,grp), recyclerSpot(m,a,ALLC), FIX}.
 // mon(name,grp) runs on a fresh Jim monument group inside jimMon(), BEFORE the collision adapter / mergeStatic, so mesh moves and
 // collider edits flow through the game's normal path. Idempotent per group (grp.userData._colfix).
 //  * furniture in a doorway lane is MOVED (meshes fully inside the region + the colliders fully inside it), never deleted:
@@ -55082,11 +55165,16 @@ const BPAIBase=BPJB.BPAIBase;window.BPAIBase=BPAIBase;
 // to the nearest spot clearing every ALLC rect by CLR m. Native monuments untouched. Fallback: original spot (logged).
 (function(root){
 const FIX={
- mkGasStation:{move:[{min:[3.75,-.01,9.6],max:[5.25,.82,10.4],dx:-2.3,dz:0,why:'desk blocking back door (5, 11.88)'}]},
- mkMilitaryOutpost:{move:[{min:[-3.75,3.39,.1],max:[-2.25,4.65,.9],dx:1.7,dz:1.1,why:'upper desk blocking inner door (-3.5, F1, -0.93)'}]},
- mkWarehouse:{move:[{min:[8.7,-.01,-4.8],max:[10.3,1.75,-3.2],dx:0,dz:-2.4,why:'crate stack in the side door lane (11.88, -4) (audit medium)'}]},
- mkTradingPost:{add:[{min:[7.15,0,.85],max:[7.85,.7,1.55],type:'wall',why:'deco crate, no collider'},{min:[3.6,0,12.4],max:[4.4,.8,13.2],type:'wall',why:'deco crate, no collider'}]},
- mkShopRow:{add:[{min:[-3.79,3.4,6.43],max:[-3.47,3.7,6.74],type:'floor',why:'0.3 m prop, step-up top'}]},
+ mkGasStation:{move:[{min:[3.75,-.01,9.6],max:[5.25,.82,10.4],dx:-2.3,dz:0,why:'desk blocking back door (5, 11.88)'},
+  {min:[-6.6,-.01,5.7],max:[-1.9,1.7,6.5],dx:3.2,dz:0,why:'b7: front shop shelf 1.2 m inside the storage door (-4, 7.57) -> slid east, clear of the lane'}]},
+ mkMilitaryOutpost:{move:[{min:[-3.75,3.39,.1],max:[-2.25,4.65,.9],dx:1.7,dz:1.1,why:'upper desk blocking inner door (-3.5, F1, -0.93)'},
+  {min:[1.9,3.39,.9],max:[4.6,4.4,2.6],dx:0,dz:.3,why:'b7: upper map table 1.9 m behind the inner door (3.5, F1, -0.93) -> 0.3 m back'}]},
+ mkWarehouse:{move:[{min:[8.7,-.01,-4.8],max:[10.3,1.75,-3.2],dx:0,dz:-2.4,why:'crate stack in the side door lane (11.88, -4) (audit medium)'},
+  {min:[-9.65,-.01,-6.75],max:[-2.85,4.65,-5.45],dx:0,dz:1.3,why:'b7: pallet rack 1.3 m inside the front side door (-7, -7.87) -> 1.3 m deeper (1.7 m aisle left)'},
+  {min:[-6.2,-.01,1.95],max:[-5.8,3.25,2.35],dx:-.9,dz:0,why:'b7: mezzanine post 1.9 m in front of the ground office door (-6, 4.08) -> 0.9 m west'}]},
+ mkLumberMill:{move:[{min:[-6.2,-.01,1.95],max:[-5.8,3.25,2.35],dx:-.9,dz:0,why:'b7: mezzanine post 1.9 m in front of the ground office door (-6, 4.08) -> 0.9 m west'}]},
+ mkTradingPost:{move:[{min:[1.9,-.01,10.2],max:[7.1,2.3,10.95],dx:-2.55,dz:0,why:'b7: storage shelf 1.2 m behind the stall-room door (5, 9.07) -> west, between the two door lanes'}],add:[{min:[7.15,0,.85],max:[7.85,.7,1.55],type:'wall',why:'deco crate, no collider'},{min:[3.6,0,12.4],max:[4.4,.8,13.2],type:'wall',why:'deco crate, no collider'}]},
+ mkShopRow:{move:[-10,0,10].map(cx=>({min:[cx+.95,-.01,5.45],max:[cx+4.05,1.6,6.15],dx:0,dz:-.7,why:'b7: shop counter 1.4 m inside the back-room door ('+(cx+3)+', 7.57) -> 0.7 m toward the front'})),add:[{min:[-3.79,3.4,6.43],max:[-3.47,3.7,6.74],type:'floor',why:'0.3 m prop, step-up top'}]},
  mkRadioTower:{add:[{min:[11.4,0,2.38],max:[11.68,.3,2.69],type:'floor',why:'0.3 m prop, step-up top'}]}};
 const inside=(b,r)=>b.min[0]>=r.min[0]&&b.min[1]>=r.min[1]&&b.min[2]>=r.min[2]&&b.max[0]<=r.max[0]&&b.max[1]<=r.max[1]&&b.max[2]<=r.max[2];
 function meshBox(m){const g=m.geometry;if(!g.boundingBox)g.computeBoundingBox();const bb=g.boundingBox.clone().applyMatrix4(m.matrixWorld);return{min:bb.min.toArray(),max:bb.max.toArray()}}
@@ -55376,7 +55464,7 @@ function jpCp(a,out,vo,k){const n=a.count;if(!a.isInterleavedBufferAttribute&&a.
  for(let i=0;i<n;i++){out[(vo+i)*k]=a.getX(i);out[(vo+i)*k+1]=a.getY(i);if(k>2)out[(vo+i)*k+2]=a.getZ(i)}}
 function jpBuildMid(man){man.updateMatrixWorld(true);const pv=pivots(man),bones=[],bi=new Map(),grp=new Map(),M=new T.Matrix4(),NM=new T.Matrix3(),inv=new T.Matrix4(),v=new T.Vector3();
  man.traverse(m=>{if(!m.isMesh||m.userData.bpLod||!shown(m,man))return;const mt=m.material,g=m.geometry;let p=m.parent;while(p&&!pv.has(p))p=p.parent;
-  const ok=p&&!m.isSkinnedMesh&&!m.isInstancedMesh&&!Array.isArray(mt)&&mt&&!mt.transparent&&!mt.skinning&&!mt.morphTargets&&g&&g.attributes.position&&g.attributes.normal&&!(g.morphAttributes&&Object.keys(g.morphAttributes).length)&&(!mt.vertexColors||g.attributes.color)&&(!mt.map||g.attributes.uv)&&m.layers.mask===1;
+  const ok=p&&!m.isSkinnedMesh&&!m.isInstancedMesh&&!Array.isArray(mt)&&mt&&!mt.transparent&&!mt.skinning&&!mt.morphTargets&&g&&g.attributes.position&&g.attributes.normal&&!(g.morphAttributes&&Object.keys(g.morphAttributes).length)&&(!mt.vertexColors||g.attributes.color)&&(!mt.map||g.attributes.uv)&&(m.userData._lm!==undefined?m.userData._lm:m.layers.mask)===1;/* round 3 fix: test the mesh's own layer mask, not the one setLayers parked it on (a man first seen far away is at 'ultra' with every high mesh on mask 0, which made the mid level merge nothing) */
   if(!ok){m.userData._jpMidKeep=1;return}
   if(!bi.has(p)){bi.set(p,bones.length);bones.push(p)}
   const k=mt.uuid+'|'+(m.castShadow?1:0)+(m.receiveShadow?1:0)+'|'+m.renderOrder;let e=grp.get(k);if(!e)grp.set(k,e={mt,cast:m.castShadow,recv:m.receiveShadow,ro:m.renderOrder,ms:[],nv:0,ni:0});
@@ -55466,7 +55554,7 @@ function update(man,camPos){const L=man.userData.bpLOD;if(!L)return null;if(++L.
  if(want==='high'||L.built[want])show(man,want);else enqueue(man,want);return L.level}
 // one call per frame: update every man, then run queued builds within BUDGET (always at least one build if any are queued)
 function tick(cam,budget){/* === JESSICA PERF START: no alloc === */const cp=cam.getWorldPosition?cam.getWorldPosition(tick._v||(tick._v=new T.Vector3())):cam.position;/* === JESSICA PERF END === */for(const m of MEN){if(!m.parent){MEN.delete(m);continue}update(m,cp)}
- /* === JESSICA PERF START: mid material sync === */jpMidSync();/* === JESSICA PERF END === */const B=budget||BUDGET,t0=now();let n=0;
+ /* === JESSICA PERF START: mid material sync === */jpMidSync();/* === JESSICA PERF END === *//* === JESSICA PERF START: build queue: nearest level first (mid, then low, then ultra; FIFO within a level) === */if(Q.length>1){const jr={mid:0,low:1,ultra:2};let so=true;for(let i=1;i<Q.length;i++)if(jr[Q[i-1][1]]>jr[Q[i][1]]){so=false;break}if(!so){const a=Q.map((q,i)=>[q,i]);a.sort((x,y)=>(jr[x[0][1]]-jr[y[0][1]])||(x[1]-y[1]));for(let i=0;i<a.length;i++)Q[i]=a[i][0]}}/* === JESSICA PERF END === */const B=budget||BUDGET,t0=now();let n=0;
  // a further build only starts if the measured cost of that level (running average) still fits in B.ms; the first one always runs
  while(Q.length&&n<B.maxBuilds){const[m,l]=Q[0];if(n>0&&now()-t0+COST[l]>B.ms)break;Q.shift();QS.delete(m.uuid+l);const L=m.userData.bpLOD;if(!L||!m.parent||L.want!==l)continue;
   const tb=now(),k=build(m,l);if(k){COST[l]=COST[l]*.7+(now()-tb)*.3;n++}if(L.built[l])show(m,l)}
@@ -55502,9 +55590,9 @@ function cmpSite(sx,sz){for(let r=0;r<16;r++)for(let k=0;k<10;k++){const a=k*.62
   if(inRiver(x,z,CMP_R+4)||PONDS.some(q=>Math.hypot(x-q.x,z-q.z)<q.r+CMP_R))continue;
   let lo=1e9,hi=-1e9,sum=0,n=0,road=false;for(let i=-4;i<=4;i++)for(let j=-4;j<=4;j++){const px=x+i*7.5,pz=z+j*7.5,h=H(px,pz);lo=Math.min(lo,h);hi=Math.max(hi,h);if(Math.abs(i)<=2&&Math.abs(j)<=2){sum+=h;n++}if(!road&&nearAnyRoad(px,pz))road=true}
   if(road||lo<1||hi>8.4||hi-lo>4.6)continue;return{x,z,y:Math.max(lo+.4,sum/n)}}return null}
-function cmpBuild(cp){if(cp.g)scene.remove(cp.g);const src=BPAIBase.mkAIBase({tier:cp.tier,oilSide:cp.oil}),gt=src.userData.gate,hinges=gt.leaves.map(l=>l.h);for(const h of hinges)src.remove(h);
+function cmpBuild(cp){const _og=cp.g;if(cp.g)scene.remove(cp.g);const src=BPAIBase.mkAIBase({tier:cp.tier,oilSide:cp.oil}),gt=src.userData.gate,hinges=gt.leaves.map(l=>l.h);for(const h of hinges)src.remove(h);
  const rf=window.BPRoofs?BPRoofs.strip(src):null;const g=bakeGroup(src);g.userData={k:'aibase'};for(const h of hinges)g.add(h);g.position.set(cp.x,cp.y,cp.z);g.rotation.y=cp.ry;g.traverse(c=>{if(c.isMesh){c.castShadow=c.receiveShadow=true}});scene.add(g);if(window.BPMonLOD)BPMonLOD.wrap(g);if(rf)g.add(rf);
- if(cp.gate){gt.open=cp.gate.open;gt.set(cp.gate.k)}cp.gate=gt;cp.g=g;cp.ud=src.userData;cp.src=src}
+ if(cp.gate){gt.open=cp.gate.open;gt.set(cp.gate.k)}cp.gate=gt;cp.g=g;cp.ud=src.userData;cp.src=src;/*will:cmpDispose*/if(_og&&_og!==g){const keep=new Set();g.traverse(c=>{if(c.geometry)keep.add(c.geometry)});for(const o of CMPS)if(o!==cp&&o.g)o.g.traverse(c=>{if(c.geometry)keep.add(c.geometry)});const gone=new Set();_og.traverse(c=>{if(c.geometry&&!keep.has(c.geometry))gone.add(c.geometry)});for(const q of gone)q.dispose()}}
 function placeCompound(n,sx,sz){const st=cmpSite(sx,sz);if(!st)return false;
  const ry=(Math.floor(hash(st.x*.3,st.z*.7)*4)%4)*Math.PI/2,cp={n,x:st.x,z:st.z,y:st.y,ry,tier:1,oil:hash(st.z,st.x)<.5?'east':'west',rigs:{},trees:[],gateT:0};
  flattenArea(st.x,st.z,st.y,21,CMP_R);flushTerrain();clearNodes(st.x,st.z,CMP_R);cmpBuild(cp);const U=cp.ud;
@@ -56049,8 +56137,9 @@ const RAIDSZ={};
 function raidSize(N){if(RAIDSZ[N]!=null)return RAIDSZ[N];let v;if(N<=1)v=3+(Math.random()*4|0);else v=raidSize(N-1)+(N<=5?1+(Math.random()*5|0):10);RAIDSZ[N]=v;return v}
 function raidCount(){return Math.max(2,Math.min(DF.cap,Math.round(raidSize(raidNo())*DF.raidMul)))}
 function itId(it){for(const k in ITEMS)if(ITEMS[k]===it)return k;return ''}
-function noteBuild(it,g,npc){if(REPLAY||npc)return;const id=itId(it);if(!id)return;BLOG.push({id,g:{x:+g.x,y:+g.y,z:+g.z,rot:g.rot||0,k:g.k,p:g.p,dx:g.dx||0,dz:g.dz||0,cx:g.cx,cz:g.cz}});if(BLOG.length>360)BLOG.shift();RT.build+=1;bumpHeat(.05)}
+function noteBuild(it,g,npc){if(REPLAY||npc||g.upDoor)return;const id=itId(it);if(!id)return;BLOG.push({id,g:{x:+g.x,y:+g.y,z:+g.z,rot:g.rot||0,k:g.k,p:g.p,dx:g.dx||0,dz:g.dz||0,cx:g.cx,cz:g.cz}});if(BLOG.length>360)BLOG.shift();RT.build+=1;bumpHeat(.05)}
 function replayBuilds(list){REPLAY=1;for(const rec of list||[]){const it=ITEMS[rec.id];if(!it)continue;try{construct(it,rec.g,0)}catch(err){}}REPLAY=0}
+/*fred_save_patch v2*/function fredDoorRec(d){for(const e of BLOG){const it=e&&ITEMS[e.id];if(it&&it.dv&&isDoor(it.dv)&&e.g&&Math.hypot(e.g.x-d.x,e.g.z-d.z)<.8)return e}return null}function fredDoorLog(d,nt){const e=fredDoorRec(d);if(e){e.id=nt;return}let k;for(const [kk,w] of WL)if(w&&w.doorDev===d){k=kk;break}const r=d.rot||0;BLOG.push({id:nt,g:{x:+d.x,y:+d.y,z:+d.z,rot:r,k,p:undefined,dx:0,dz:0,cx:d.x+.6*Math.cos(r),cz:d.z-.6*Math.sin(r)}})}function fredDoorAt(rec){if(!rec||!isDoor(rec.t))return null;const d=devs.find(q=>q.owner==='you'&&!q._gone&&isDoor(q.t)&&Math.hypot(q.x-rec.x,q.z-rec.z)<.8);if(!d)return null;if(DORD.indexOf(rec.t)>DORD.indexOf(d.t))upgradeDoor(d,rec.t,true);return d}function fredPieceHp(){const out=[],seen=new Set();for(const c of ALLC){if(!c.piece||c.owner!=='you'||!c.wk||!c.maxHp||!(c.hp>0)||c.hp>=c.maxHp||seen.has(c.mesh||c))continue;seen.add(c.mesh||c);out.push([c.wk,Math.round(c.hp*10)/10])}return out}function fredRestoreHp(list){if(!Array.isArray(list))return;for(const q of list){if(!Array.isArray(q)||typeof q[0]!=='string')continue;const hp=+q[1];if(!isFinite(hp)||hp<=0)continue;const rs=ALLC.filter(c=>c.piece&&c.owner==='you'&&c.wk===q[0]&&c.maxHp);if(!rs.length)continue;for(const c of rs){c.hp=Math.min(c.maxHp,hp)}wallDmg(rs[0],0)}}function fredSameDev(dv,x,z,t,qx,qz){return (dv===t||(isDoor(dv)&&isDoor(t)))&&Math.hypot(x-qx,z-qz)<.8}function fredDropPiece(k){for(let i=BLOG.length-1;i>=0;i--){const e=BLOG[i],it=e&&ITEMS[e.id];if(it&&it.bd&&e.g&&e.g.k===k)BLOG.splice(i,1)}}function fredDropDev(d){for(let i=BLOG.length-1;i>=0;i--){const e=BLOG[i],it=e&&ITEMS[e.id];if(it&&it.dv&&!it.bd&&e.g&&fredSameDev(it.dv,e.g.x,e.g.z,d.t,d.x,d.z))BLOG.splice(i,1)}}function fredFreshBuildState(){BLOG.length=0}function fredReplay(s){let list=(Array.isArray(s.blog)?s.blog:[]).filter(e=>e&&typeof e.id==='string'&&e.g&&typeof e.g==='object').map(e=>({...e,g:{...e.g}}));if(s.meta&&typeof s.meta==='object'&&'builds' in s.meta&&Array.isArray(s.devices)){const recs=s.devices.filter(r=>r&&typeof r.t==='string');list=list.filter(e=>{const it=ITEMS[e.id];if(!it||!it.dv||it.bd)return true;return recs.some(r=>fredSameDev(it.dv,e.g.x,e.g.z,r.t,r.x,r.z))})}BLOG.length=0;replayBuilds(list);const doorK=new Set();for(const e of list){const it=ITEMS[e.id];if(it&&it.dv&&isDoor(it.dv)&&e.g.k!=null){if(doorK.has(e.g.k))continue;doorK.add(e.g.k);const w=WL.get(e.g.k);if(w&&w.doorDev&&w.doorDev.owner==='you'&&ITEMS[w.doorDev.t])e.id=w.doorDev.t}BLOG.push(e)}while(BLOG.length>360)BLOG.shift();fredRestoreHp(s.ph)}
 function blip(freq,dur,type){try{actx=actx||new AudioContext();if(actx.state==='suspended')actx.resume();const o=actx.createOscillator(),g=actx.createGain();o.type=type||'sawtooth';o.frequency.value=freq;g.gain.setValueAtTime(.05,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+dur);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+dur)}catch(e){}}
 function ratingUI(c){const d=document.createElement('div');d.id='det';const rows=[['Scavenge',RT.scavenge],['Hunt',RT.hunt],['Build',RT.build],['Blood',RT.blood]];d.innerHTML='<b>Island rating</b><p>Loot, kills and building are remembered, the way a wipe remembers you. Heat cools if the days stay quiet, and it decides how mean the tenth-night crew is.</p>'+rows.map(r=>'<div class="srow"><span>'+r[0]+'</span><b>'+r[1].toFixed(1)+'</b></div>').join('')+'<div class="srow"><span>Rating</span><b>'+rate100()+' · '+RANKS[rateStars()]+'</b></div><div class="srow"><span>Heat</span><b>'+heatStars()+' / 5</b></div><div class="srow"><span>Difficulty</span><b>'+DF.n+'</b></div><div class="srow"><span>Next raid</span><b>'+(daysToRaid()?('in '+daysToRaid()+' days'):'tonight')+'</b></div>';c.appendChild(d)}
 function paintRate(){const st=rateStars(),hs=heatStars(),dr=daysToRaid(),live=EN.filter(e=>e.siege&&e.hp>0).length;const key=st+'|'+hs+'|'+dr+'|'+raidPhase+'|'+live+'|'+(age>16?1:0)+'|'+DIFFK;if(key===rateKey)return;rateKey=key;const el=$('rate');if(el)el.innerHTML='<b>'+RANKS[st]+'</b><span class="pips">'+( '●'.repeat(st)+'○'.repeat(5-st))+'</span><small>Rating '+rate100()+' · Heat '+hs+' · '+(dr?('raid in '+dr+'d'):'raid tonight')+' · '+DF.n+'</small>';const b=$('raid');if(!b)return;if(raidPhase==='warning'){b.style.display='block';b.className='warn';b.textContent='Raid tonight — they move at dark'}else if(raidPhase==='active'||raidPhase==='retreat'){b.style.display='block';b.className=raidPhase==='active'?'hot':'warn';b.textContent=raidPhase==='active'?('Raid in progress · '+live+' still out'):('Falling back · '+live+' left')}else b.style.display='none';const h=$('hint');if(h&&age>16)h.style.display='none'}
@@ -56109,8 +56198,8 @@ function wbHud(){const el=$('wbar');if(!el)return;let o=null;const now=performan
  const h=f.nm+'|'+Math.ceil(hp)+'|'+Math.round(f.mx);if(h===WB.h)return;WB.h=h;
  el.innerHTML='<b>'+f.nm+'</b><span>'+(hp<=0?'Destroyed':Math.ceil(hp)+' / '+Math.round(f.mx))+'</span><div class="tr"><i style="width:'+(r*100).toFixed(1)+'%"></i></div>';
  el.dataset.s=st;el.classList.add('on')}
-function smashPiece(c,quiet){const mesh=c.mesh,wk=c.wk;if(mesh){for(let i=ALLC.length-1;i>=0;i--)if(ALLC[i].mesh===mesh)ALLC.splice(i,1);scene.remove(mesh)}else{const i=ALLC.indexOf(c);if(i>=0)ALLC.splice(i,1)}if(wk){const w=WL.get(wk);if(w&&w.doorDev)killDev(w.doorDev);if(w&&w.winDev)killDev(w.winDev);WL.delete(wk)}if(!quiet)say('A wall comes down.')}
-function killDev(d){if(!d||d._gone)return;d._gone=1;if(d.l)d.l.intensity=0;if(d.m){scene.remove(d.m);const ti=things.indexOf(d.m);if(ti>=0)things.splice(ti,1)}
+function smashPiece(c,quiet){const mesh=c.mesh,wk=c.wk;if(wk&&c.owner==='you')fredDropPiece(wk);if(mesh){for(let i=ALLC.length-1;i>=0;i--)if(ALLC[i].mesh===mesh)ALLC.splice(i,1);scene.remove(mesh)}else{const i=ALLC.indexOf(c);if(i>=0)ALLC.splice(i,1)}if(wk){const w=WL.get(wk);if(w&&w.doorDev)killDev(w.doorDev);if(w&&w.winDev)killDev(w.winDev);WL.delete(wk)}if(!quiet)say('A wall comes down.')}
+function killDev(d){if(!d||d._gone)return;if(d.owner==='you')fredDropDev(d);d._gone=1;if(d.l)d.l.intensity=0;if(d.m){scene.remove(d.m);const ti=things.indexOf(d.m);if(ti>=0)things.splice(ti,1)}
  for(let i=ALLC.length-1;i>=0;i--)if(ALLC[i].d===d)ALLC.splice(i,1);
  for(const [,v] of WL){if(v.doorDev===d){v.door=0;v.doorDev=null}if(v.winDev===d){v.win=0;v.winDev=null}}
  for(let i=wires.length-1;i>=0;i--)if(wires[i].a===d||wires[i].b===d){scene.remove(wires[i].l);wires.splice(i,1)}
@@ -56190,7 +56279,7 @@ function findCoverSpot(e,fromX,fromZ){
   const cx=ox+ux*1.4,cz=oz+uz*1.4;if(H(cx,cz)<.7||blkAt(e,cx,cz))continue;
   if(cd<bs){bs=cd;best=[cx,cz]}}
  return best}
-function tacticalMove(e,tx,tz,dp,pref,speed,dt){
+function tacticalMove(e,tx,tz,dp,pref,speed,dt){/* === JESSICA FIX START: raider open gate pause === */if(e.k==='raider'&&!e.camp&&typeof CMPS!=='undefined'){for(let i=0;i<CMPS.length;i++){const cp=CMPS[i];if(!cp.gd||!cp.gd.open)continue;const l=cmpLocal(cp,e.x,e.z);if(Math.abs(l[0])>3.5||l[1]<-27||l[1]>-12.5)continue;if(!cmpInside(cp,tx,tz)&&l[1]<=-17.6)continue;go(e,tx,tz,speed,dt);return}}/* === JESSICA FIX END === */
  const dx=tx-e.x,dz=tz-e.z,d=dp||Math.hypot(dx,dz)||1,nx=dx/d,nz=dz/d,px=-nz,pz=nx;
  e.stT=(e.stT||0)-dt;if(e.stT<=0){e.stT=1.1+Math.random()*1.4;e.strafeDir=(Math.random()<.5?1:-1)*(e.role==='flanker'?1.35:1)}
  const sd=e.strafeDir||1;
@@ -56316,7 +56405,7 @@ function snapshot(customName){
   v:1,slotId,name:claimName,ts:nowTs,meta,gather:GATHER,diff:DIFFK,
   bp:[...BPK],as:ammoSel,S:{...S},t,days,pace,yaw,pitch,p:{x:P.x,y:P.y,z:P.z},
   cr:cropSave(),pl:PLANTERS.map(q=>[Math.round(q.x*100)/100,Math.round(q.y*100)/100,Math.round(q.z*100)/100,q.rot]),slots,pack:PACK,packSlots:Array.from({length:12},(_,k)=>serSlot(SL[PX+k])),eq:{head:EQ.head,chest:EQ.chest,legs:EQ.legs,feet:EQ.feet},cl:{head:CL.head,chest:CL.chest,legs:CL.legs,feet:CL.feet},rt:{...RT},
-  claim:CLAIM?{x:CLAIM.x,z:CLAIM.z,kind:CLAIM.kind}:null,blog:BLOG,
+  claim:CLAIM?{x:CLAIM.x,z:CLAIM.z,kind:CLAIM.kind}:null,blog:BLOG,ph:fredPieceHp(),
   raidWarned,raidSpawned,rs:{...RAIDSZ},wx:{k:wx,t:wxT},
   mk:MK.map(m=>({x:Math.round(m.x*10)/10,z:Math.round(m.z*10)/10,n:m.n,c:m.c})),
   fires:fires.map(f=>({x:f.x,z:f.z,life:f.life})),
@@ -56340,9 +56429,9 @@ function applySave(s){if(!s||s.v!==1||!s.p)return false;
  if(s.rt)Object.assign(RT,s.rt);raidWarned=s.raidWarned??-1;raidSpawned=s.raidSpawned??-1;
  if(s.rs)Object.assign(RAIDSZ,s.rs);if(s.wx&&WXNAME[s.wx.k]){wx=s.wx.k;wxT=s.wx.t||70}
  if(s.claim)placeClaimAt(s.claim.x,s.claim.z,true,s.claim.kind);
- replayBuilds(s.blog);flushTerrain();clearPlantedCrops();clearPlanters();if(Array.isArray(s.pl))for(const q of s.pl)if(Array.isArray(q)&&q.length>=4)mkPlanterAt(+q[0],+q[1],+q[2],q[3]?1:0);if(Array.isArray(s.cr))for(const q of s.cr)cropRestore(q);
+ fredReplay(s);flushTerrain();clearPlantedCrops();clearPlanters();if(Array.isArray(s.pl))for(const q of s.pl)if(Array.isArray(q)&&q.length>=4)mkPlanterAt(+q[0],+q[1],+q[2],q[3]?1:0);if(Array.isArray(s.cr))for(const q of s.cr)cropRestore(q);
  for(const f of s.fires||[])lightFire(f.x,f.z,f.life||120);
- for(const rec of s.devices||[]){const d=devAt(rec);if(!d)continue;if(Array.isArray(rec.sl))d.sl=rec.sl.map(x=>x?{...x,mods:x.mods&&typeof x.mods==='object'?(Array.isArray(x.mods)?[...x.mods]:{...x.mods}):undefined,att:x.att?{...x.att}:undefined}:null);if(rec.hp!=null)d.hp=rec.hp;if(rec.water!=null)d.water=rec.water;d.burn=rec.burn||0;d.ch=rec.ch||0;d.on=rec.on!==false;d.open=!!rec.open}
+ for(const rec of s.devices||[]){const d=devAt(rec)||fredDoorAt(rec);if(!d)continue;if(Array.isArray(rec.sl))d.sl=rec.sl.map(x=>x?{...x,mods:x.mods&&typeof x.mods==='object'?(Array.isArray(x.mods)?[...x.mods]:{...x.mods}):undefined,att:x.att?{...x.att}:undefined}:null);if(rec.hp!=null)d.hp=rec.hp;if(rec.water!=null)d.water=rec.water;d.burn=rec.burn||0;d.ch=rec.ch||0;d.on=rec.on!==false;d.open=!!rec.open}
  for(const pair of s.wires||[]){const A=devAt(pair[0]),B=devAt(pair[1]);if(A&&B&&A!==B)addWire(A,B)}
  vmId=null;syncVM();render();say(claimName+' restored · Day '+(days+1)+' · Rating '+rate100()+'.');return true}
 function placeClaimAt(x,z,quiet,kind){const y=Math.max(G(x,z),H(x,z),.2),isBed=kind==='bed';if(claimMesh){scene.remove(claimMesh);claimMesh=null}const b=new MB();
@@ -57156,7 +57245,7 @@ function shack(){const s=site(3,2);if(!s)return;mon('Roadside Shack',s.cx,s.cz,3
  K.roof(-1.6,0,5.2,5,2.95,MC.corr);b.cyl(.15,.15,1.2,8,-3,3.5,-1.4,MC.corrD);for(const x of[-2.14,-1.06])b.box(.12,2.5,.4,x,1.25,2.2,MC.blk);b.box(1.2,.2,.4,-1.6,2.6,2.2,MC.blk);
  K.sign(-3,2,2.45,1.2,.5,MC.red,true);K.win(.83,1.7,0,1.2,.8,false);k.solid(-1.6,-1.5,2.6,.5,1.8,MC.woodD);
  K.crate(1,-2.9,1,0);K.crate(1,-.7,.9,0);K.barrel(2.2,-1.8,MC.rust);K.barrel(2.4,2.2,MC.red);K.tires(3.9,2.3);K.mast(4.2,-2.4,4.5)})}
-function satDish(){const s=site(5,5);if(!s)return;mon('Satellite Dish',s.cx,s.cz,5,5,s.y,k=>{const K=monKit(k),b=k.b;k.pad(5.4,-5.4);
+function satDish(){const s=site(5,5);if(!s)return;mon('Satellite Dish',s.cx,s.cz,5,5,s.y,k=>{const K=monKit(k),b=k.b;/* === JESSICA FIX START: recycler pad out of the generator container === */k.pad(-4.8,-.4);/* fixed corner (5.4,-5.4) sat inside the K.container at (4.4,-4.2); the SE pocket south of the dish is sealed, so the nearest clear reachable spot is the west lane between the bunker and the dish pedestal */ /* === JESSICA FIX END === */
  // Perimeter security walls with barbed wire and entry gates
  const P=[[-7.2,-7.2,7.2,-6.8],[-7.2,-7.2,-6.8,7.2],[6.8,-7.2,7.2,7.2],[-7.2,6.8,-2.2,7.2],[2.2,6.8,7.2,7.2]];
  for(const q of P){K.wall(q[0],q[1],q[2],q[3],2.2,MC.conc);K.wire(q[0],q[1],q[2],q[3],2.26)}
@@ -57181,7 +57270,7 @@ function satDish(){const s=site(5,5);if(!s)return;mon('Satellite Dish',s.cx,s.cz
  K.container(4.4,-4.2,false,MC.olive);
  K.crate(3,-3.8,-3.8,0);K.crate(2,0,4.2,0);K.crate(2,4.4,2.2,1.57);
  K.barrel(2.8,4.6,MC.red);K.barrel(3.6,4.8,MC.blue);K.barrel(-3.2,4.8,MC.rust);K.tires(-5.4,4.2);K.mast(-6.0,5.8,6.5);K.mast(6.0,5.8,6.5)})}
-function oilDepot(){const s=site(5,4);if(!s)return;mon('Oil Depot',s.cx,s.cz,5,4,s.y,k=>{const K=monKit(k),b=k.b;k.pad(5.4,-4.2);
+function oilDepot(){const s=site(5,4);if(!s)return;mon('Oil Depot',s.cx,s.cz,5,4,s.y,k=>{const K=monKit(k),b=k.b;/* === JESSICA FIX START: recycler pad out of the pump house === */k.pad(.3,-4.6);/* fixed corner (5.4,-4.2) sat across the pump house south and east walls; moved to the open apron between the berm and the pump house */ /* === JESSICA FIX END === */
  // Containment berm & twin mammoth crude-oil storage silos (west side)
  k.solid(-3.2,-.8,7.4,4.6,.42,MC.concD);
  for(const sx of[-5.0,-1.4]){
@@ -57471,7 +57560,7 @@ function raiderArmory(){
  const s=campSite(6,5);if(!s)return;
  const rCount=6+((RCR()*3)|0); // 6 to 8 Raiders
  raiderMon('Raider Siege Armory','armory',s.cx,s.cz,6,5,s.y,rCount,k=>{
-  const K=monKit(k),R=rcKit(k,K),b=k.b;k.pad(6.6,-5.2);
+  const K=monKit(k),R=rcKit(k,K),b=k.b;/* === JESSICA FIX START: recycler pad out from under the overwatch tower === */k.pad(2.8,-5.2);/* fixed corner (6.6,-5.2) sat under R.tower(5.8,-4.6) with a tower leg through the recycler; moved west to the clear strip between the tier-2 crate and the tower, off the garrison spawn and patrol lines */ /* === JESSICA FIX END === */
   // Blast wall perimeter with barbed wire & jersey roadblocks
   const P=[[-8.8,-7.2,8.8,-6.8],[-8.8,-7.2,-8.4,7.2],[8.4,-7.2,8.8,7.2],[-8.8,6.8,-2.6,7.2],[2.6,6.8,8.8,7.2]];
   for(const q of P){K.wall(q[0],q[1],q[2],q[3],2.4,MC.corrD);K.wire(q[0],q[1],q[2],q[3],2.46)}
@@ -58577,18 +58666,24 @@ function mkBarrel(kind, variant){variant=variant||'drum';const g=new T.Group(),b
   else{add(gBarHoop,mHoopB,0,h*.2,0).scale.set(hs,1,hs);add(gBarHoop,mHoopB,0,h*.78,0).scale.set(hs,1,hs);add(gBarBand,mBand.brown,0,h*.48,0).scale.set(hs*.96,.7,hs*.96);add(gBarHoop,mHoopB,0,h-.05,0).scale.set(hs*.72,.5,hs*.72)}
   g.userData.rad=kind==='oil'?.66:.56}
  g.userData.kind=kind;g.userData.variant=variant;g.userData.uses=1;return g}
+/*jim-nature7 node merge*/function jimNodeMerge(g){const by=new Map();for(const m of[...g.children]){if(!m.isMesh)continue;let a=by.get(m.material);if(!a)by.set(m.material,a=[]);a.push(m)}
+ for(const[mat,ms]of by){if(ms.length<2)continue;const P=[],N=[],U=[];let uv=ms.every(m=>m.geometry.attributes.uv);const v=new T.Vector3(),nm=new T.Matrix3();
+  for(const m of ms){m.updateMatrix();const q=m.geometry.index?m.geometry.toNonIndexed():m.geometry,pa=q.attributes.position,na=q.attributes.normal,ua=q.attributes.uv;nm.getNormalMatrix(m.matrix);
+   for(let i=0;i<pa.count;i++){v.fromBufferAttribute(pa,i).applyMatrix4(m.matrix);P.push(v.x,v.y,v.z);v.fromBufferAttribute(na,i).applyMatrix3(nm).normalize();N.push(v.x,v.y,v.z);if(uv)U.push(ua.getX(i),ua.getY(i))}g.remove(m)}
+  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(P,3));geo.setAttribute('normal',new T.Float32BufferAttribute(N,3));if(uv)geo.setAttribute('uv',new T.Float32BufferAttribute(U,2));geo.computeBoundingSphere();
+  const mm=new T.Mesh(geo,mat);mm.castShadow=ms[0].castShadow;mm.receiveShadow=ms[0].receiveShadow;g.add(mm)}return g} // one mesh per material; root transform/userData untouched
 function mkSulfurNode(){const g=new T.Group();
  const base=new T.Mesh(gRock,mRock);base.scale.set(1.68,.32,1.58);base.position.y=0;g.add(base);
  const r=new T.Mesh(gRock,mRock2);r.scale.set(1.38,.66,1.28);r.position.y=.12;g.add(r);
  const r2=new T.Mesh(gRock,mRock);r2.scale.set(.86,.52,.82);r2.position.set(.26,.18,-.14);g.add(r2);
  for(let i=0;i<11;i++){const a=i*.57+(Math.random()-.5)*.28,rad=.08+Math.random()*.42,c=new T.Mesh(gCryN,i%2?mSulN:mSulN2);c.position.set(Math.cos(a)*rad,.34+Math.random()*.16,Math.sin(a)*rad);c.rotation.set((Math.random()-.5)*.52,Math.random()*6,(Math.random()-.5)*.52);c.scale.setScalar(.95+Math.random()*.85);g.add(c)}
- g.scale.setScalar(1.32);g.userData.uses=2;g.userData.rad=.95;return g}
+ jimNodeMerge(g);/*jim-nature7 sulfur*/g.scale.setScalar(1.32);g.userData.uses=2;g.userData.rad=.95;return g}
 function mkOreNode(){const g=new T.Group();
  const base=new T.Mesh(gRock,mRock2);base.scale.set(1.32,.28,1.24);base.position.y=0;g.add(base);
  const r=new T.Mesh(gRock,mOreR);r.scale.set(1.02,.62,.92);r.position.y=.10;r.rotation.y=Math.random()*3;g.add(r);
  const r2=new T.Mesh(gRock,mOreR);r2.scale.set(.68,.48,.64);r2.position.set(-.22,.14,.16);g.add(r2);
  for(let i=0;i<9;i++){const a=i*.7+Math.random()*.25,rad=.06+Math.random()*.36,c=new T.Mesh(gOreN,mOreN);c.position.set(Math.cos(a)*rad,.22+Math.random()*.18,Math.sin(a)*rad);c.rotation.set(Math.random()*2,Math.random()*2,Math.random()*2);c.scale.set(1.1,.65+Math.random()*.5,1.0);g.add(c)}
- g.scale.setScalar(1.55);g.userData.uses=2;g.userData.rad=.88;return g}
+ jimNodeMerge(g);/*jim-nature7 ore*/g.scale.setScalar(1.55);g.userData.uses=2;g.userData.rad=.88;return g}
 function resamplePath(path,step){if(!path||path.length<2)return path?path.slice():[];const out=[Object.assign({},path[0])];let acc=0;for(let i=1;i<path.length;i++){const p0=path[i-1],p1=path[i];if(p0._onBridge||p1._onBridge||p0._bridgeEnd||p1._bridgeEnd){out.push(Object.assign({},p1));acc=0;continue}let x0=p0.x,z0=p0.z,x1=p1.x,z1=p1.z,seg=Math.hypot(x1-x0,z1-z0);if(seg<1e-4)continue;while(acc+seg>=step){const t=(step-acc)/Math.max(seg,1e-4);x0+=(x1-x0)*t;z0+=(z1-z0)*t;out.push({x:x0,z:z0});seg=Math.hypot(x1-x0,z1-z0);acc=0;if(out.length>800)return out}acc+=seg}const last=path[path.length-1];if(Math.hypot(out[out.length-1].x-last.x,out[out.length-1].z-last.z)>.6)out.push(Object.assign({},last));return out}
 function dryPath(ax,az,bx,bz){const dx=bx-ax,dz=bz-az,dist=Math.hypot(dx,dz)||1,n=Math.max(2,Math.ceil(dist/14)),px=-dz/dist,pz=dx/dist,pts=[];
  const amp=Math.min(20,dist*.085),p1=hash(ax*.37+bz,az*.41+bx)*6.283,p2=hash(bx*.53+az,bz*.29+ax)*6.283,f1=1.2+hash(ax,bz)*1.1;
@@ -58654,14 +58749,14 @@ function roadMaterial(trail){const have=trail?TRAILMAT:ROADMAT;if(have)return ha
  const tex=polish(new T.CanvasTexture(cv));tex.wrapS=T.RepeatWrapping;tex.wrapT=T.ClampToEdgeWrapping;tex.colorSpace=T.SRGBColorSpace;
  const M=LMat({map:tex,vertexColors:true,side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4});
  M._canv=cv;M._ctx=g;M._base=baseData;M._tex=tex;if(trail)TRAILMAT=M;else ROADMAT=M;return M}
-function buildRoadMesh(runs){for(const trail of[false,true]){const R=runs.filter(r=>(r.spec.half<2)===trail);if(R.length)buildRoadMeshPart(R,trail)}}
+function buildRoadMesh(runs){/* will: stub trails */for(const run of runs){const P2=run.pts;if(run.spec.half>=2||P2.length<2)continue;let L2=0;for(let i=1;i<P2.length;i++)L2+=Math.hypot(P2[i].x-P2[i-1].x,P2[i].z-P2[i-1].z);if(L2>=20)continue;const on=p=>{const b=roadGrid.get(Math.floor(p.x/RCELL)+','+Math.floor(p.z/RCELL));if(!b)return false;for(const sg of b){if(sg.rid===run.rid)continue;const h=segHit(sg,p.x,p.z);if(h.dist<h.half+h.edge+1)return true}return false};if(P2.every(on)){run._stub=1;for(const sg of SEGS)if(sg.rid===run.rid)sg._stub=1}}for(const trail of[false,true]){const R=runs.filter(r=>(r.spec.half<2)===trail);if(R.length)buildRoadMeshPart(R,trail)}}
 function buildRoadMeshPart(runs,trail){const pos=[],col=[],uv=[],idx=[],skirt=[];
  const ditchC=new T.Color(0x4e3e2c),shC=new T.Color(0x9e8c70),curbC=new T.Color(0xb4a688),curbTrC=new T.Color(0x9a8264),rutC=new T.Color(0x6e543c),laneC=new T.Color(0xa68860),crownC=new T.Color(0xc4a87c);
  const sm=t=>t<=0?0:t>=1?1:t*t*(3-2*t);
- const nearLane=(wx,wz,rid,extra)=>{let best=null;const b=roadGrid.get((Math.floor(wx/RCELL))+','+(Math.floor(wz/RCELL)));if(!b)return null;for(let n=0;n<b.length;n++){const s=b[n];if(s.rid===rid)continue;const h=segHit(s,wx,wz);if(h.dist<h.half+h.edge+extra&&(!best||h.dist<best.dist))best=h}return best};
+ const nearLane=(wx,wz,rid,extra)=>{let best=null;const b=roadGrid.get((Math.floor(wx/RCELL))+','+(Math.floor(wz/RCELL)));if(!b)return null;for(let n=0;n<b.length;n++){const s=b[n];if(s.rid===rid||s._stub)continue;const h=segHit(s,wx,wz);if(h.dist<h.half+h.edge+extra&&(!best||h.dist<best.dist))best=h}return best};
  // profile point ids; kerb tops (3, 11) are duplicated so the kerb gets a hard crease instead of a smooth blob
  const PL=[0,1,2,3,3,4,5,6,7,8,9,10,11,11,12,13,14],N=PL.length;
- for(const run of runs){const spec=run.spec,src=run.pts;if(src.length<2)continue;// mesh-only midpoints (1.5m stations): the draped road strip chorded across terrain folds every 3m, floating ~.5m on one
+ for(const run of runs){const spec=run.spec,src=run.pts;if(src.length<2||run._stub)continue;// mesh-only midpoints (1.5m stations): the draped road strip chorded across terrain folds every 3m, floating ~.5m on one
   // side and dipping under the bank on the other along steep river banks, which read as a trench. Bridge ends are left as they were.
   const pts=[src[0]];for(let i=1;i<src.length;i++){const a=src[i-1],b=src[i],br=a._bridgeEnd||b._bridgeEnd||a._onBridge||b._onBridge||a._bridgeLock||b._bridgeLock;if(!br)pts.push({x:(a.x+b.x)/2,z:(a.z+b.z)/2,y:(a.y+b.y)/2,raw:(a.raw+b.raw)/2,_ring:a._ring&&b._ring?1:undefined});pts.push(b)}const n=pts.length;
   const k=trail?.68:1,W=spec.half,E=spec.edge,L=spec.lift,cB=trail?curbTrC:curbC,cH=L+(trail?.025:.045);
@@ -58696,7 +58791,7 @@ function buildRoadMeshPart(runs,trail){const pos=[],col=[],uv=[],idx=[],skirt=[]
    if(bEnd&&bDist<7){const by=pts[i]._bridgeEnd?y+.05:y+.05*(1-sm(bDist/7));y=by}
    let fe=1;if(freeA)fe=Math.min(fe,sm(cum[i]/6));if(freeB)fe=Math.min(fe,sm((tot-cum[i])/6));
    const jit=.94+hash(x*.37,z*.41)*.1;
-   const cutL=!!nearLane(x+px*prof[3][0]*flare,z+pz*prof[3][0]*flare,run.rid,.45),cutR=!!nearLane(x+px*prof[11][0]*flare,z+pz*prof[11][0]*flare,run.rid,.45);
+   /* will: kerb cut */const kc=o=>{const kx=x+px*o,kz=z+pz*o;if(nearLane(kx,kz,run.rid,.45)||nearLane(kx+dx*.75,kz+dz*.75,run.rid,.45)||nearLane(kx-dx*.75,kz-dz*.75,run.rid,.45))return true;return(!bEnd||bDist>7)&&onBridge(kx,kz,1.2)};const cutL=kc(prof[3][0]*flare),cutR=kc(prof[11][0]*flare);
    const row=[];
    for(let q=0;q<N;q++){const p=PL[q],cut=(p===3&&cutL)||(p===11&&cutR);
     const kIn=(p===3&&PL[q-1]===3)||(p===11&&PL[q+1]===11);/* flat kerb top: inner copy of each kerb point sits .24m toward the centre */
@@ -58709,7 +58804,7 @@ function buildRoadMeshPart(runs,trail){const pos=[],col=[],uv=[],idx=[],skirt=[]
     {const top=(jb>0&&run.rid>jh.rid?.035*jb:0),dr=p===0||p===14?gy-.03:p===1||p===13?gy-.004:Math.max(gy+yy,gy+.05)+top,w=bEnd?bF:1;
      if(w<1){if(p===0||p===14)vy=Math.min(vy,gy-.2);else if(p===1||p===13)vy=Math.min(vy,gy-.03);else vy=Math.max(vy,gy+.035)}
      vy=vy*(1-w)+dr*w}
-    if(fe<1){const gl=gy-.08;vy=gl+(vy-gl)*fe}
+    if(fe<1){const gl=gy-.08;vy=gl+(vy-gl)*fe}/* will: hide outer strip under crossing road */if((p<=2||p>=12)&&!(bEnd&&bDist<10)){const oh=nearLane(vx,vz,run.rid,.3);if(oh&&oh.dist<oh.half+.3)vy=Math.min(vy,Math.min(gy,oh.y)-.06)}
     row.push([vx,vz]);pos.push(vx,vy,vz);const c=cut?laneC:tint[p];col.push(c.r*jit,c.g*jit,c.b*jit);uv.push(cum[i]*uScale,cut?.44:(kIn?(p===3?.26:.74):vMap[p]));
     if(p<=1||p>=13)skirt.push(pos.length/3-1)}
    prevRow=row;
@@ -58783,6 +58878,44 @@ function cullFarBarrels(){for(let i=things.length-1;i>=0;i--){const o=things[i];
 function redrapeBanks(){const m=riverBankMesh;if(!m||!m.userData.meta)return;const p=m.geometry.attributes.position,M=m.userData.meta;
  for(let i=0;i<p.count;i++){const k=M[i*2],of=M[i*2+1];if(k<2)continue;const ty=Hg(p.getX(i),p.getZ(i));p.setY(i,k===2?Math.max(ty+.05,.18*of-.18*(1-of)):k===3?ty+.03*of:ty-.08)}
  p.needsUpdate=true;m.geometry.computeVertexNormals();m.geometry.computeBoundingSphere()}
+/*will:roads7*/
+function willRamp(runs){const sm=t=>t<=0?0:t>=1?1:t*t*(3-2*t),touched=new Set();window.__willRamp=[];
+ for(const run of runs){const pts=run.pts,n=pts.length;if(n<3)continue;
+  for(const j of[0,n-1]){const p0=pts[j],br=p0._bridgeEnd;if(!br)continue;const A=p0._u<0,dir=j===0?1:-1;
+   const cum=[0];for(let k=1;k<n;k++){const a=pts[j+dir*(k-1)],b=pts[j+dir*k];cum.push(cum[k-1]+Math.hypot(b.x-a.x,b.z-a.z))}
+   let ey=A?br.yA:br.yB;const other=A?br.yB:br.yA;
+   let bank=null;for(let k=1;k<n;k++){if(cum[k]>=8){bank=pts[j+dir*k].y;break}}
+   if(bank!=null&&bank-ey>.6){const maxE=other+.13*2*br.halfSpan;const ne=Math.min(maxE,ey+.5*(bank-ey));if(ne>ey){ey=ne;if(A)br.yA=ey;else br.yB=ey;touched.add(br)}}
+   let R=8;for(let k=1;k<n&&cum[k]<=40;k++){const q=pts[j+dir*k];if(q._onBridge||q._bridgeEnd)break;R=Math.max(R,Math.min(40,Math.abs(q.y-ey)/.1))}
+   p0.y=ey;let moved=0;for(let k=1;k<n&&cum[k]<R;k++){const q=pts[j+dir*k];if(q._onBridge||q._bridgeEnd)break;const ny=ey+(q.y-ey)*sm(cum[k]/R);moved=Math.max(moved,Math.abs(ny-q.y));q.y=ny}
+   window.__willRamp.push([+br.x.toFixed(1),+br.z.toFixed(1),A?'A':'B',+ey.toFixed(2),+R.toFixed(1),+moved.toFixed(2)])}}
+ for(const br of touched){br.deckY=Math.max(1.32,Math.max(br.yA,br.yB)+.28);if(br.mesh){scene.remove(br.mesh);br.mesh=mkBridgeMesh(br)}}
+ for(const b of STATIC_GRID.values())for(const c of b){if(c.kind!=='bridge_rail')continue;for(const br of BRIDGES){const ox=c.x-br.x,oz=c.z-br.z,al=ox*br.dx+oz*br.dz,lat=ox*br.px+oz*br.pz;if(Math.abs(al)<=br.halfSpan&&Math.abs(lat)<=br.halfW+.5){const u=al/br.halfSpan,au=Math.abs(u),lin=br.yA+(br.yB-br.yA)*(u+1)/2,rise=br.deckY-Math.max(br.yA,br.yB);c.y=au>.62?lin+rise*(t=>t*t*(3-2*t))((1-au)/.38):lin+rise+br.archH*(1-(au/.62)**2);break}}}}
+function willSettle(runs){let nset=0;
+ for(const run of runs){const pts=run.pts,n=pts.length,half=run.spec.half;if(n<2)continue;
+  const cum=[0];for(let k=1;k<n;k++)cum.push(cum[k-1]+Math.hypot(pts[k].x-pts[k-1].x,pts[k].z-pts[k-1].z));
+  const bEnds=[];for(const j of[0,n-1])if(pts[j]._bridgeEnd)bEnds.push(cum[j]);
+  const d=new Float32Array(n),G=new Float32Array(n).fill(1e9),ww=half+(run.spec.edge||0);
+  for(let i=0;i<n;i++){const p=pts[i];if(p._bridgeEnd||p._onBridge)continue;if(bEnds.some(c=>Math.abs(c-cum[i])<14)||onBridge(p.x,p.z,10)||inRiver(p.x,p.z,0))continue;
+   const a=pts[Math.max(0,i-1)],b=pts[Math.min(n-1,i+1)];let dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;
+   let g=-1e9;for(const w of[0,half*.65,-half*.65,half,-half,ww,-ww])g=Math.max(g,Hg(p.x-dz*w,p.z+dx*w));G[i]=g;
+   if(p.y-g>.45)d[i]=(g+.08)-p.y}
+  const e=new Float32Array(n);for(let i=0;i<n;i++){let m=0;for(let k=Math.max(0,i-3);k<=Math.min(n-1,i+3);k++){if(!d[k])continue;const v=d[k]*(1-Math.abs(i-k)/4);if(v<m)m=v}e[i]=Math.min(0,Math.max(m,(G[i]+.08)-pts[i].y))}
+  for(let i=0;i<n;i++){const p=pts[i];if(e[i]<0&&!p._bridgeEnd&&!p._onBridge){p.y+=e[i];nset++}}}
+ window.__willSettle=nset;window.__willRuns=runs;return nset}
+function willSpurs(runs){const out=[];const tr=runs.find(r=>r.spec.half<2);if(!tr)return out;let rid=0,ri=0;for(const r of runs){rid=Math.max(rid,r.rid|0);ri=Math.max(ri,r.ri|0)}
+ for(const m of MONS){const J=m.jg;if(!J||!J.ud||!J.ud.doors)continue;const c=Math.cos(J.ry),s=Math.sin(J.ry),pr=m.rp||[m.x,m.z];let best=null,bd=1e9;
+  for(const q of J.ud.doors){if(q.y>=.5)continue;const lx=q.ax==='x'?q.a:q.p,lz=q.ax==='x'?q.p:q.a,x=J.ox+lx*c+lz*s,z=J.oz-lx*s+lz*c,d=Math.hypot(x-pr[0],z-pr[1]);if(d<bd){bd=d;const nx=q.ax==='x'?0:Math.sign(lx)||1,nz=q.ax==='x'?Math.sign(lz)||1:0;best={x,z,ox:nx*c+nz*s,oz:-nx*s+nz*c}}}
+  if(!best)continue;const D=best,P1={x:D.x+D.ox*6,z:D.z+D.oz*6};let R=null,rd=40;
+  for(const sg of SEGS){if(sg._stub||sg.ba&&sg.bb)continue;const t=Math.max(0,Math.min(1,((P1.x-sg.ax)*(sg.bx-sg.ax)+(P1.z-sg.az)*(sg.bz-sg.az))/(sg.l2||1))),x=sg.ax+(sg.bx-sg.ax)*t,z=sg.az+(sg.bz-sg.az)*t,d=Math.hypot(x-P1.x,z-P1.z);if(d<rd&&!onBridge(x,z,6)){rd=d;R={x,z}}}
+  const gap0=SEGS.reduce((a,sg)=>Math.min(a,Math.hypot(sg.ax-D.x,sg.az-D.z),Math.hypot(sg.bx-D.x,sg.bz-D.z)),1e9);if(gap0<3){out.push([m.jim||m.kind,'ok',+gap0.toFixed(1)]);continue}
+  if(!R){out.push([m.jim||m.kind,'noroad',+gap0.toFixed(1)]);continue}
+  const pts=[],leg=(A,B,from)=>{const L=Math.hypot(B.x-A.x,B.z-A.z),n=Math.max(1,Math.ceil(L/2.5));for(let k=from;k<=n;k++)pts.push({x:A.x+(B.x-A.x)*k/n,z:A.z+(B.z-A.z)*k/n})};leg(D,P1,0);leg(P1,R,1);
+  let bad='';for(let k=0;k<pts.length&&!bad;k++){const p=pts[k];if(k>=3&&(inRiver(p.x,p.z,1)||inPond(p.x,p.z)))bad='water';if(k>=3)for(const o of MONS)if(o!==m&&Math.hypot(o.x-p.x,o.z-p.z)<o.r)bad='mon';const gx=Math.floor(p.x/SCELL),gz=Math.floor(p.z/SCELL);for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){const B=STATIC_GRID.get((gx+a)+','+(gz+b));if(B)for(const o of B)if(o.kind!=='bridge_rail'&&Math.hypot(o.x-p.x,o.z-p.z)<o.r+1.3)bad=o.kind}}
+  if(bad){out.push([m.jim||m.kind,'blocked:'+bad,+gap0.toFixed(1)]);continue}
+  for(const p of pts){p.y=Hg(p.x,p.z)+.04;p.raw=p.y}pts.reverse();runs.push({pts,spec:tr.spec,rid:++rid,ri:++ri,_willSpur:1});out.push([m.jim||m.kind,'spur',+gap0.toFixed(1),+(Math.hypot(P1.x-D.x,P1.z-D.z)+rd).toFixed(1)])}
+ window.__willSpurs=out;return out}
+function willResettle(){const runs=window.__willRuns;if(!runs)return;const nsp=willSpurs(runs).filter(o=>o[1]==='spur').length;const n=willSettle(runs.filter(r=>r.spec.half<2));window.__willRuns=runs;window.__willSettle2=n;if(!n&&!nsp)return;rebuildRoads(runs);for(const m of scene.children.slice())if(m.isMesh&&m.material===TRAILMAT){scene.remove(m);m.geometry.dispose()}const R=runs.filter(r=>r.spec.half<2);if(R.length)buildRoadMeshPart(R,true)}
 function seatRoads(){Hg=H;const runs=[];ROADS.forEach((rd,ri)=>{const spec=roadSpec(rd.kind);for(const pts of splitRuns(smoothStations(rd.pts)))runs.push({pts,spec,ri,rid:runs.length})});rebuildRoads(runs);gradeTerrain();liftRuns(runs);rebuildRoads(runs);gradeTerrain();
  for(const run of runs){
   const pts=run.pts,n=pts.length;
@@ -58804,7 +58937,7 @@ function seatRoads(){Hg=H;const runs=[];ROADS.forEach((rd,ri)=>{const spec=roadS
   br.deckY=Math.max(1.32,Math.max(br.yA,br.yB)+.28);
   if(br.mesh){scene.remove(br.mesh);br.mesh=mkBridgeMesh(br)}
  }
- liftRuns(runs);pinNearPads(runs);rebuildRoads(runs);gradeTerrain();redrapeBanks();buildRoadMesh(runs);H=(x,z)=>{const b=bridgeAt(x,z),r=roadAt(x,z),g=Hg(x,z);let y=r==null?g:r;return b!=null&&b>y?b:y};const placed=[],pDummy=new T.Object3D();for(const p of POSTS){if(onPad(p.x,p.z)||inRiver(p.x,p.z,2.5)||inPond(p.x,p.z)||onBridge(p.x,p.z,2.5)||nearMon(p.x,p.z,11.5)){p.skip=1;continue}let onRd=false;visitRoads(p.x,p.z,h=>{if(h.dist<h.half+.15)onRd=true});if(onRd){p.skip=1;continue}const y=H(p.x,p.z);if(y<.55||y>9.2){p.skip=1;continue}let close=false;for(const q of placed)if((q.x-p.x)*(q.x-p.x)+(q.z-p.z)*(q.z-p.z)<2.2){close=true;break}if(close){p.skip=1;continue}p.y=y;placed.push(p)}if(placed.length){const pm=new T.InstancedMesh(gRoadPost,mRoadPost,placed.length);for(let i=0;i<placed.length;i++){const p=placed[i];pDummy.position.set(p.x,p.y+.72,p.z);pDummy.updateMatrix();pm.setMatrixAt(i,pDummy.matrix)}pm.instanceMatrix.needsUpdate=true;pm.frustumCulled=false;scene.add(pm)}snapWorld();cullFarBarrels();reseatFoundations()}
+ liftRuns(runs);pinNearPads(runs);willRamp(runs);rebuildRoads(runs);gradeTerrain();redrapeBanks();willSettle(runs);rebuildRoads(runs);buildRoadMesh(runs);H=(x,z)=>{const b=bridgeAt(x,z),r=roadAt(x,z),g=Hg(x,z);let y=r==null?g:r;return b!=null&&b>y?b:y};const placed=[],pDummy=new T.Object3D();for(const p of POSTS){if(onPad(p.x,p.z)||inRiver(p.x,p.z,2.5)||inPond(p.x,p.z)||onBridge(p.x,p.z,2.5)||nearMon(p.x,p.z,11.5)){p.skip=1;continue}let onRd=false;visitRoads(p.x,p.z,h=>{if(h.dist<h.half+.15)onRd=true});if(onRd){p.skip=1;continue}const y=H(p.x,p.z);if(y<.55||y>9.2){p.skip=1;continue}let close=false;for(const q of placed)if((q.x-p.x)*(q.x-p.x)+(q.z-p.z)*(q.z-p.z)<2.2){close=true;break}if(close){p.skip=1;continue}p.y=y;placed.push(p)}if(placed.length){const pm=new T.InstancedMesh(gRoadPost,mRoadPost,placed.length);for(let i=0;i<placed.length;i++){const p=placed[i];pDummy.position.set(p.x,p.y+.72,p.z);pDummy.updateMatrix();pm.setMatrixAt(i,pDummy.matrix)}pm.instanceMatrix.needsUpdate=true;pm.frustumCulled=false;scene.add(pm)}snapWorld();cullFarBarrels();reseatFoundations()}
 function densePath(path,step){if(!path||path.length<2)return path;const out=[path[0]];for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];if(a._onBridge||b._onBridge||a._bridgeEnd||b._bridgeEnd){out.push(b);continue}const d=Math.hypot(b.x-a.x,b.z-a.z),n=Math.ceil(d/step);for(let k=1;k<n;k++){const t=k/n;out.push({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t})}out.push(b)}path.length=0;for(const p of out)path.push(p);return path}
 function baseBlobs(){const o=[];for(const n of NP){const l=n.lot||(n.tc?{x:n.tc.x,z:n.tc.z}:null);if(!l)continue;const p=n.plan||{w:2,d:2},rA=Math.max(14,Math.hypot(p.w,p.d)*C/2+4);let b={x:l.x,z:l.z,r:n.cmp?Math.max(rA,26):rA};if(n.farm){const rB=9,dx=n.farm.x-l.x,dz=n.farm.z-l.z,d=Math.hypot(dx,dz);if(d+rB>rA){const R=(d+rA+rB)/2,k=d>1e-3?(R-rA)/d:0;b={x:l.x+dx*k,z:l.z+dz*k,r:R}}}o.push(b)}return o}
 function shovePathOffBases(path,kind){if(!path||path.length<2)return path;const ro=kind==='trail'?2.4:5.1,obs=baseBlobs().map(o=>({x:o.x,z:o.z,need:o.r+ro+1.5}));if(!obs.length)return path;for(const m of MONS)obs.push({x:m.x,z:m.z,need:(m.r||12)+7});const W=5;for(let pass=0;pass<10;pass++){let moved=false;for(const o of obs){const S=path.map(p=>({x:p.x,z:p.z})),n=S.length,near=(q,idx)=>idx>0&&idx<n-1&&!path[idx]._ring&&!path[idx]._bridgeLock&&Math.hypot(q.x-o.x,q.z-o.z)<o.need-.05;let i=1;while(i<n-1){if(!near(S[i],i)){i++;continue}let j=i;while(j+1<n-1&&near(S[j+1],j+1))j++;const a=S[Math.max(0,i-1)],b=S[Math.min(n-1,j+1)];let dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<1e-3){dx=1;dz=0;len=1}dx/=len;dz/=len;let bk=i,bd=1e9;for(let k=i;k<=j;k++){const d=Math.hypot(S[k].x-o.x,S[k].z-o.z);if(d<bd){bd=d;bk=k}}const sg=(S[bk].x-o.x)*(-dz)+(S[bk].z-o.z)*dx,side=Math.abs(sg)>.5?(sg>0?1:-1):(hash(Math.round(o.x),Math.round(o.z))>.5?1:-1),D=[];for(let k=i;k<=j;k++){const al=(S[k].x-o.x)*dx+(S[k].z-o.z)*dz,nx=o.x+dx*al+(-dz)*side*o.need,nz=o.z+dz*al+dx*side*o.need;D.push([nx-S[k].x,nz-S[k].z]);path[k].x=nx;path[k].z=nz}for(let m=1;m<=W;m++){const w=.5*(1+Math.cos(Math.PI*m/(W+1))),l=i-m,r=j+m;if(l>=1&&!near(S[l],l)&&!path[l]._bridgeLock){path[l].x=S[l].x+D[0][0]*w;path[l].z=S[l].z+D[0][1]*w}if(r<n-1&&!near(S[r],r)&&!path[r]._bridgeLock){const e=D[D.length-1];path[r].x=S[r].x+e[0]*w;path[r].z=S[r].z+e[1]*w}}moved=true;i=j+1}}if(!moved)break}return path}
@@ -58963,10 +59096,10 @@ function bridgeAt(x,z){
   const al=rx*br.dx+rz*br.dz,lat=rx*br.px+rz*br.pz;
   if(Math.abs(al)>br.halfSpan||Math.abs(lat)>br.halfW+.28)continue;
   const u=al/br.halfSpan,au=Math.abs(u);
-  const endY=u<0?br.yA:br.yB;
+  const lin=br.yA+(br.yB-br.yA)*(u+1)/2,rise=br.deckY-Math.max(br.yA,br.yB);
   let y;
-  if(au>.62){const t=(1-au)/.38,s=t*t*(3-2*t);y=endY+(br.deckY-endY)*s}
-  else{const q=au/.62;y=br.deckY+br.archH*(1-q*q)}
+  if(au>.62){const t=(1-au)/.38,s=t*t*(3-2*t);y=lin+rise*s}
+  else{const q=au/.62;y=lin+rise+br.archH*(1-q*q)}
   if(top==null||y>top)top=y;
  }
  return top;
@@ -59262,9 +59395,9 @@ function mkBridgeMesh(br){
  const deckCol=isStone?0x848078:isFoot?0x6e5034:0x785636,trimCol=isStone?0x646058:0x4a321e,railCol=isStone?0x949088:0x5c4026,ironCol=0x2e3238;
  const steps=Math.max(18,Math.round(L/.85)),stepL=L/steps;
  const heightAt=u=>{
-  const au=Math.abs(u),endY=u<0?br.yA:br.yB;
-  if(au>.62){const t=(1-au)/.38,s=t*t*(3-2*t);return endY+(br.deckY-endY)*s}
-  const q=au/.62;return br.deckY+br.archH*(1-q*q);
+  const au=Math.abs(u);const lin=br.yA+(br.yB-br.yA)*(u+1)/2,rise=br.deckY-Math.max(br.yA,br.yB);
+  if(au>.62){const t=(1-au)/.38,s=t*t*(3-2*t);return lin+rise*s}
+  const q=au/.62;return lin+rise+br.archH*(1-q*q);
  };
  // BRIDGE_RIBBON=false restores the original tilted plank-box deck (and its apron below).
  if(BRIDGE_RIBBON){
@@ -59376,10 +59509,16 @@ function mkBridgeMesh(br){
  }
  g.position.set(br.x,0,br.z);
  g.rotation.y=Math.atan2(br.dx,br.dz);
- mergeStatic(g);
+ mergeStatic(g);willBake(g);
  scene.add(g);
  return g;
 }
+const _willBM=new Map();
+function willBake(g){const by=new Map();for(const m of[...g.children]){const mt=m.material;if(!m.isMesh||!mt||!mt.isMeshLambertMaterial||mt.map||mt.transparent||mt.vertexColors||!m.geometry.index)continue;const k=mt.side+'|'+mt.emissive.getHex();let a=by.get(k);if(!a)by.set(k,a={side:mt.side,em:mt.emissive.getHex(),L:[]});a.L.push(m)}
+ for(const a of by.values()){if(a.L.length<2)continue;let nv=0,ni=0;for(const m of a.L){nv+=m.geometry.attributes.position.count;ni+=m.geometry.index.count}const P=new Float32Array(nv*3),N=new Float32Array(nv*3),C=new Float32Array(nv*3),I=new Uint32Array(ni);let o=0,oi=0;
+  for(const m of a.L){m.updateMatrix();const ge=m.geometry.clone().applyMatrix4(m.matrix),p=ge.attributes.position.array,n=ge.attributes.normal.array,ix=ge.index.array,c=m.material.color,cnt=p.length/3;P.set(p,o*3);N.set(n,o*3);for(let i=0;i<cnt;i++){C[(o+i)*3]=c.r;C[(o+i)*3+1]=c.g;C[(o+i)*3+2]=c.b}for(let i=0;i<ix.length;i++)I[oi+i]=ix[i]+o;o+=cnt;oi+=ix.length;ge.dispose();m.geometry.dispose();g.remove(m)}
+  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.BufferAttribute(P,3));geo.setAttribute('normal',new T.BufferAttribute(N,3));geo.setAttribute('color',new T.BufferAttribute(C,3));geo.setIndex(new T.BufferAttribute(I,1));
+  const mk=a.side+'|'+a.em;let mat=_willBM.get(mk);if(!mat){mat=LMat({color:0xffffff,vertexColors:true,side:a.side,emissive:a.em});_willBM.set(mk,mat)}const mesh=new T.Mesh(geo,mat);mesh.matrixAutoUpdate=false;g.add(mesh)}}
 // bridge axis follows the road (so the deck ends meet the road ends without a jog), but never more than 35 deg off square to the river
 function bridgeAxis(nx,nz,rdx,rdz){const c=rdx*nx+rdz*nz,lim=Math.cos(35*Math.PI/180);if(c>=lim)return[rdx,rdz];let qx=rdx-nx*c,qz=rdz-nz*c;const ql=Math.hypot(qx,qz);if(ql<1e-4)return[nx,nz];qx/=ql;qz/=ql;const sn=Math.sin(35*Math.PI/180);return[nx*lim+qx*sn,nz*lim+qz*sn]}
 function addBridgeSpan(cx,cz,dx,dz,halfSpan,halfW,style){
@@ -59502,8 +59641,8 @@ function layRoads(){digPonds();digRivers();const mains=[];if(MONS.length>=2){con
  for(const path of mains){barrelsAlong(path);nodesAlong(path)}}
  for(const n of NP){const from=trailFrom(n);let best=null,bd=1e9;for(const rd of ROADS){if(rd.kind==='trail')continue;for(let i=0;i<rd.pts.length;i+=1){const p=rd.pts[i];if(p._onBridge||p._bridgeLock||p._bridgeEnd||BRIDGES.some(b=>Math.hypot(b.x-p.x,b.z-p.z)<(b.halfSpan||10)+30))continue;const d=Math.hypot(p.x-from.x,p.z-from.z);if(d<bd){bd=d;best=p}}}if(!best||bd>520||bd<8)continue;const path=dryPath(from.x,from.z,best.x,best.z);pave(path,'trail');
  // walled compounds: the trail ends at the gate (front wall at local z -17.6) instead of running through the wall into the yard
- if(n.cmp&&CMPS.indexOf(n.cmp)>=0&&path.length>=2){const g1=cmpTf(n.cmp,0,-19.5),g2=cmpTf(n.cmp,0,-25.5);path.unshift({x:g1[0],z:g1[1]},{x:g2[0],z:g2[1]})}}
- const framed=paveSpawnRoad();tidyRoadNet();clearRoads();buildBridges();seatRoads();window.__props=scatterProps();window.__crops=scatterCrops();for(const q of TRADER_Q.splice(0))spawnTrader(...q);scatterFormations(115);scatterKind(190,'tree',mkChopTree,10,1.15,10.2);scatterKind(65,'tree',mkSnag,16,1.15,9.5);if(framed)openSight(framed.hx,framed.hz);snapWorld();clampRoadMesh();buildPropOcc();fillForest();fillLeaf();fillGrass(3200);fillShrubs(400);fillUndergrowth();initSnowSystem();initAmbientWildlife()}
+ if(n.cmp&&CMPS.indexOf(n.cmp)>=0&&path.length>=2){const g1=cmpTf(n.cmp,0,-17.9),g2=cmpTf(n.cmp,0,-25.5);path.unshift({x:g1[0],z:g1[1]},{x:g2[0],z:g2[1]})}}
+ const framed=paveSpawnRoad();tidyRoadNet();clearRoads();buildBridges();seatRoads();window.__props=scatterProps();window.__crops=scatterCrops();for(const q of TRADER_Q.splice(0))spawnTrader(...q);scatterFormations(115);scatterKind(190,'tree',mkChopTree,10,1.15,10.2);scatterKind(65,'tree',mkSnag,16,1.15,9.5);if(framed)openSight(framed.hx,framed.hz);snapWorld();willResettle();clampRoadMesh();buildPropOcc();fillForest();fillLeaf();fillGrass(3200);fillShrubs(400);fillUndergrowth();initSnowSystem();initAmbientWildlife()}
 // road network tidy-up (round 15): remove hairpin spikes left by the base/monument shoves, join loose road ends to the
 // nearest road within 45 m (dry ground only), and delete short fragments that still connect to nothing
 function tidyRoadNet(){const lock=p=>p._bridgeLock||p._onBridge||p._bridgeEnd;pruneBridges();
@@ -62729,7 +62868,7 @@ function renderCheat(){const p=$('cheat');$('chb').textContent=chOpen?'Close':'C
  {const nt=document.createElement('div');nt.className='ch2';nt.style.cssText='font-size:11px;opacity:.75;text-transform:none';nt.textContent='The game is paused while this menu is open.';p.appendChild(nt)}
  if(!CH.on){sec('Turn cheats on to use these options.');return}
  const tg=(l,k,after)=>chBtn(l,CH[k],()=>{CH[k]=!CH[k];if(after)after()}),act=(l,f)=>chBtn(l,false,()=>{const was=chOpen;f();window.__bpSnap=1;if(was&&!chOpen){chOpen=true;lookLock(false)}}),/* __bpSnap: run one update+render so time/world cheats show even while the game is paused */giv=(l,f,msg)=>act(l,()=>{CHEAT_DROP=0;CHEAT_GIVE=true;try{f()}finally{CHEAT_GIVE=false}say(CHEAT_DROP?msg+' Bag full: '+CHEAT_DROP+' stack'+(CHEAT_DROP>1?'s':'')+' dropped at your feet.':msg);render&&render()});
- sec('Player');let g=grid();g.append(act('Clear bag',()=>{for(let i=0;i<PX;i++)if(i>=6)SL[i]=null;for(let i=PX;i<PX+12;i++)SL[i]=null;render();say('Bag cleared (belt kept).')}));g.append(tg('God mode','god'),tg('Infinite needs','inf'),tg('Peaceful','peace'),tg('Free crafting','free'),chBtn('Low graphics: '+(LOW?'ON':'OFF'),LOW,()=>applyLow(!LOW)),(()=>{const fe=document.getElementById('bpFps'),fon=!!fe&&fe.style.display==='block';return chBtn('FPS counter: '+(fon?'ON':'OFF'),fon,()=>dispatchEvent(new KeyboardEvent('keydown',{code:'F3',key:'F3'})))})(),tg('Fly (Space up / C down)','fly',()=>{if(!CH.fly)landFix()}),tg('Super speed','fast'),act('Refill needs',()=>{S.health=S.hunger=S.thirst=S.energy=100;S.warmth=70;say('Needs refilled.')}));
+ sec('Player');let g=grid();g.append(act('Clear bag',()=>{for(let i=0;i<PX;i++)if(i>=6)SL[i]=null;for(let i=PX;i<PX+12;i++)SL[i]=null;render();say('Bag cleared (belt kept).')}));g.append(tg('God mode','god'),tg('Infinite needs','inf'),tg('Peaceful','peace'),tg('Free crafting','free'),chBtn('Low graphics: '+(LOW?'ON':'OFF'),LOW,()=>applyLow(!LOW)),(()=>{const fe=document.getElementById('bpFps'),fon=!!fe&&fe.style.display==='block';return chBtn('FPS counter: '+(fon?'ON':'OFF'),fon,()=>{if(window.__bpFpsToggle)window.__bpFpsToggle();else{dispatchEvent(new KeyboardEvent('keydown',{code:'F3',key:'F3'}));dispatchEvent(new KeyboardEvent('keyup',{code:'F3',key:'F3'}))}})})(),tg('Fly (Space up / C down)','fly',()=>{if(!CH.fly)landFix()}),tg('Super speed','fast'),act('Refill needs',()=>{S.health=S.hunger=S.thirst=S.energy=100;S.warmth=70;say('Needs refilled.')}));
  sec('Time');g=grid();for(const[l,v]of[['Dawn',.27],['Noon',.5],['Dusk',.73],['Midnight',0]])g.appendChild(act(l,()=>{t=v;say('Time set: '+l)}));
  g.appendChild(tg('Freeze time','freeze'));g.appendChild(act('Cycle weather',()=>{const order=['clear','overcast','rain','storm','fog','snow'];wx=order[(order.indexOf(wx)+1)%order.length];wxT=100;if(wx==='snow'){snowAmt=Math.max(snowAmt,.55);applySnowCover(snowAmt)}say(WXSAY[wx])}));
  sec('Fast-forward');g=grid();for(const v of[1,5,20,60])g.appendChild(chBtn(v+'×',CH.ts===v,()=>CH.ts=v));
@@ -62911,7 +63050,7 @@ function hud(){
  wbHud();
  $('hurt').style.opacity=Math.max(0,(45-S.health)/45);$('hit').style.opacity=hurtFx;
 }
-if(opts&&(opts.saveData||opts.cont)){
+if(!(opts&&(opts.saveData||opts.cont)))fredFreshBuildState();if(opts&&(opts.saveData||opts.cont)){
  const raw=opts.saveData?(typeof opts.saveData==='string'?JSON.parse(opts.saveData):opts.saveData):loadRaw();
  if(!applySave(raw))say('No claim on record. Starting fresh.');
 }else if(opts){
@@ -62925,7 +63064,7 @@ if(opts&&(opts.saveData||opts.cont)){
 ensureStarter();render();persist(opts&&opts.saveData?'load':'auto');
 const wakeBtn=$('wake');if(wakeBtn)wakeBtn.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();wake();if(ev.pointerType==='mouse')lookLock(true)});
 root.addEventListener('pointerdown',()=>{try{if(actx&&actx.state==='suspended')actx.resume()}catch(e){}},{passive:true});
-window.__controlsTest={getYaw:()=>yaw,getSpeed:()=>lastMv,getPos:()=>({x:P.x,z:P.z,yaw}),setKeys(codes){for(const k of Object.keys(keys))keys[k]=0;const map={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ShiftLeft:'shift',ShiftRight:'shift',ArrowUp:'arrowup',ArrowDown:'arrowdown',ArrowLeft:'arrowleft',ArrowRight:'arrowright'};for(const c of codes||[]){const k=map[c];if(k)keys[k]=1}}};
+window.__controlsTest={heldKeys:()=>Object.keys(keys).filter(k=>keys[k]),getYaw:()=>yaw,getSpeed:()=>lastMv,getPos:()=>({x:P.x,z:P.z,yaw}),setKeys(codes){for(const k of Object.keys(keys))keys[k]=0;const map={KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ShiftLeft:'shift',ShiftRight:'shift',ArrowUp:'arrowup',ArrowDown:'arrowdown',ArrowLeft:'arrowleft',ArrowRight:'arrowright'};for(const c of codes||[]){const k=map[c];if(k)keys[k]=1}}};
 // playtest hook for farming/backpack checks (read-mostly; mirrors the other __bp helpers)
 window.__bpFarm={state:()=>({crops:CROPS.length,wild:things.filter(o=>o.userData.k==='crop'&&o.userData.wild).length,planters:PLANTERS.length,pack:PACK,packN:packN()}),
  wear:id=>{PACK=id&&ITEMS[id]&&ITEMS[id].pack?id:0;charSync();render();return PACK},takeOff:()=>takeOffPack(),slots:()=>SL.slice(0,66).map(q=>q&&q.id+':'+q.n),
@@ -63019,7 +63158,11 @@ function jpLights(){const cp=cam.position,cand=[],V=jpEffView();
   cand.push({l,s:l.intensity/(1+(d/reach)*(d/reach)),x:_jpS.x,y:_jpS.y,z:_jpS.z})}
  if(cand.length>1)cand.sort((a,b)=>b.s-a.s);
  for(let i=0;i<JPL.pool.length;i++){const P2=JPL.pool[i],c=i<JPL.K?cand[i]:null;if(c){P2.position.set(c.x,c.y,c.z);P2.color.copy(c.l.color);P2.intensity=c.l.intensity;P2.distance=c.l.distance;P2.decay=c.l.decay}else P2.intensity=0}}
-function jpFrame(dt){dt=Math.max(0,Math.min(.25,dt))||0;/* round 2: clamp (the first rAF can give a negative dt, which stalled the 5 Hz LOD tick) */jpChunks();jpLights();jpTerrainSync(dt);jpMergeSync(dt);if((jpLodT-=dt)<=0){jpLodT=.2;if(window.BPManLOD)BPManLOD.tick(cam);if(window.BPMonLOD)BPMonLOD.tick(cam)}}
+function jpFrame(dt){dt=Math.max(0,Math.min(.25,dt))||0;/* round 2: clamp (the first rAF can give a negative dt, which stalled the 5 Hz LOD tick) */jpChunks();jpLights();jpTerrainSync(dt);
+// === JESSICA PERF START: road/river chunk culling (distance; frustum by three.js) + 1 Hz upkeep ===
+jpRoadSync(dt);
+// === JESSICA PERF END ===
+jpMergeSync(dt);if((jpLodT-=dt)<=0){jpLodT=.2;if(window.BPManLOD)BPManLOD.tick(cam);if(window.BPMonLOD)BPMonLOD.tick(cam)}else if(window.BPManLOD&&BPManLOD._queue.length)BPManLOD.tick(cam)/* round 3: while man LOD builds are queued, tick every frame (build-5 build throughput; the 5 Hz tick alone took ~10 s to show the merged mid level after arriving at a camp) */}
 function jpApplyView(){cam.far=LOW?Math.min(170,jpFar()):jpFar();cam.updateProjectionMatrix();cullT=0}
 // scene.updateMatrixWorld walked all ~46k objects every frame (~11 ms on the test box). Hidden subtrees (culled props, hidden LOD
 // levels, far monuments) are now skipped; anything skipped while its transform may have changed is flagged and fully refreshed
@@ -63066,21 +63209,23 @@ try{jpChunkTerrain()}catch(e){console.warn('jp terrain chunks',e);JPT=null}
 function jpSees(e,dt){if((e._jpSeeT=(e._jpSeeT||0)-dt)>0&&e._jpSeeV!==undefined)return e._jpSeeV;e._jpSeeT=.15;const a=jpSees.a||(jpSees.a={x:0,y:0,z:0}),b=jpSees.b||(jpSees.b={x:0,y:0,z:0});
  a.x=e.x;a.y=e.y;a.z=e.z;b.x=P.x;b.y=P.y-1.7;b.z=P.z;return e._jpSeeV=turretSees(a,b)}
 function jpCampDrive(e,dt){const c=e.camp,dx=P.x-e.x,dz=P.z-e.z;
- if(dx*dx+dz*dz>3600&&!(e.alertT>0)&&!e.hunt&&!(c&&c.alertT>0)&&!(e.hp<(e.maxHp||95)*.42)){e._jpA=(e._jpA||0)+dt;if(e._jpA<.1)return;dt=Math.min(e._jpA,.5);e._jpA=0}else e._jpA=0;
+ if(dx*dx+dz*dz>3600&&!(e.alertT>0)&&!e.hunt&&!(c&&c.alertT>0)&&!(e.hp<(e.maxHp||95)*.42)){e._jpA=(e._jpA||0)+dt;if(e._jpA<.1)return;dt=Math.min(e._jpA,.25);e._jpA=0}else e._jpA=0;
  driveCampRaider(e,dt)}
 // the one game raycaster also tests layer 1, where ManLOD's 'mid' level parks the (undrawn) full-detail meshes it merged
 try{ray.layers.enable(1)}catch(e){}
-// Crates and barrels: merged draw batches. ~670 crate/barrel/cluster objects = ~4.3k meshes with ~2.1k distinct (per-colour) materials,
-// so instancing per material would not batch. Each source mesh is baked into one big vertex-coloured mesh per (material settings,
-// shadow flags, 64 m cell): colour = material colour x vertex colour, so shading is identical. The game objects are untouched: same
-// groups in `things`/CR, same userData, same raycasting (source meshes are only made invisible; r128 raycasts ignore .visible).
-// A sync pass (every frame for objects within 30 m, the rest over 0.5 s) recomputes each source's world matrix from its local
-// transforms; a changed transform (lid opening, barrel fall/regrow animation) re-bakes just that mesh's vertex range, and an object
-// that is hidden (cullTick, break/respawn wait) or removed from the scene is dropped from the batch's index buffer (draw range shrinks).
-// Objects that stay detached for 30 s are released (their meshes made visible again). New crates/barrels are picked up every 3 s.
-// Transparent, textured, MeshBasic (crate glow, colour animated per frame), skinned/instanced meshes are left alone. Kill switch:
-// window.__jpNoMerge=1 before load.
-const JPM={on:!window.__jpNoMerge,roots:[],rm:new Set(),near:[],rr:0,scanT:0,time:0,cell:64,near2:900,mats:new Map(),groups:[]};
+// Crates, barrels and other many-small-mesh props (junk piles, oil rigs, oil deposits, AI-base props, recyclers): merged draw batches.
+// ~670 crates/barrels alone are ~4.3k meshes with ~2.1k distinct (per-colour) materials, so instancing per material would not batch.
+// Each source mesh is baked into one big vertex-coloured mesh per (material settings, shadow flags, 64 m cell): colour = material
+// colour x vertex colour, so shading is identical. The game objects are untouched: same groups in `things`/CR, same userData, same
+// raycasting (source meshes are only made invisible; r128 raycasts ignore .visible).
+// A sync pass (every frame for objects within 30 m, the rest over 1 s) recomputes each source's world matrix from its local
+// transforms; a changed transform (lid opening, barrel fall/regrow) re-bakes just that mesh's vertex range, and an object that is
+// hidden (cullTick, break/respawn wait) or removed from the scene is dropped from the batch's index buffer (draw range shrinks).
+// A source that keeps moving (8 checks in a row far away, 90 frames near: rig beams/belts) or whose material changes colour /
+// emissive / transparency (lamps, readers) is handed back: its own mesh is made visible again and it leaves the batch for good.
+// Objects detached for 30 s are released the same way. New props are picked up every 3 s. Transparent, textured, MeshBasic
+// (crate glow), skinned/instanced meshes are never merged. Kill switch: window.__jpNoMerge=1 before load.
+const JPM={kinds:new Set(['crate','barrel','cluster','junk','rig','oilDeposit','aibase','recycler']),on:!window.__jpNoMerge,roots:[],rm:new Set(),near:[],rr:0,scanT:0,time:0,cell:64,near2:900,mats:new Map(),groups:[]};
 const _jmA=new T.Matrix4(),_jmB=new T.Matrix4(),_jmC=new T.Matrix4(),_jmN=new T.Matrix3(),_jmV=new T.Vector3(),_jmCh=[],_jmCh2=[];
 function jpMatKey(mt){if(!mt||Array.isArray(mt)||!(mt.isMeshLambertMaterial||mt.isMeshPhongMaterial||mt.isMeshStandardMaterial)||mt.transparent||mt.map||mt.alphaMap||mt.emissiveMap||mt.normalMap||mt.bumpMap||mt.lightMap||mt.aoMap||mt.envMap||mt.specularMap||mt.roughnessMap||mt.metalnessMap||mt.displacementMap||mt.wireframe||mt.alphaTest>0||mt.skinning||mt.morphTargets||mt.clippingPlanes||mt.onBeforeCompile!==T.Material.prototype.onBeforeCompile)return null;
  return[mt.type,mt.side,mt.flatShading?1:0,mt.fog?1:0,mt.emissive?mt.emissive.getHexString():'',mt.emissiveIntensity,mt.roughness,mt.metalness,mt.shininess,mt.specular?mt.specular.getHexString():'',mt.reflectivity,mt.combine,mt.polygonOffset?mt.polygonOffsetFactor+'/'+mt.polygonOffsetUnits:0,mt.depthWrite?1:0,mt.depthTest?1:0,mt.colorWrite?1:0,mt.toneMapped?1:0,mt.dithering?1:0,mt.visible?1:0,mt.blending,mt.opacity].join('|')}
@@ -63098,13 +63243,13 @@ function jpBake(s,W){const g=s.g,e=W.elements,pa=s.geo.attributes.position,na=s.
  const b=g.box;if(x0<b.min.x||y0<b.min.y||z0<b.min.z||x1>b.max.x||y1>b.max.y||z1>b.max.z){b.min.x=Math.min(b.min.x,x0);b.min.y=Math.min(b.min.y,y0);b.min.z=Math.min(b.min.z,z0);b.max.x=Math.max(b.max.x,x1);b.max.y=Math.max(b.max.y,y1);b.max.z=Math.max(b.max.z,z1);b.getBoundingSphere(g.geo.boundingSphere)}
  if(v0<g.lo)g.lo=v0;if(v0+s.nv>g.hi)g.hi=v0+s.nv;s.W.set(e);s.m.matrixWorld.copy(W)}
 function jpSameW(a,e){for(let i=0;i<16;i++)if(Math.abs(a[i]-e[i])>1e-6)return false;return true}
-function jpMergeScan(){const add=[];const consider=o=>{if(!o||JPM.rm.has(o))return;const k=o.userData&&o.userData.k;if(k==='crate'||k==='barrel'||k==='cluster')add.push(o)};for(const o of things)consider(o);for(const o of CR)consider(o);
+function jpMergeScan(){const add=[];const consider=o=>{if(!o||JPM.rm.has(o))return;const k=o.userData&&o.userData.k;if(k&&JPM.kinds.has(k))add.push(o)};for(const o of things)consider(o);for(const o of CR)consider(o);for(const o of scene.children)consider(o);
  if(!add.length)return;const buckets=new Map();
  for(const o of add){JPM.rm.add(o);const st=jpRootW(o,_jmA);const r={o,ms:[],det:0,nf:false,x:_jmA.elements[12],z:_jmA.elements[14],dead:false};
   o.traverse(m=>{if(!m.isMesh||m.isInstancedMesh||m.isSkinnedMesh||!m.visible||m.layers.mask!==1||m.onBeforeRender!==T.Object3D.prototype.onBeforeRender)return;const g=m.geometry,mt=m.material,key=jpMatKey(mt);
    if(!key||!g||!g.attributes.position||!g.attributes.normal||g.attributes.position.itemSize!==3||(g.morphAttributes&&Object.keys(g.morphAttributes).length)||(mt.vertexColors&&!g.attributes.color))return;
    const bk=key+'#'+(m.castShadow?1:0)+(m.receiveShadow?1:0)+'#'+m.renderOrder+'#'+Math.floor(r.x/JPM.cell)+','+Math.floor(r.z/JPM.cell);let B=buckets.get(bk);if(!B)buckets.set(bk,B={key,mt,cast:m.castShadow,recv:m.receiveShadow,ro:m.renderOrder,ss:[],nv:0,ni:0});
-   const s={m,r,g:null,geo:g,mt,nv:g.attributes.position.count,ni:g.index?g.index.count:g.attributes.position.count,v0:0,i0:0,W:new Float64Array(16),on:false};B.ss.push(s);B.nv+=s.nv;B.ni+=s.ni;r.ms.push(s)});
+   const s={m,r,g:null,geo:g,mt,nv:g.attributes.position.count,ni:g.index?g.index.count:g.attributes.position.count,v0:0,i0:0,W:new Float64Array(16),on:false,rb:0,cr:mt.color.r,cg:mt.color.g,cb:mt.color.b,ce:mt.emissive?mt.emissive.getHex():0};B.ss.push(s);B.nv+=s.nv;B.ni+=s.ni;r.ms.push(s)});
   JPM.roots.push(r)}
  for(const B of buckets.values()){if(B.ss.length<2){for(const s of B.ss)s.r.ms.splice(s.r.ms.indexOf(s),1);continue}jpMakeGroup(B)}}
 function jpMakeGroup(B){const nv=B.nv,P=new Float32Array(nv*3),N=new Float32Array(nv*3),C=new Float32Array(nv*3),IA=new Uint32Array(B.ni),I=nv>65535?new Uint32Array(B.ni):new Uint16Array(B.ni);
@@ -63125,17 +63270,76 @@ function jpKillSrc(s){if(s.dead)return;s.dead=true;if(s.on){s.on=false;s.g.dirty
 function jpDropRoot(r){r.dead=true;for(const s of r.ms)jpKillSrc(s);JPM.rm.delete(r.o);const i=JPM.roots.indexOf(r);if(i>=0)JPM.roots.splice(i,1)}
 function jpCheckRoot(r){if(r.dead)return;const st=jpRootW(r.o,_jmA);
  if(!st){if(!r.det)r.det=JPM.time;else if(JPM.time-r.det>30){jpDropRoot(r);return}}else{r.det=0;r.x=_jmA.elements[12];r.z=_jmA.elements[14]}
- for(let i=0;i<r.ms.length;i++){const s=r.ms[i];if(s.dead)continue;if(s.m.material!==s.mt||s.m.geometry!==s.geo){jpKillSrc(s);continue}if(s.m.visible)s.m.visible=false;
-  let on=st===1&&jpSrcW(s,_jmA,_jmC);if(on&&!jpSameW(s.W,_jmC.elements))jpBake(s,_jmC);if(on!==s.on){s.on=on;s.g.dirtyI=true}}}
+ for(let i=0;i<r.ms.length;i++){const s=r.ms[i];if(s.dead)continue;const mt=s.mt;if(s.m.material!==mt||s.m.geometry!==s.geo||mt.color.r!==s.cr||mt.color.g!==s.cg||mt.color.b!==s.cb||(mt.emissive&&mt.emissive.getHex()!==s.ce)||mt.transparent){jpKillSrc(s);continue}if(s.m.visible)s.m.visible=false;
+  let on=st===1&&jpSrcW(s,_jmA,_jmC);if(on){if(!jpSameW(s.W,_jmC.elements)){jpBake(s,_jmC);if(++s.rb>=(r.nf?90:8)){jpKillSrc(s);continue}}else s.rb=0}if(on!==s.on){s.on=on;s.g.dirtyI=true}}}
 function jpMergeSync(dt){if(!JPM.on)return;JPM.time+=dt;if((JPM.scanT-=dt)<=0){JPM.scanT=3;jpMergeScan()}
  const R=JPM.roots,n=R.length;if(n){const cx=cam.position.x,cz=cam.position.z;
   for(let i=0;i<JPM.near.length;i++)jpCheckRoot(JPM.near[i]);
-  const k=Math.min(n,Math.ceil(n*Math.min(Math.max(dt,0),.25)/.5));
+  const k=Math.min(n,Math.ceil(n*Math.min(Math.max(dt,0),.25)/1));
   for(let i=0;i<k;i++){if(JPM.rr>=R.length){JPM.rr=0;JPM.near.length=0;for(const r of R)if(r.nf)JPM.near.push(r)}if(!R.length)break;const r=R[JPM.rr++];if(!r.nf)jpCheckRoot(r);if(!r.dead){const dx=r.x-cx,dz=r.z-cz;r.nf=dx*dx+dz*dz<JPM.near2}}}
  for(let i=JPM.groups.length-1;i>=0;i--){const g=JPM.groups[i];if(!g.ss.length){scene.remove(g.mesh);g.geo.dispose();JPM.groups.splice(i,1);continue}if(g.dirtyI)jpIndex(g);
   if(g.hi>g.lo){g.pa.updateRange.offset=g.lo*3;g.pa.updateRange.count=(g.hi-g.lo)*3;g.pa.needsUpdate=true;g.na.updateRange.offset=g.lo*3;g.na.updateRange.count=(g.hi-g.lo)*3;g.na.needsUpdate=true;g.lo=1e9;g.hi=-1}}}
 try{if(JPM.on){jpMergeScan();JPM.scanT=3}}catch(e){console.warn('jp merge',e);JPM.on=false}
 window.__jpMerge=JPM;
+// === JESSICA PERF END ===
+// === JESSICA PERF START: road/river chunks ===
+// The finished road mesh (~79k tris), trail mesh (~43k) and river-bank strip (~12k) are each ONE scene mesh with
+// frustumCulled=false, so all ~134k triangles are drawn every frame from anywhere on the map. After they are fully built
+// (this runs at the end of world setup, and re-scans once a second) each one is found BY REFERENCE (ROADMAT / TRAILMAT
+// material, riverBankMesh) - no road/river generation code is touched. Its INDEX is split into square tiles (128 m,
+// by triangle centre; 64 m culled no more triangles at 100 m view but cost ~2x the extra draw calls); every tile mesh SHARES the source's position/normal/colour/uv attributes and material and copies its
+// renderOrder, shadow flags and layers, so it looks identical, every triangle is drawn exactly once (no seams), and later
+// edits (snow paint on banks/roads, clampRoadMesh, redraping) show up automatically. The source mesh stays where it was,
+// hidden, as the only raycast target (r128 raycasts ignore .visible; chunks have raycast disabled), so anything that
+// references it keeps working. Tiles are frustum culled by three.js and hidden beyond view distance + 24 m.
+// A 1 Hz check: source removed -> its tiles go; geometry/index/vertex count replaced (road rebuilt) -> re-tiled;
+// attribute objects replaced -> re-linked; positions edited -> tile bounds recomputed; new road/bank meshes -> tiled.
+// The camera-centred sea plane and the 1.5k-tri river ribbon are left alone (one draw each; tiling would only add calls).
+// Kill switch: window.__jpNoRoadChunks=1 before load (or window.__jpRoad.off() at runtime). Tile: window.__jpRoadTile.
+const JPR={on:!window.__jpNoRoadChunks,tile:Math.max(16,+window.__jpRoadTile||128),margin:24,S:[],t:0,ct:0};
+function jpRoadSources(){const L=[];
+ if(typeof riverBankMesh!=='undefined'&&riverBankMesh&&riverBankMesh.isMesh)L.push([riverBankMesh,'bank']);
+ for(const o of scene.children){if(!o.isMesh||o.isInstancedMesh||o.name==='jp_road_chunk')continue;const mt=o.material;
+  if(typeof ROADMAT!=='undefined'&&ROADMAT&&mt===ROADMAT)L.push([o,'road']);else if(typeof TRAILMAT!=='undefined'&&TRAILMAT&&mt===TRAILMAT)L.push([o,'trail'])}
+ return L}
+function jpRoadBounds(c,pos){const I=c.geometry.index.array,b=c.geometry.boundingBox||(c.geometry.boundingBox=new T.Box3());b.makeEmpty();const v=_jpS;
+ for(let q=0;q<I.length;q++){v.fromBufferAttribute(pos,I[q]);b.expandByPoint(v)}b.expandByScalar(.5);
+ c.geometry.boundingSphere=b.getBoundingSphere(c.geometry.boundingSphere||new T.Sphere());c.userData.jpB=b}
+function jpRoadChunk(src,kind){const g=src.geometry,pos=g&&g.attributes.position;
+ if(!pos||pos.itemSize!==3||Array.isArray(src.material)||(g.groups&&g.groups.length>1)||src.isSkinnedMesh||(g.morphAttributes&&Object.keys(g.morphAttributes).length))return null;
+ const idx=g.index?g.index.array:null,tri=(idx?(g.index.count):pos.count)/3|0;if(tri<2000)return null;
+ src.updateMatrixWorld(true);const W=src.matrixWorld,v=new T.Vector3(),TS=JPR.tile,B=new Map();
+ for(let t=0;t<tri;t++){const a=idx?idx[t*3]:t*3,b=idx?idx[t*3+1]:t*3+1,c=idx?idx[t*3+2]:t*3+2;
+  v.set((pos.getX(a)+pos.getX(b)+pos.getX(c))/3,(pos.getY(a)+pos.getY(b)+pos.getY(c))/3,(pos.getZ(a)+pos.getZ(b)+pos.getZ(c))/3).applyMatrix4(W);
+  const k=Math.floor(v.x/TS)+','+Math.floor(v.z/TS);let l=B.get(k);if(!l)B.set(k,l=[]);l.push(a,b,c)}
+ const grp=new T.Group();grp.name='jp_road_chunks';grp.userData.jpRoadSrc=kind;grp.position.copy(src.position);grp.quaternion.copy(src.quaternion);grp.scale.copy(src.scale);
+ const ms=[];
+ for(const l of B.values()){const geo=new T.BufferGeometry();for(const k in g.attributes)geo.setAttribute(k,g.attributes[k]);
+  geo.setIndex(new T.BufferAttribute(pos.count>65535?new Uint32Array(l):new Uint16Array(l),1));
+  const m=new T.Mesh(geo,src.material);m.name='jp_road_chunk';m.userData.jpRoadSrc=kind;m.raycast=function(){};m.renderOrder=src.renderOrder;m.castShadow=src.castShadow;m.receiveShadow=src.receiveShadow;
+  m.layers.mask=src.layers.mask;m.onBeforeRender=src.onBeforeRender;m.onAfterRender=src.onAfterRender;m.frustumCulled=true;m.matrixAutoUpdate=false;m.updateMatrix();jpRoadBounds(m,pos);grp.add(m);ms.push(m)}
+ (src.parent||scene).add(grp);grp.updateMatrixWorld(true);
+ const S={src,kind,geo:g,idx:g.index,iv:g.index?g.index.version:0,pv:pos.version,pc:pos.count,attrs:Object.assign({},g.attributes),mat:src.material,grp,ms,tris:tri};src.visible=false;return S}
+function jpRoadDrop(S,restore){if(S.grp.parent)S.grp.parent.remove(S.grp);for(const m of S.ms){m.geometry.attributes={};m.geometry.dispose()}/* frees only the tile's own index buffer; the shared attributes stay with the source */if(restore&&S.src.parent)S.src.visible=true}
+function jpRoadScan(){if(!JPR.on)return;const have=new Set(JPR.S.map(S=>S.src));for(const [o,k] of jpRoadSources()){if(have.has(o))continue;const S=jpRoadChunk(o,k);if(S)JPR.S.push(S)}}
+function jpRoadCheck(){for(let i=JPR.S.length-1;i>=0;i--){const S=JPR.S[i],src=S.src,g=src.geometry,pos=g&&g.attributes.position;
+  if(!src.parent){jpRoadDrop(S,false);JPR.S.splice(i,1);continue}
+  if(g!==S.geo||g.index!==S.idx||!pos||pos.count!==S.pc||(g.index&&g.index.version!==S.iv)){jpRoadDrop(S,true);JPR.S.splice(i,1);const N=jpRoadChunk(src,S.kind);if(N)JPR.S.push(N);continue}
+  let relink=false;for(const k in g.attributes)if(S.attrs[k]!==g.attributes[k]){relink=true;break}
+  if(relink){for(const m of S.ms){for(const k in g.attributes)m.geometry.setAttribute(k,g.attributes[k])}S.attrs=Object.assign({},g.attributes)}
+  if(relink||pos.version!==S.pv){S.pv=pos.version;for(const m of S.ms)jpRoadBounds(m,pos)}
+  if(src.material!==S.mat){S.mat=src.material;for(const m of S.ms)m.material=src.material}
+  if(src.renderOrder!==S.ms[0].renderOrder)for(const m of S.ms)m.renderOrder=src.renderOrder;
+  if(S.grp.parent!==src.parent)(src.parent||scene).add(S.grp);
+  if(src.visible)src.visible=false}
+ jpRoadScan()}
+function jpRoadSync(dt){if(!JPR.on)return;dt=dt||0;
+ if((JPR.t-=dt)<=0){JPR.t=1;jpRoadCheck()}
+ if((JPR.ct-=dt)>0)return;JPR.ct=.1;const cx=cam.position.x,cz=cam.position.z,R=jpEffView()+JPR.margin,R2=R*R;
+ for(const S of JPR.S){const gp=S.grp.position;for(const m of S.ms){const b=m.userData.jpB,x=cx-gp.x,z=cz-gp.z,dx=x<b.min.x?b.min.x-x:x>b.max.x?x-b.max.x:0,dz=z<b.min.z?b.min.z-z:z>b.max.z?z-b.max.z:0,vis=dx*dx+dz*dz<=R2;if(m.visible!==vis)m.visible=vis}}}
+window.__jpRoad={J:JPR,stats:()=>{let n=0,vis=0,tr=0;for(const S of JPR.S)for(const m of S.ms){n++;if(m.visible){vis++;tr+=m.geometry.index.count/3}}return{on:JPR.on,tile:JPR.tile,sources:JPR.S.map(S=>S.kind+':'+S.tris+'/'+S.ms.length),chunks:n,inRange:vis,inRangeTris:tr}},
+ off(){JPR.on=false;for(const S of JPR.S)jpRoadDrop(S,true);JPR.S.length=0},on(){JPR.on=true;JPR.t=0;JPR.ct=0;jpRoadScan()}};
+try{jpRoadScan()}catch(e){console.warn('jp road chunks',e);try{window.__jpRoad.off()}catch(e2){}}
 // === JESSICA PERF END ===
 if(window.BPNatLOD&&typeof JESSICA_LOWPOWER!=='undefined'&&(JESSICA_LOWPOWER||LOW))BPNatLOD.CFG.rewarmMs=10;
 if(window.BPNatLOD)try{cam.position.set(P.x,P.y,P.z);cam.updateMatrixWorld();cullT=0;cullTick(0);BPNatLOD.warm(cam,things)}catch(e){console.warn('natlod warm',e)}
@@ -63364,9 +63568,11 @@ bar.append(mk('Save file',saveFile),mk('Load file',()=>loadFile(true)),mk('Contr
 
 const SET=(()=>{try{return JSON.parse(localStorage.getItem('blackpine-set')||'{}')}catch(e){return{}}})();window.__bpSens=SET.sens||1;window.__bpInv=!!SET.inv;if(SET.gather)window.__bpGather=SET.gather;window.__bpSaveGather=v=>{SET.gather=v;saveSet()};
 // === JESSICA PERF START: graphics settings storage (shared by both menus) ===
-const JPS={get(){try{return JSON.parse(localStorage.getItem('blackpine-perf')||'{}')}catch(e){return{}}},
+const JPS={VIEW:{min:60,max:300,step:10,def:JESSICA_VIEW_DIST,presets:[60,80,100,120,150,200,250,300]},/* Fred: in-game slider range + title-button stops, one source */
+ viewVals(){const V=JPS.VIEW,a=V.presets.concat([V.def]).filter(v=>v>=V.min&&v<=V.max&&Math.abs((v-V.min)/V.step-Math.round((v-V.min)/V.step))<1e-6);return a.filter((v,i)=>a.indexOf(v)===i).sort((x,y)=>x-y)},
+ get(){try{return JSON.parse(localStorage.getItem('blackpine-perf')||'{}')}catch(e){return{}}},
  auto(){return JPS.get().auto!==false},
- view(){const v=+JPS.get().view;return v>=60&&v<=300?v:JESSICA_VIEW_DIST},
+ view(){const v=+JPS.get().view,V=JPS.VIEW;return v>=V.min&&v<=V.max?v:V.def},
  scale(){const v=+JPS.get().scale;return v>=.4&&v<=2?v:JESSICA_RENDER_SCALE*(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)?.75:1)},
  set(k,v){const A=window.__jpPerfApi;if(A){if(k==='view')A.setView(v);else if(k==='scale')A.setScale(v);else if(k==='auto')A.setAuto(v);return}const s=JPS.get();s[k]=v;try{localStorage.setItem('blackpine-perf',JSON.stringify(s))}catch(e){}}};
 // === JESSICA PERF END ===
@@ -63383,7 +63589,7 @@ function renderPreSettings(){
  const invBtn=mk('Invert Y-Axis: '+(window.__bpInv?'ON':'OFF'),()=>{window.__bpInv=!window.__bpInv;saveSet();renderPreSettings()});
  const mmBtn=mk('Minimap HUD: '+(SET.mm!==false?'ON':'OFF'),()=>{SET.mm=SET.mm===false;saveSet();applySet();renderPreSettings()});
  const tcBtn=mk('Touch Controls: '+(SET.touch?'ON':'OFF'),()=>{SET.touch=!SET.touch;saveSet();applySet();renderPreSettings()});
- /* === JESSICA PERF START: graphics buttons in the pre-game drawer === */const vdBtn=mk('View Distance: '+JPS.view()+' m',()=>{const vals=[80,110,140,180,220,300],cur=JPS.view();let i=vals.findIndex(v=>v>=cur-5);JPS.set('view',vals[(i+1)%vals.length]);renderPreSettings()});
+ /* === JESSICA PERF START: graphics buttons in the pre-game drawer === */const vdBtn=mk('View Distance: '+JPS.view()+' m',()=>{const vals=JPS.viewVals(),cur=JPS.view();const n=vals.find(v=>v>cur+.5);JPS.set('view',n===undefined?vals[0]:n);renderPreSettings()});
  const rsMx=Math.max(1,Math.min(2,devicePixelRatio||1));const rsBtn=mk('Render Scale: '+Math.round(Math.min(JPS.scale(),rsMx)*100)+'%',()=>{const vals=[.5,.65,.75,.85,1,1.25,1.5].filter(v=>v<=rsMx+.001),cur=Math.min(JPS.scale(),rsMx);let i=vals.findIndex(v=>v>=cur-.02);JPS.set('scale',vals[(i+1)%vals.length]);renderPreSettings()});/* === JESSICA PERF END === */
  preSetGrid.append(sensBtn,invBtn,mmBtn,tcBtn,vdBtn,rsBtn);
 }
@@ -63529,7 +63735,7 @@ function view(name){
   row('Back to Pause Menu',()=>view('main'));
  }else if(name==='set'){
   h.textContent='Settings';const l=document.createElement('label'),sp=document.createElement('span'),r=document.createElement('input');r.type='range';r.min=.3;r.max=2.5;r.step=.05;r.value=window.__bpSens;sp.textContent='Look sensitivity: '+(+r.value).toFixed(2)+'x';l.append(sp,r);r.oninput=()=>{window.__bpSens=+r.value;sp.textContent='Look sensitivity: '+(+r.value).toFixed(2)+'x';saveSet()};c.appendChild(l);
-  /* === JESSICA PERF START: graphics sliders in pause Settings, same label+range control as Look sensitivity === */{const vl=document.createElement('label'),vs=document.createElement('span'),vr=document.createElement('input');vr.type='range';vr.min=60;vr.max=300;vr.step=10;vr.value=JPS.view();vs.textContent='View distance: '+vr.value+' m';vl.append(vs,vr);vr.oninput=()=>{vs.textContent='View distance: '+vr.value+' m';JPS.set('view',+vr.value)};c.appendChild(vl);
+  /* === JESSICA PERF START: graphics sliders in pause Settings, same label+range control as Look sensitivity === */{const vl=document.createElement('label'),vs=document.createElement('span'),vr=document.createElement('input');vr.type='range';vr.min=JPS.VIEW.min;vr.max=JPS.VIEW.max;vr.step=JPS.VIEW.step;vr.value=JPS.view();vs.textContent='View distance: '+vr.value+' m';vl.append(vs,vr);vr.oninput=()=>{vs.textContent='View distance: '+vr.value+' m';JPS.set('view',+vr.value)};c.appendChild(vl);
    const ql=document.createElement('label'),qs=document.createElement('span'),qr=document.createElement('input');qr.type='range';qr.min=.5;qr.max=Math.max(1,Math.min(2,Math.ceil((devicePixelRatio||1)*20)/20));qr.step=.05;qr.value=Math.min(JPS.scale(),+qr.max);qs.textContent='Render scale: '+Math.round(qr.value*100)+'%';ql.append(qs,qr);qr.oninput=()=>{qs.textContent='Render scale: '+Math.round(qr.value*100)+'%';JPS.set('scale',+qr.value)};c.appendChild(ql);
    const aq=row('Auto quality: '+(JPS.auto()?'on':'off'),()=>{JPS.set('auto',!JPS.auto());aq.textContent='Auto quality: '+(JPS.auto()?'on':'off')})}/* === JESSICA PERF END === */
   const iv=row('Invert Y: '+(window.__bpInv?'on':'off'),()=>{window.__bpInv=!window.__bpInv;iv.textContent='Invert Y: '+(window.__bpInv?'on':'off');saveSet()});
@@ -63601,6 +63807,7 @@ go.onclick=()=>begin(false);cont.onclick=()=>begin(true);
 var on=!/[?&]fps=0/.test(location.search);function show(){el.style.display=on?'block':'none';}
 function add(){document.body.appendChild(el);show();}if(document.body)add();else addEventListener('DOMContentLoaded',add);
 addEventListener('keydown',function(e){if(e.code==='F3'){e.preventDefault();on=!on;show();}},true);
+window.__bpFpsToggle=function(){on=!on;show();return on;};
 var n=0,t=performance.now(),worst=0,last=t;(function loop(now){n++;var d=now-last;last=now;if(d>worst)worst=d;if(now-t>=500){if(on)el.textContent=Math.round(n*1000/(now-t))+' FPS  ('+Math.round(worst)+' ms worst)';n=0;t=now;worst=0;}requestAnimationFrame(loop);})(t);})();
 </script>
 </body></html>

@@ -54859,7 +54859,8 @@ function jfRaidGo(n,r,sp,dt){const cp=r.cp,gd=cp.gd,shut=!!(gd&&!gd.open);if(n.s
   return stepTo(n,r.w[0],r.w[1],sp,dt)}
  const sv=n.tgtSettler;n._jfG=1;if(cp.n)n.tgtSettler=cp.n;try{return go(n,r.w[0],r.w[1],sp,dt)}finally{n._jfG=0;n.tgtSettler=sv}}
 // === JESSICA FIX END ===
-function go(n,tx,tz,sp,dt){/* === JESSICA FIX START: raiders route through compound gates === */if(n.k==='raider'&&!n.cmp&&!n._jfG){const jr=jfRaidGate(n,tx,tz);if(jr)return jfRaidGo(n,jr,sp,dt)}/* === JESSICA FIX END === */if(n.cmp&&n.k==='settler'&&!cmpInside(n.cmp,tx,tz))cmpLock(n);if(n.cmp){const r=cmpGo(n,tx,tz);if(r){tx=r[0];tz=r[1];const l=cmpLocal(n.cmp,n.x,n.z);if(Math.abs(l[0])<2.4&&l[1]<-10.5&&l[1]>-27.5){n.pth=[];n.pT=null;return stepTo(n,tx,tz,sp,dt)}}}if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
+/* FRED STUCK NET */function fredLos(n,ax,az,bx,bz){const d=Math.hypot(bx-ax,bz-az);for(let u=.3;u<d;u+=.3)if(blkAt(n,ax+(bx-ax)*u/d,az+(bz-az)*u/d))return false;return !blkAt(n,bx,bz)}function fredNudge(n,tx,tz){let best=null,bs=1e9;const d0=Math.hypot(tx-n.x,tz-n.z);for(const r of[1.2,2,3,4.5,6])for(let k=0;k<16;k++){const a=k*.3927+(n.seed||0),x=n.x+Math.cos(a)*r,z=n.z+Math.sin(a)*r;if(Math.abs(x)>B-4||Math.abs(z)>B-4||H(x,z)<.65||!fredLos(n,n.x,n.z,x,z))continue;const sc=Math.hypot(tx-x,tz-z)-d0+r*.35;if(sc<bs){bs=sc;best=[x,z]}}if(!best)return false;n.x=best[0];n.z=best[1];n.y=Math.max(G(n.x,n.z,n.y),H(n.x,n.z),0);if(n.m)n.m.position.set(n.x,n.y,n.z);return true}function fredDrop(n){n.pth=[];n.pT=null;n.side=-(n.side||1);n.detT=2.5;n.stuck=0;n._replan=0;if(n.k==='settler'){if(n.lt){(n.bad=n.bad||new Set()).add(n.lt);if(n.bad.size>6)n.bad.clear();n.lt=null}n.nextRigCheck=age+60;n.svcT0=0;n.svcD=null;n.job=null;n.rigGo=null;n.treeGo=null;n.treeT=30;n.outLock=0;n.ws=99}else{n.patP=null;n.patW=1+Math.random()*2}n.gwDrops=(n.gwDrops||0)+1}function fredWatch(n,tx,tz,dt){if(!n||n.siege||n.cmp||n.aggro>0||!(dt>0))return;const g=n.gw,d=Math.hypot(tx-n.x,tz-n.z);if(!g||Math.hypot(g.x-tx,g.z-tz)>2.5){n.gw={x:tx,z:tz,best:d,t:0,k:(g&&Math.hypot(g.x-tx,g.z-tz)<6)?g.k:0};return}if(d<g.best-.4||d<1.6){g.best=d;g.t=0;g.k=0;return}if((g.t+=dt)<4)return;g.t=0;g.best=d;g.k++;fredDrop(n);if(g.k>=5){g.k=0;if(fredNudge(n,tx,tz))n.gwNudges=(n.gwNudges||0)+1}}
+function go(n,tx,tz,sp,dt){fredWatch(n,tx,tz,dt);/* === JESSICA FIX START: raiders route through compound gates === */if(n.k==='raider'&&!n.cmp&&!n._jfG){const jr=jfRaidGate(n,tx,tz);if(jr)return jfRaidGo(n,jr,sp,dt)}/* === JESSICA FIX END === */if(n.cmp&&n.k==='settler'&&!cmpInside(n.cmp,tx,tz))cmpLock(n);if(n.cmp){const r=cmpGo(n,tx,tz);if(r){tx=r[0];tz=r[1];const l=cmpLocal(n.cmp,n.x,n.z);if(Math.abs(l[0])<2.4&&l[1]<-10.5&&l[1]>-27.5){n.pth=[];n.pT=null;return stepTo(n,tx,tz,sp,dt)}}}if(!n.pT||Math.hypot(n.pT[0]-tx,n.pT[1]-tz)>2.2||(n.pR-=dt)<=0){n.pT=[tx,tz];n.pR=2.8;n.pth=plan(n,tx,tz)}
  while(n.pth.length&&Math.hypot(n.pth[0][0]-n.x,n.pth[0][1]-n.z)<.85)n.pth.shift();
  const w=n.pth.length?n.pth[0]:[tx,tz];return stepTo(n,w[0],w[1],sp,dt)}
 function gatherNode(n,kinds,flt){let farm=null,fd=1e9,b=null,bd=1e9;const list=resList();for(let i=0;i<list.length;i++){const o=list[i],k=o.userData.k;if(!kinds.includes(k)||(n.bad&&n.bad.has(o))||(flt&&!flt(o)))continue;const d=Math.hypot(o.position.x-n.x,o.position.z-n.z);if(o.userData.farm===n){if(d<fd){fd=d;farm=o}}else if(!o.userData.farm&&d<230&&d<bd&&!campDanger(n,o.position.x,o.position.z)){bd=d;b=o}}return farm||b}
@@ -55735,14 +55736,14 @@ function serviceCompoundRigs(n,dt){
   const needsFuel=(k==='pump'||k==='quarry')&&slotSum(d.sl,0,3,'fuel')<2&&(n.inv.fuel||0)>0;
   const needsCrude=(k==='refinery')&&slotSum(d.sl,0,3,'crude')<2&&(n.inv.crude||0)>0;
   if(out>0||needsFuel||needsCrude){
-   if(Math.hypot(d.x-n.x,d.z-n.z)>3.4){go(n,d.x+1.6,d.z+1.6,3.6,dt);return true}
+   {/* fred: one rig per trip, whole trip capped at 12 s */if(!n.svcT0)n.svcT0=age;if(age-n.svcT0>12){n.svcT0=0;n.svcD=null;n.nextRigCheck=age+60;return false}if(n.svcD&&n.svcD!==d&&!n.svcD._gone)continue;if(n.svcD!==d){n.svcD=d;n.svcB=1e9;n.svcS=0}const dd=Math.hypot(d.x-n.x,d.z-n.z);if(dd>3.4){if(dd<n.svcB-.3){n.svcB=dd;n.svcS=0}else n.svcS+=dt;if(!(n.svcS>2&&dd<7.5)){go(n,d.x+1.6,d.z+1.6,3.6,dt);return true}}n.svcD=null}
    rigPull(n,d);
    rigStock(n);
    n.cd=.25;
   }
  }
  // Cooldown so the settler leaves the compound to gather in the world
- n.nextRigCheck=age+60; // fred: user's 60 s collect cooldown
+ n.nextRigCheck=age+60;n.svcT0=0;n.svcD=null; // fred: user's 60 s collect cooldown
  return false;
 }
 

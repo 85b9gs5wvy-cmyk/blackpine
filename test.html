@@ -56143,7 +56143,7 @@ function raidInstant(n){
 }
 function drySite(x,z,minD,loose){const md=minD==null?140:minD,mpad=loose?18:48,relief=loose?3.6:2.6,minH=loose?.85:1.15,maxH=loose?8.2:6.6;for(let r=0;r<10;r++)for(let k=0;k<8;k++){const a=k*.785+r*.17,d=r*18,nx=x+Math.cos(a)*d,nz=z+Math.sin(a)*d;if(Math.abs(nx)>B-90||Math.abs(nz)>B-90)continue;if(Math.hypot(nx-SP.x,nz-SP.z)<md)continue;if(MONS.some(m=>Math.hypot(m.x-nx,m.z-nz)<m.r+mpad))continue;if(NP.some(q=>Math.hypot((q.lot?q.lot.x:q.hx)-nx,(q.lot?q.lot.z:q.hz)-nz)<115))continue;if(typeof inRiver==='function'&&(inRiver(nx,nz,26)||inPond(nx,nz)))continue;const h=H(nx,nz);if(h<minH||h>maxH)continue;let lo=h,hi=h;for(const p of[[16,0],[-16,0],[0,16],[0,-16]]){const qh=H(nx+p[0],nz+p[1]);lo=Math.min(lo,qh);hi=Math.max(hi,qh)}if(hi-lo<relief&&lo>.85)return[nx,nz]}return null}
 function clearLook(tx,tz){let best=null,bs=1e9;for(let k=0;k<24;k++){const a=k*.262+0.35,x=tx+Math.cos(a)*17,z=tz+Math.sin(a)*17,h=H(x,z);if(h<1.2||h>6.4)continue;let block=0;for(const o of things){if(o.userData.k!=='tree'&&o.userData.k!=='rock')continue;const px=o.position.x,pz=o.position.z,dx=tx-x,dz=tz-z,l2=dx*dx+dz*dz||1;let u=((px-x)*dx+(pz-z)*dz)/l2;if(u<.06||u>.92)continue;if(Math.hypot(px-(x+dx*u),pz-(z+dz*u))<2.6)block++}const pen=block*12+Math.abs(h-2.4);if(pen<bs){bs=pen;best=[x,z,h,block]}}return best}
-function spawnSettlers(){const cols=[0x3b6ea5,0x4a8a52,0xa5823b,0x8a4a9a,0x3b8a8a,0x9a3b4a,0x6a6a3b,0x4a4a9a,0x9a6a3b,0x3b9a6a,0x6a3b9a,0x9a9a3b,0x3b6a9a,0x9a3b6a,0x5a8a3b,0x8a5a3b];const want=12;const bear=(x,z)=>Math.atan2(-(x-SP.x),-(z-SP.z));const ad=(a,b)=>{let d=Math.abs(a-b)%6.283185;if(d>3.141593)d=6.283185-d;return d};const fwd=(th,dist)=>[SP.x-Math.sin(th)*dist,SP.z-Math.cos(th)*dist];let nx=SP.x+68,nz=SP.z+12;if(MONS.length){let b=MONS[0],bd=1e9;for(const m of MONS){const d=Math.hypot(m.x-SP.x,m.z-SP.z);if(d<bd){bd=d;b=m}}const dx=b.x-SP.x,dz=b.z-SP.z,l=Math.hypot(dx,dz)||1;nx=SP.x+dx/l*70;nz=SP.z+dz/l*70}const keep=LOT_MIN;LOT_MIN=40;const cands=[];for(const s of [1.2,-1.2,1.75,-1.75,2.35,-2.35])cands.push(fwd(faceYaw+s,54));cands.push([nx,nz]);for(let k=0;k<12;k++)cands.push(fwd(faceYaw+.85+k*.42,48+(k%4)*11));const plantAt=need=>{for(const c of cands){const near=drySite(c[0],c[1],32,1);if(!near||Math.hypot(near[0]-SP.x,near[1]-SP.z)>100)continue;if(need&&ad(bear(near[0],near[1]),faceYaw)<.95)continue;if(mkSettler(near[0],near[1],cols[0],{close:1,build:1})){NP[NP.length-1].close=1;return true}}return false};if(!plantAt(true))plantAt(false);LOT_MIN=keep;for(let i=0;NP.length<want&&i<want*18;i++){const x=(hash(i*2.17,9.4)*2-1)*(B-150),z=(hash(4.4,i*3.11)*2-1)*(B-150),site=drySite(x,z,70,1);if(site)mkSettler(site[0],site[1],cols[NP.length%cols.length],NP.length%3===0?{build:1}:undefined)}const home=NP.slice().sort((a,b)=>Math.hypot((a.lot?a.lot.x:a.x)-SP.x,(a.lot?a.lot.z:a.z)-SP.z)-Math.hypot((b.lot?b.lot.x:b.x)-SP.x,(b.lot?b.lot.z:b.z)-SP.z))[0];if(home&&home.lot){const ax=(home.lot.x+home.x)*.5,az=(home.lot.z+home.z)*.5;const spot=clearLook(ax,az);if(spot){P.x=LP.x=spot[0];P.z=LP.z=spot[1];P.y=spot[2]+1.7}yaw=Math.atan2(-(ax-P.x),-(az-P.z));pitch=-.32;if(Math.hypot(home.lot.x-P.x,home.lot.z-P.z)<140){say('Down the road a settler put a cupboard down and is building the camp out from it. A cupboard room, a workshop, a loot room and a bedroom upstairs still have to go up.');msgT=8}}}
+function spawnSettlers(){const cols=[0x3b6ea5,0x4a8a52,0xa5823b,0x8a4a9a,0x3b8a8a,0x9a3b4a,0x6a6a3b,0x4a4a9a,0x9a6a3b,0x3b9a6a,0x6a3b9a,0x9a9a3b,0x3b6a9a,0x9a3b6a,0x5a8a3b,0x8a5a3b];const want=12;const bear=(x,z)=>Math.atan2(-(x-SP.x),-(z-SP.z));const ad=(a,b)=>{let d=Math.abs(a-b)%6.283185;if(d>3.141593)d=6.283185-d;return d};const fwd=(th,dist)=>[SP.x-Math.sin(th)*dist,SP.z-Math.cos(th)*dist];let nx=SP.x+68,nz=SP.z+12;if(MONS.length){let b=MONS[0],bd=1e9;for(const m of MONS){const d=Math.hypot(m.x-SP.x,m.z-SP.z);if(d<bd){bd=d;b=m}}const dx=b.x-SP.x,dz=b.z-SP.z,l=Math.hypot(dx,dz)||1;nx=SP.x+dx/l*70;nz=SP.z+dz/l*70}const keep=LOT_MIN;LOT_MIN=40;const cands=[];for(const s of [1.2,-1.2,1.75,-1.75,2.35,-2.35])cands.push(fwd(faceYaw+s,54));cands.push([nx,nz]);for(let k=0;k<12;k++)cands.push(fwd(faceYaw+.85+k*.42,48+(k%4)*11));const plantAt=need=>{for(const c of cands){const near=drySite(c[0],c[1],32,1);if(!near||Math.hypot(near[0]-SP.x,near[1]-SP.z)>100)continue;if(need&&ad(bear(near[0],near[1]),faceYaw)<.95)continue;if(mkSettler(near[0],near[1],cols[0],{close:1,build:1})){NP[NP.length-1].close=1;return true}}return false};if(!plantAt(true))plantAt(false);LOT_MIN=keep;let preN=NP.filter(q=>q.cmp).length;for(let i=0;NP.length<want&&i<want*18;i++){const x=(hash(i*2.17,9.4)*2-1)*(B-150),z=(hash(4.4,i*3.11)*2-1)*(B-150),site=drySite(x,z,70,1);if(site){const wantPre=preN<2;if(mkSettler(site[0],site[1],cols[NP.length%cols.length],wantPre?undefined:{build:1})&&wantPre&&NP[NP.length-1].cmp)preN++}}const home=NP.slice().sort((a,b)=>Math.hypot((a.lot?a.lot.x:a.x)-SP.x,(a.lot?a.lot.z:a.z)-SP.z)-Math.hypot((b.lot?b.lot.x:b.x)-SP.x,(b.lot?b.lot.z:b.z)-SP.z))[0];if(home&&home.lot){const ax=(home.lot.x+home.x)*.5,az=(home.lot.z+home.z)*.5;const spot=clearLook(ax,az);if(spot){P.x=LP.x=spot[0];P.z=LP.z=spot[1];P.y=spot[2]+1.7}yaw=Math.atan2(-(ax-P.x),-(az-P.z));pitch=-.32;if(Math.hypot(home.lot.x-P.x,home.lot.z-P.z)<140){say('Down the road a settler put a cupboard down and is building the camp out from it. A cupboard room, a workshop, a loot room and a bedroom upstairs still have to go up.');msgT=8}}}
 let RES=[], resAt=-10;
 function resList(){
   if(age-resAt<1.6&&RES.length)return RES;
@@ -56572,7 +56572,8 @@ function raidTurretAct(e,dt,speed,d){const G=RGUN[e.gun],dx=d.x-e.x,dz=d.z-e.z,q
  go(e,d.x,d.z,speed*1.1,dt);return true}
 // ===== MONUMENT ROGUES: melee & pistol/shotgun scavengers guarding the bigger monuments, hostile to EVERYONE =====
 const MELEE_IDS=['club','spear','knife','machete'],ROG=[];
-function rogueCount(mo){if(!mo||mo.raiderCamp||!mo.w||!mo.d)return 0;const a=mo.w*mo.d;return a>=36?3:a>=20?2:0}
+function inSafeOutpost(x,z,pad){for(const m of MONS){if((m.safeZone||m.n==="Trading Post"||m.n==="Trading Outpost")&&Math.hypot(x-m.x,z-m.z)<(m.r||18)+(pad||14))return true}return false}
+function rogueCount(mo){if(!mo||mo.raiderCamp||mo.safeZone||mo.n==="Trading Post"||mo.n==="Trading Outpost"||!mo.w||!mo.d)return 0;const a=mo.w*mo.d;return a>=36?3:a>=20?2:0}
 function spawnRogue(mo,i){
  const mel=MELEE_IDS[(i+((Math.abs(mo.x+mo.z))|0))%MELEE_IDS.length];
  const isMel=i%2===1,gun=isMel?null:(i%4===2?'shotgun':'pistol'),G=gun?RGUN[gun]:null,R=Math.max(mo.w,mo.d)*C/2+2.5;
@@ -56739,7 +56740,7 @@ function raidTick(dt){const pc=ch('peace');const raidDay=(days+1)%5===0;
  if(!pc&&!raidDay&&dl()<.3&&EN.filter(e=>!e.siege&&!e.camp&&!e.rogue).length<DF.nightMax&&(rt-=dt)<=0){rt=DF.night;spawnRaider(false)}
  campTick(dt,pc);
  rogueRespawn(dt,pc);
- for(let i=EN.length-1;i>=0;i--){const e=EN[i];if(pc&&e.hp>0){e.hp=-99;e._despawn=1}else if(!e.siege&&!e.camp&&dl()>.55&&!e.cheat&&e.hp>0){e.hp=-99;e._despawn=1}if(e.hp<=0){dropFoe(e);EN.splice(i,1);if(!e._despawn&&e.hp!==-99){const rem=e.camp?e.camp.raiders.filter(q=>q&&q!==e&&q.hp>0).length:0;say(e.rogue?(e.gun?'Rogue gunman down.':'Monument rogue down.'):e.warlord?'Raider Warlord eliminated!':e.camp?('Camp raider eliminated ('+rem+' left at '+e.camp.n+').'):e.siege?'Siege raider down.':'Raider eliminated.');lootRaider(e);RT.blood+=e.warlord?2.5:e.camp?1.4:1;bumpHeat(e.warlord?.25:.1)}continue}
+ for(let i=EN.length-1;i>=0;i--){const e=EN[i];if((pc||inSafeOutpost(e.x,e.z,10))&&e.hp>0){e.hp=-99;e._despawn=1}else if(!e.siege&&!e.camp&&dl()>.55&&!e.cheat&&e.hp>0){e.hp=-99;e._despawn=1}if(e.hp<=0){dropFoe(e);EN.splice(i,1);if(!e._despawn&&e.hp!==-99){const rem=e.camp?e.camp.raiders.filter(q=>q&&q!==e&&q.hp>0).length:0;say(e.rogue?(e.gun?'Rogue gunman down.':'Monument rogue down.'):e.warlord?'Raider Warlord eliminated!':e.camp?('Camp raider eliminated ('+rem+' left at '+e.camp.n+').'):e.siege?'Siege raider down.':'Raider eliminated.');lootRaider(e);RT.blood+=e.warlord?2.5:e.camp?1.4:1;bumpHeat(e.warlord?.25:.1)}continue}
   if(e.rogue){driveRogue(e,dt);continue}
   if(ROG.length&&!e.flee){const rg=rogueNear(e);if(rg){rogueFire(e,dt,rg);animMan(e,dt);continue}}
   if(e.camp){/* === JESSICA PERF START: far calm camp raiders at 10 Hz === */jpCampDrive(e,dt)/* === JESSICA PERF END === */;continue}
@@ -57301,7 +57302,7 @@ function animalTick(dt){const pc=ch('peace');
    stepBeast(a,tx,tz,5.6,dt);
   }else{/* === JESSICA PERF START: far idle animals wander at 4 Hz (accumulated dt) === */if(d>jpEffView()){a._jw=(a._jw||0)+dt;if(a._jw>=.25){wander(a,1.3,Math.min(a._jw,.5));a._jw=0}}else wander(a,1.3,dt)/* === JESSICA PERF END === */}
   /* === JESSICA PERF START: skip hidden animal anim === */if(!a.m||a.m.visible)animBeast(a,dt)}/* === JESSICA PERF END === */
- for(let i=WV.length-1;i>=0;i--){const a=WV[i];a._mv=0;const d=Math.hypot(P.x-a.x,P.z-a.z);if(a.hp<=0||pc||d>220){killAnimal(a,a.hp<=0&&!pc&&d<=80);continue}
+ for(let i=WV.length-1;i>=0;i--){const a=WV[i];a._mv=0;const d=Math.hypot(P.x-a.x,P.z-a.z);if(a.hp<=0||pc||d>220||inSafeOutpost(a.x,a.z,10)){killAnimal(a,a.hp<=0&&!pc&&d<=80);continue}
   a.cd=Math.max(0,a.cd-dt);a.aggro=Math.max(0,a.aggro-dt);
   const detectR=(dl()<.4?32:17);
   if(d<detectR||a.aggro>0){
@@ -58948,10 +58949,10 @@ function mkOreNode(){const g=new T.Group();
  jimNodeMerge(g);/*jim-nature7 ore*/g.scale.setScalar(1.55);g.userData.uses=2;g.userData.rad=.88;return g}
 function resamplePath(path,step){if(!path||path.length<2)return path?path.slice():[];const out=[Object.assign({},path[0])];let acc=0;for(let i=1;i<path.length;i++){const p0=path[i-1],p1=path[i];if(p0._onBridge||p1._onBridge||p0._bridgeEnd||p1._bridgeEnd){out.push(Object.assign({},p1));acc=0;continue}let x0=p0.x,z0=p0.z,x1=p1.x,z1=p1.z,seg=Math.hypot(x1-x0,z1-z0);if(seg<1e-4)continue;while(acc+seg>=step){const t=(step-acc)/Math.max(seg,1e-4);x0+=(x1-x0)*t;z0+=(z1-z0)*t;out.push({x:x0,z:z0});seg=Math.hypot(x1-x0,z1-z0);acc=0;if(out.length>800)return out}acc+=seg}const last=path[path.length-1];if(Math.hypot(out[out.length-1].x-last.x,out[out.length-1].z-last.z)>.6)out.push(Object.assign({},last));return out}
 function dryPath(ax,az,bx,bz){const dx=bx-ax,dz=bz-az,dist=Math.hypot(dx,dz)||1,n=Math.max(2,Math.ceil(dist/14)),px=-dz/dist,pz=dx/dist,pts=[];
- const amp=Math.min(20,dist*.085),p1=hash(ax*.37+bz,az*.41+bx)*6.283,p2=hash(bx*.53+az,bz*.29+ax)*6.283,f1=1.2+hash(ax,bz)*1.1;
+ const amp=Math.min(5,dist*.025),p1=hash(ax*.37+bz,az*.41+bx)*6.283,p2=hash(bx*.53+az,bz*.29+ax)*6.283,f1=1.2+hash(ax,bz)*1.1;
  for(let i=0;i<=n;i++){const t=i/n,m=Math.sin(Math.PI*t)*amp*(Math.sin(t*Math.PI*f1*2+p1)*.7+Math.sin(t*Math.PI*5.3+p2)*.3);let x=ax+dx*t+px*m,z=az+dz*t+pz*m;if(i>0&&i<n&&H(x,z)<.55&&!(typeof inRiver==='function'&&inRiver(x,z,4))){let bh=H(x,z),bx2=x,bz2=z;for(const s of[12,-12,24,-24,40,-40]){const nx=x+px*s,nz=z+pz*s,nh=H(nx,nz);if(nh>bh){bh=nh;bx2=nx;bz2=nz}}x=bx2;z=bz2}pts.push({x,z})}
- let sm=pts;for(let pass=0;pass<2&&sm.length>2;pass++){const q=[sm[0]];for(let i=1;i<sm.length-1;i++)q.push({x:(sm[i-1].x+sm[i].x*2+sm[i+1].x)/4,z:(sm[i-1].z+sm[i].z*2+sm[i+1].z)/4});q.push(sm[sm.length-1]);sm=q}return sm}
-function monGate(m,toward){const a=Math.atan2(toward.z-m.z,toward.x-m.x),r=(m.r||14)+10;return{x:m.x+Math.cos(a)*r,z:m.z+Math.sin(a)*r}}
+ let sm=pts;for(let pass=0;pass<4&&sm.length>2;pass++){const q=[sm[0]];for(let i=1;i<sm.length-1;i++)q.push({x:(sm[i-1].x+sm[i].x*2+sm[i+1].x)/4,z:(sm[i-1].z+sm[i].z*2+sm[i+1].z)/4});q.push(sm[sm.length-1]);sm=q}return sm}
+function monGate(m,toward){const dx=toward.x-m.x,dz=toward.z-m.z;let gx=0,gz=1;if(Math.abs(dx)>Math.abs(dz)*.92){gx=dx>=0?1:-1;gz=0}else{gz=dz>=0?1:-1}const pe=gx!==0?(m.w||4)*C/2:(m.d||4)*C/2,r=Math.max(pe+14,(m.r||14)+8);return{x:m.x+gx*r,z:m.z+gz*r}}
 function monRing(m){const r=(m.r||14)+10,pts=[];for(let i=0;i<=64;i++){const a=i/64*6.283185;pts.push({x:m.x+Math.cos(a)*r,z:m.z+Math.sin(a)*r,_ring:1})}return pts}
 function pairBeside(a,b){const dx=b.x-a.x,dz=b.z-a.z,d=Math.hypot(dx,dz)||1,px=-dz/d,pz=dx/d,side=hash((a.x+b.x)|0,(a.z+b.z)|0)>.5?1:-1,off=Math.max(a.r||14,b.r||14)+10;return{A:{x:a.x+px*side*off,z:a.z+pz*side*off},B:{x:b.x+px*side*off,z:b.z+pz*side*off}}}
 function rimPoint(m,toward){const dx=toward.x-m.x,dz=toward.z-m.z,d=Math.hypot(dx,dz)||1,px=-dz/d,pz=dx/d,side=hash(Math.round(m.x),Math.round((toward.x||0)+(toward.z||0)))>.5?1:-1,off=(m.r||14)+12;return {x:m.x+px*side*off,z:m.z+pz*side*off}}
@@ -59892,7 +59893,7 @@ function layRoads(){digPonds();digRivers();const mains=[];if(MONS.length>=2){con
  cand.sort((a,b)=>a[0]-b[0]);for(const c of cand.slice(0,3))edges.push([c[1],c[2]]);
  // Generation order: world -> rivers (digRivers above) -> bridges (planBridges) -> roads (pave routes onto the pre-placed bridges).
  // roundabouts only where 3+ roads meet; other monuments get a direct road to their gate (the ring+spokes read as blocky)
- const deg=pts.map((_,i)=>edges.filter(e=>e[0]===i||e[1]===i).length),gate=(m,t,i)=>{const a=Math.atan2(t.z-m.z,t.x-m.x),r=(m.r||14)+8;return{x:m.x+Math.cos(a)*r,z:m.z+Math.sin(a)*r}};
+ const deg=pts.map((_,i)=>edges.filter(e=>e[0]===i||e[1]===i).length),gate=(m,t,i)=>monGate(m,t);
  // no ring roads (user, round 15): every road runs straight in to the monument edge; rings made most of the stacked junction strips
  const plan=[],acc=[];
  for(const e of edges){const A=gate(pts[e[0]],pts[e[1]],e[0]),Bp=gate(pts[e[1]],pts[e[0]],e[1]);for(const seg of trimToNetwork(dryPath(A.x,A.z,Bp.x,Bp.z),acc,26,40,Math.min(34,Math.hypot(A.x-Bp.x,A.z-Bp.z)*.5))){plan.push([seg,'road',22,1]);acc.push(seg)}}
@@ -63262,6 +63263,7 @@ function lightFire(x,z,life){const y=H(x,z),g=new T.Group();
 const dl=()=>(Math.sin(2*Math.PI*(t-.25))+1)/2;
 const day=new T.Color(0x8eb4c9),night=new T.Color(0x05080f),tmp=new T.Color();
 function update(dt){
+ if(window.__bpMPtick)try{window.__bpMPtick(dt)}catch(e){}
  if(dead)return;age+=dt;hurtFx=Math.max(0,hurtFx-dt*1.6);
  const fwd=ch('freeze')?0:(CH.on?CH.ts:1),tn=t+dt*fwd*pace/REAL_DAY;if(tn>=1)days++;t=tn%1;
  let f=-jv.y,s=jv.x;if(keys.w||keys.arrowup)f++;if(keys.s||keys.arrowdown)f--;if(keys.d||keys.arrowright)s++;if(keys.a||keys.arrowleft)s--;
@@ -63605,7 +63607,10 @@ let last=performance.now();
 let rafId=0;
 function loop(n){if(gen!==GEN)return;const rawDt=(n-last)/1000,dt=Math.max(0,Math.min(.1,rawDt))||0;last=n;if(!window.__bpPause&&!window.__bpPortrait){update(dt);hudT+=dt;if(hudT>=.08){hudT=0;hud()}adaptRes(rawDt);/* === JESSICA PERF START: per-frame culling, light pool, 5 Hz LOD ticks === */jpFrame(rawDt);/* === JESSICA PERF END === */ren.render(scene,cam)}else if(window.__bpSnap){window.__bpSnap=0;update(.016);hud();ren.render(scene,cam)}rafId=requestAnimationFrame(loop)}
 rafId=requestAnimationFrame(loop);
-return {setGather:v=>{GATHER=v},getGather:()=>GATHER,getDifficulty:()=>DIFFK,difficulties:Object.keys(DIFFS),setDifficulty:k=>{if(!DIFFS[k])return DIFFK;DIFFK=k;DF=DIFFS[k];CAMP_RESPAWN=DF.campResp;for(const c of RCAMPS)if(c.reinforceT>CAMP_RESPAWN)c.reinforceT=CAMP_RESPAWN;persist('manual');say('Difficulty: '+DF.n+'. Raids, camps and settlers use it from now on.');return DIFFK},cheats:()=>toggleCheat(),setPace:v=>setPace(v),getPace:()=>pace,paces:PACES,getClaimName:()=>claimName,setClaimName:nm=>{claimName=String(nm||'').trim()||claimName;persist('manual');return claimName},getSlotId:()=>slotId,setSlotId:id=>{if(id)slotId=id;return slotId},saveNow:(kind)=>{persist(kind||'manual');say('Saved claim: '+claimName+'.');return snapshot()},saveAsNew:(nm)=>{slotId='slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);if(nm)claimName=String(nm).trim()||claimName;persist('manual');say('Saved new slot: '+claimName+'.');return snapshot()},getSnapshot:nm=>snapshot(nm),exportSave:()=>{persist('manual');return JSON.stringify(snapshot())},lock:()=>lookLock(true),destroy(){try{if(document.pointerLockElement===cv)document.exitPointerLock()}catch(e){}window.removeEventListener('resize',rs);window.removeEventListener('blur',onBlurClear);document.removeEventListener('visibilitychange',onVis);window.removeEventListener('pointermove',tipGuard);window.removeEventListener('pointerdown',tipGuard);window.removeEventListener('blur',tipGuard);document.removeEventListener('mouseleave',tipGuard);document.removeEventListener('visibilitychange',tipGuard);if(GEN===gen)GEN++;cancelAnimationFrame(rafId);try{ren.dispose();ren.forceContextLoss()}catch(e){}window.__controlsTest=undefined;window.__bp=undefined;root.replaceChildren()}};
+window.__bpMPctx={gen,T,scene,cam,root,P,S,spawnMan,animMan,H:(x,z)=>H(x,z),say:m=>say(m),
+ get yaw(){return yaw},get pitch(){return pitch},get t(){return t},set t(v){t=v},get days(){return days},set days(v){days=v},get dead(){return dead},get age(){return age},
+ held:()=>{const q=SL[sel];return q&&ITEMS[q.id]?ITEMS[q.id].n:''},snapshot:()=>snapshot(),diff:()=>DIFFK,claim:()=>claimName};
+return {setGather:v=>{GATHER=v},getGather:()=>GATHER,getDifficulty:()=>DIFFK,difficulties:Object.keys(DIFFS),setDifficulty:k=>{if(!DIFFS[k])return DIFFK;DIFFK=k;DF=DIFFS[k];CAMP_RESPAWN=DF.campResp;for(const c of RCAMPS)if(c.reinforceT>CAMP_RESPAWN)c.reinforceT=CAMP_RESPAWN;persist('manual');say('Difficulty: '+DF.n+'. Raids, camps and settlers use it from now on.');return DIFFK},cheats:()=>toggleCheat(),setPace:v=>setPace(v),getPace:()=>pace,paces:PACES,getClaimName:()=>claimName,setClaimName:nm=>{claimName=String(nm||'').trim()||claimName;persist('manual');return claimName},getSlotId:()=>slotId,setSlotId:id=>{if(id)slotId=id;return slotId},saveNow:(kind)=>{persist(kind||'manual');say('Saved claim: '+claimName+'.');return snapshot()},saveAsNew:(nm)=>{slotId='slot_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);if(nm)claimName=String(nm).trim()||claimName;persist('manual');say('Saved new slot: '+claimName+'.');return snapshot()},getSnapshot:nm=>snapshot(nm),exportSave:()=>{persist('manual');return JSON.stringify(snapshot())},lock:()=>lookLock(true),destroy(){try{if(document.pointerLockElement===cv)document.exitPointerLock()}catch(e){}window.removeEventListener('resize',rs);window.removeEventListener('blur',onBlurClear);document.removeEventListener('visibilitychange',onVis);window.removeEventListener('pointermove',tipGuard);window.removeEventListener('pointerdown',tipGuard);window.removeEventListener('blur',tipGuard);document.removeEventListener('mouseleave',tipGuard);document.removeEventListener('visibilitychange',tipGuard);if(GEN===gen)GEN++;try{window.__bpMPgone&&window.__bpMPgone(gen)}catch(e){}window.__bpMPctx=undefined;cancelAnimationFrame(rafId);try{ren.dispose();ren.forceContextLoss()}catch(e){}window.__controlsTest=undefined;window.__bp=undefined;root.replaceChildren()}};
 
 }
 (function(){
@@ -64058,7 +64063,7 @@ function launchSlot(slotId){
 }
 window.__bpLaunchSlot=launchSlot;
 refreshMenuUI();
-go.onclick=()=>begin(false);cont.onclick=()=>begin(true);
+go.onclick=()=>begin(false);cont.onclick=()=>begin(true);window.__bpBegin=begin;
 })();
 </script><script>/* BP FPS counter: F3 toggles, or add ?fps=1 to the URL */
 (function(){var el=document.createElement('div');el.id='bpFps';el.style.cssText='position:fixed;top:6px;right:8px;z-index:99999;font:bold 13px monospace;color:#7CFC00;background:rgba(0,0,0,.55);padding:3px 7px;border-radius:4px;pointer-events:none;display:none';
@@ -64069,3 +64074,503 @@ window.__bpFpsToggle=function(){on=!on;show();return on;};
 var n=0,t=performance.now(),worst=0,last=t;(function loop(now){n++;var d=now-last;last=now;if(d>worst)worst=d;if(now-t>=500){if(on)el.textContent=Math.round(n*1000/(now-t))+' FPS  ('+Math.round(worst)+' ms worst)';n=0;t=now;worst=0;}requestAnimationFrame(loop);})(t);})();
 </script>
 </body></html>
+<style id="bp-mp-css">
+.mp-box{margin-top:14px;padding:12px 14px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:rgba(18,20,22,.55)}
+.mp-box.invited{border-color:#c9d63a;box-shadow:0 0 0 2px rgba(201,214,58,.25)}
+.mp-hd{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;justify-content:space-between;margin-bottom:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:12px;color:#e6e6e0}
+.mp-hd small{font-weight:400;text-transform:none;letter-spacing:0;color:#b4ad9e;font-size:11px}
+.mp-row{display:flex;gap:8px;margin-top:8px}
+.mp-row input{flex:1;min-width:0;padding:9px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.35);color:#e6e6e0;font:inherit;font-size:14px}
+.mp-row button{flex:1;padding:9px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#e6e6e0;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.mp-row button:hover:not(:disabled){background:rgba(201,214,58,.22);border-color:#c9d63a}
+.mp-row button:disabled{opacity:.45;cursor:default}
+.mp-row #mpJoin{flex:0 0 auto;background:#c9d63a;color:#14120e;border-color:#c9d63a}
+#mpStat{margin:8px 0 0;font-size:12px;min-height:16px;color:#b4ad9e}
+#mpStat.err{color:#ff8a6a}
+#mpPill{position:fixed;left:calc(env(safe-area-inset-left,0px) + 8px);top:calc(env(safe-area-inset-top,0px) + 8px);z-index:60;display:none;padding:5px 10px;border-radius:999px;background:rgba(18,20,22,.78);border:1px solid rgba(255,255,255,.2);color:#e6e6e0;font:700 12px/1.2 "Roboto Condensed",Arial,sans-serif;letter-spacing:.04em;cursor:pointer;user-select:none}
+#mpPill b{color:#c9d63a}
+#mpPop{position:fixed;left:calc(env(safe-area-inset-left,0px) + 8px);top:calc(env(safe-area-inset-top,0px) + 42px);z-index:61;display:none;min-width:220px;max-width:300px;padding:10px 12px;border-radius:10px;background:rgba(18,20,22,.92);border:1px solid rgba(255,255,255,.2);color:#e6e6e0;font:13px/1.35 "Roboto Condensed",Arial,sans-serif}
+#mpPop h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#c9d63a}
+#mpPop .pl{display:flex;align-items:center;gap:7px;padding:2px 0}
+#mpPop .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+#mpPop button{margin:8px 6px 0 0;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.09);color:#e6e6e0;font:inherit;font-weight:700;cursor:pointer}
+#mpPop button.bad{border-color:#c4552a;color:#ff9a78}
+#mpTags{position:fixed;inset:0;pointer-events:none;z-index:20;overflow:hidden}
+.mp-tag{position:absolute;left:0;top:0;transform:translate(-50%,-100%);white-space:nowrap;text-align:center;font:700 13px/1.15 "Roboto Condensed",Arial,sans-serif;color:#fff;text-shadow:0 1px 3px #000,0 0 6px #000;will-change:transform}
+.mp-tag i{display:block;font-style:normal;font-weight:400;font-size:11px;color:#d8d2c2}
+.mp-tag .hpb{display:block;margin:2px auto 0;width:44px;height:3px;background:rgba(0,0,0,.6);border-radius:2px;overflow:hidden}
+.mp-tag .hpb u{display:block;height:100%;background:#7ed957}
+#mpChat{position:fixed;left:calc(env(safe-area-inset-left,0px) + 8px);top:calc(env(safe-area-inset-top,0px) + 44px);z-index:50;width:min(320px,70vw);pointer-events:none;font:13px/1.3 "Roboto Condensed",Arial,sans-serif;color:#eee}
+#mpChat div{margin-top:3px;padding:3px 7px;border-radius:5px;background:rgba(0,0,0,.5);text-shadow:0 1px 2px #000;transition:opacity 1s}
+#mpChat div.old{opacity:0}
+#mpChat div.sys{color:#c9d63a}
+#mpChat b{margin-right:5px}
+#mpPair{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font:14px/1.4 "Roboto Condensed",Arial,sans-serif;color:#e6e6e0}
+#mpPair .pbox{width:min(520px,92vw);max-height:92vh;overflow:auto;padding:16px;border-radius:12px;background:#1b1e19;border:1px solid rgba(255,255,255,.2)}
+#mpPair h3{margin:0 0 4px;color:#c9d63a;font-size:16px;text-transform:uppercase;letter-spacing:.05em}
+#mpPair .hint{margin:0 0 10px;color:#b4ad9e;font-size:12px}
+#mpPair .step{margin-bottom:10px}
+#mpPair textarea{display:block;width:100%;box-sizing:border-box;margin-bottom:6px;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.4);color:#e6e6e0;font:11px monospace;resize:vertical}
+#mpPair button{margin:0 6px 0 0;padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.09);color:#e6e6e0;font:inherit;font-weight:700;cursor:pointer}
+#mpPair button:disabled{opacity:.45}
+#mpPair #pStat{min-height:18px;margin:6px 0;font-size:12px;color:#b4ad9e}#mpPair #pStat.err{color:#ff8a6a}
+#mpPair button.x{border-color:#c4552a;color:#ff9a78}
+#mpIn{position:fixed;left:50%;bottom:16%;transform:translateX(-50%);z-index:70;display:none;width:min(420px,86vw);padding:9px 11px;border-radius:8px;border:1px solid #c9d63a;background:rgba(18,20,22,.92);color:#fff;font:15px "Roboto Condensed",Arial,sans-serif}
+</style>
+<script id="bp-mp">
+/* Blackpine co-op (peer-to-peer, PeerJS). Phases 1-3 + time sync + chat.
+   Host browser runs the real game. Guests start from a snapshot of the host's base and see each other live.
+   Game hooks (all in the main script): window.__bpMPtick, window.__bpMPctx, window.__bpMPgone, window.__bpBegin. */
+(function(){
+'use strict';
+const PEER_SRC=['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js','https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
+const BROKER_FAIL='Could not reach the free PeerJS matchmaking server (it is often down or blocked on some networks). Tick "No-server mode" below and use copy/paste codes instead.',PFX='blackpine-mp-',ALPHA='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const COLORS=['#d9534f','#3f8fd2','#e0a030','#9b59b6','#2ecc71','#e67e22','#1abc9c','#e84393'];
+const COLN=COLORS.map(c=>parseInt(c.slice(1),16));
+const SEND_MS=100,TIME_MS=4000,CHUNK=24000,MAXP=8,STALE_MS=8000,EYE=1.7;
+const ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]};
+const MP={role:null,peer:null,code:'',name:'Player',color:0,myId:'',hostConn:null,conns:new Map(),roster:new Map(),remotes:new Map(),states:new Map(),sendT:0,timeT:0,gen:-1,pending:null,busy:false,animFail:0,direct:false};
+window.__bpMP=MP;
+const $=id=>document.getElementById(id);
+const clean=s=>String(s==null?'':s).replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,16);
+const r2=v=>Math.round(v*100)/100;
+function ctx(){return window.__bpMPctx||null}
+function setStat(msg,err){const e=$('mpStat');if(e){e.textContent=msg||'';e.className=err?'err':''}}
+function lerpAng(a,b,k){const d=(((b-a+Math.PI)%(Math.PI*2))+Math.PI*2)%(Math.PI*2)-Math.PI;return a+d*k}
+function randCode(){let s='';for(let i=0;i<5;i++)s+=ALPHA[Math.random()*ALPHA.length|0];return s}
+function parseRoom(str){str=String(str||'').trim();const m=str.match(/[?&#]room=([A-Za-z0-9]+)/);return(m?m[1]:str).replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,12)}
+function inviteLink(){const o=location.origin;if(!o||o==='null')return 'Room code: '+MP.code;return o+location.pathname+'?room='+MP.code}
+function copyText(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t).then(()=>true,()=>false)}catch(e){}return Promise.resolve(false)}
+
+/* ---------- PeerJS loader ---------- */
+let peerLoad=null;
+function loadPeer(){
+  if(window.Peer)return Promise.resolve();
+  if(peerLoad)return peerLoad;
+  peerLoad=new Promise((res,rej)=>{
+    let i=0;
+    const next=()=>{
+      if(i>=PEER_SRC.length){peerLoad=null;return rej(new Error('Could not load the connection library. Check your network.'))}
+      const s=document.createElement('script');s.src=PEER_SRC[i++];s.crossOrigin='anonymous';
+      s.onload=()=>window.Peer?res():next();s.onerror=()=>{s.remove();next()};
+      document.head.appendChild(s);
+    };next();
+  });
+  return peerLoad;
+}
+function iceCfg(){return{debug:0,config:ICE}}
+
+/* ---------- lobby UI ---------- */
+function buildLobby(){
+  const act=document.querySelector('#title .bp-actions');
+  if(!act||$('mpBox'))return;
+  const box=document.createElement('div');box.className='mp-box';box.id='mpBox';
+  box.innerHTML='<div class="mp-hd"><span>Multiplayer co-op</span><small>No server. The host\'s browser runs the world, so the host must keep the tab open.</small></div>'+
+   '<div class="mp-row"><input id="mpName" maxlength="16" placeholder="Your name" autocomplete="off"></div>'+
+   '<div class="mp-row"><button id="mpHostNew" type="button">Host new claim</button><button id="mpHostCont" type="button">Host saved claim</button></div>'+
+   '<div class="mp-row"><input id="mpCode" maxlength="120" placeholder="Room code or invite link" autocomplete="off" spellcheck="false"><button id="mpJoin" type="button">Join</button></div>'+
+   '<label style="display:flex;gap:7px;align-items:center;margin-top:8px;font-size:12px;color:#b4ad9e"><input type="checkbox" id="mpDirect"> No-server mode (swap copy/paste codes instead of using the free matchmaker)</label><p id="mpStat"></p>';
+  act.insertAdjacentElement('afterend',box);
+  for(const id of ['mpName','mpCode'])$(id).addEventListener('keydown',e=>e.stopPropagation());
+  try{$('mpName').value=localStorage.getItem('blackpine-mp-name')||''}catch(e){}
+  $('mpHostNew').onclick=()=>hostGame(false);
+  $('mpHostCont').onclick=()=>hostGame(true);
+  $('mpJoin').onclick=()=>joinGame();
+  $('mpCode').addEventListener('keydown',e=>{if(e.key==='Enter')joinGame()});
+  $('mpDirect').addEventListener('change',()=>{$('mpJoin').textContent=$('mpDirect').checked?'Join with code':'Join'});
+  const room=parseRoom((location.search.match(/[?&]room=([^&]+)/)||[])[1]||'');
+  if(room){
+    $('mpCode').value=room;box.classList.add('invited');setStat('You were invited to room '+room+'. Enter a name and press Join.');
+    try{box.scrollIntoView({block:'center'})}catch(e){}
+  }
+}
+function brokerFallback(){const d=$('mpDirect');if(d&&!d.checked){d.checked=true;d.dispatchEvent(new Event('change'));setStat(($('mpStat').textContent||'')+' No-server mode is now switched on: press the button again.',true)}}
+function lock(on){for(const id of ['mpHostNew','mpHostCont','mpJoin']){const b=$(id);if(b)b.disabled=on}MP.busy=on}
+function myName(){const v=clean(($('mpName')||{}).value)||'Player'+(Math.random()*90+10|0);try{localStorage.setItem('blackpine-mp-name',v)}catch(e){}return v}
+
+
+/* ---------- no-server transport: copy/paste codes over raw WebRTC ---------- */
+const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const dec=s=>JSON.parse(decodeURIComponent(escape(atob(String(s).replace(/\s+/g,'')))));
+function waitIce(pc){return new Promise(res=>{if(pc.iceGatheringState==='complete')return res();const f=()=>{if(pc.iceGatheringState==='complete'){pc.removeEventListener('icegatheringstatechange',f);res()}};pc.addEventListener('icegatheringstatechange',f);setTimeout(res,7000)})}
+class RawConn{
+  constructor(pc,id){this.pc=pc;this.peer=id;this.dc=null;this.h={};this.open=false;
+    pc.addEventListener('connectionstatechange',()=>{if(pc.connectionState==='failed'||pc.connectionState==='closed')this._down()})}
+  on(e,f){(this.h[e]=this.h[e]||[]).push(f)}
+  emit(e,a){(this.h[e]||[]).slice().forEach(f=>{try{f(a)}catch(x){console.warn('mp',x)}})}
+  attach(dc){this.dc=dc;
+    dc.onopen=()=>this._up();
+    dc.onmessage=e=>{let d;try{d=JSON.parse(e.data)}catch(x){return}this.emit('data',d)};
+    dc.onclose=()=>this._down();
+    if(dc.readyState==='open')setTimeout(()=>this._up(),0)}
+  _up(){if(this.open)return;this.open=true;this.emit('open')}
+  _down(){if(this.open){this.open=false;this.emit('close')}}
+  send(d){if(this.open&&this.dc.readyState==='open')this.dc.send(JSON.stringify(d))}
+  close(){const was=this.open;try{this.dc&&this.dc.close()}catch(e){}try{this.pc.close()}catch(e){}if(was){this.open=false;this.emit('close')}}
+}
+const RTC_CFG={iceServers:ICE.iceServers};
+const sdpOf=pc=>({type:pc.localDescription.type,sdp:pc.localDescription.sdp});
+async function rawInvite(){
+  const pc=new RTCPeerConnection(RTC_CFG),conn=new RawConn(pc,'raw-'+randCode()+randCode());
+  conn.attach(pc.createDataChannel('bp',{ordered:true}));
+  await pc.setLocalDescription(await pc.createOffer());await waitIce(pc);
+  return{code:enc({k:'o',s:sdpOf(pc)}),conn,
+    async accept(ans){const o=dec(ans);if(!o||o.k!=='a')throw new Error('That is not a reply code.');await pc.setRemoteDescription(o.s)}};
+}
+async function rawReply(offerCode){
+  const o=dec(offerCode);if(!o||o.k!=='o')throw new Error('That is not an invite code.');
+  const pc=new RTCPeerConnection(RTC_CFG),conn=new RawConn(pc,'raw-host');
+  pc.ondatachannel=e=>conn.attach(e.channel);
+  await pc.setRemoteDescription(o.s);await pc.setLocalDescription(await pc.createAnswer());await waitIce(pc);
+  return{code:enc({k:'a',s:sdpOf(pc)}),conn};
+}
+MP._raw={rawInvite,rawReply};
+
+/* ---------- pairing dialog (host: Add friend / guest: Join with code) ---------- */
+function closePair(){const m=$('mpPair');if(m)m.remove()}
+function openPair(mode){
+  closePair();
+  const m=document.createElement('div');m.id='mpPair';
+  m.innerHTML='<div class="pbox"><h3></h3><p class="hint"></p><div class="step" id="pS1"></div><div class="step" id="pS2"></div><p id="pStat"></p><button class="x" type="button">Close</button></div>';
+  document.body.appendChild(m);
+  m.querySelector('.x').onclick=closePair;
+  m.addEventListener('keydown',e=>e.stopPropagation());m.addEventListener('keyup',e=>e.stopPropagation());
+  const st=(t,err)=>{const e=$('pStat');if(e){e.textContent=t||'';e.className=err?'err':''}};
+  const ta=(ro,ph)=>{const t=document.createElement('textarea');t.rows=3;t.readOnly=!!ro;t.placeholder=ph||'';t.spellcheck=false;return t};
+  const bt=(txt,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=txt;b.onclick=fn;return b};
+  const copy=async t=>{const ok=await copyText(t.value);if(!ok){t.focus();t.select()}st(ok?'Copied. Send it to your friend (chat, text, email).':'Select the text and copy it manually.')};
+  const s1=$('pS1'),s2=$('pS2');
+  if(mode==='host'){
+    m.querySelector('h3').textContent='Add a friend (no server)';
+    m.querySelector('.hint').textContent='Each friend needs their own invite code. Send it to them, they send a reply code back, and you paste it here.';
+    const out=ta(true,'Invite code appears here'),inp=ta(false,'Paste your friend\'s reply code here');
+    let inv=null;
+    const make=bt('1. Create invite code',async()=>{make.disabled=true;st('Creating…');
+      try{inv=await rawInvite();out.value=inv.code;onHostConn(inv.conn);st('Invite ready. Copy it and send it to your friend.')}catch(e){st('Could not create an invite: '+(e&&e.message||e),1);make.disabled=false}});
+    s1.append(make,out,bt('Copy',()=>copy(out)));
+    s2.append(inp,bt('2. Connect',async()=>{if(!inv)return st('Create an invite code first.',1);try{await inv.accept(inp.value);st('Connecting… your friend should appear in a few seconds.')}catch(e){st('That reply code did not work: '+(e&&e.message||e),1)}}));
+  }else{
+    m.querySelector('h3').textContent='Join with a code (no server)';
+    m.querySelector('.hint').textContent='Paste the invite code your friend sent you, make a reply code, and send the reply back. The game starts once the host connects.';
+    const inp=ta(false,'Paste the host\'s invite code here'),out=ta(true,'Your reply code appears here');
+    s1.append(inp,bt('1. Create reply code',async()=>{
+      if(MP.busy||MP.role)return;st('Working…');
+      try{await rawReplyAndWait(inp.value,out,st)}catch(e){st('That invite code did not work: '+(e&&e.message||e),1)}}));
+    s2.append(out,bt('Copy',()=>copy(out)));
+  }
+}
+async function rawReplyAndWait(code,out,st){
+  MP.name=myName();MP.direct=true;
+  const r=await rawReply(code);out.value=r.code;
+  attachGuest(r.conn,'DIRECT',150000);
+  st('2. Copy the reply code, send it to the host, then wait here. Keep this tab open.');
+}
+
+/* ---------- host ---------- */
+async function hostGame(useSaved){
+  if(MP.busy||MP.role)return;
+  if(useSaved&&$('cont')&&$('cont').disabled){setStat('No saved claim to continue. Use "Host new claim".',true);return}
+  if(typeof window.__bpBegin!=='function'){setStat('Game launcher not ready.',true);return}
+  const direct=!!($('mpDirect')&&$('mpDirect').checked);
+  if(direct){
+    MP.name=myName();MP.color=0;MP.direct=true;MP.role='host';MP.code='DIRECT';MP.myId='host-direct';
+    MP.roster.clear();MP.roster.set(MP.myId,{name:MP.name,color:0});lock(true);setStat('Starting a no-server room…');
+    window.__bpBegin(!!useSaved);return;
+  }
+  MP.direct=false;
+  lock(true);setStat('Opening a room…');
+  try{
+    await loadPeer();
+    MP.name=myName();MP.color=0;
+    const {p,code}=await openRoom();
+    MP.peer=p;MP.code=code;MP.role='host';MP.myId=PFX+code;
+    MP.roster.clear();MP.roster.set(MP.myId,{name:MP.name,color:0});
+    p.on('connection',onHostConn);
+    p.on('error',e=>{if(e&&e.type!=='peer-unavailable')toast('Network: '+(e.type||e.message||'error'))});
+    p.on('disconnected',()=>{try{p.reconnect()}catch(e){}});
+    copyText(inviteLink());
+    setStat('Room '+code+' is open. Invite link copied. Starting…');
+    window.__bpMPinvite=Date.now();
+    window.__bpBegin(!!useSaved);
+  }catch(e){leaveMP(true);setStat((e&&e.message)||'Could not host.',true);lock(false);brokerFallback()}
+}
+function openRoom(){
+  return new Promise((res,rej)=>{
+    let tries=0;
+    const go=()=>{
+      const code=randCode(),p=new window.Peer(PFX+code,iceCfg());
+      let done=false;
+      const to=setTimeout(()=>{if(!done){done=true;try{p.destroy()}catch(e){}rej(new Error(BROKER_FAIL))}},25000);
+      p.on('open',()=>{if(done)return;done=true;clearTimeout(to);res({p,code})});
+      p.on('error',e=>{if(done)return;done=true;clearTimeout(to);try{p.destroy()}catch(_){}
+        if(e&&e.type==='unavailable-id'&&tries++<6)go();else rej(new Error('Matchmaking error: '+((e&&e.type)||'unknown')))});
+    };go();
+  });
+}
+function freeColor(){const used=new Set([...MP.roster.values()].map(r=>r.color));for(let i=0;i<COLORS.length;i++)if(!used.has(i))return i;return 1}
+function whenCtx(cb,tries){const c=ctx();if(c)return cb(c);if((tries||0)>60)return;setTimeout(()=>whenCtx(cb,(tries||0)+1),500)}
+function onHostConn(conn){
+  let id=conn.peer,joined=false;
+  conn.on('data',d=>{
+    if(!d||typeof d!=='object')return;
+    if(d.t==='hello'&&!joined){
+      if(MP.conns.size>=MAXP-1){try{conn.send({t:'full'})}catch(e){}setTimeout(()=>{try{conn.close()}catch(e){}},400);return}
+      joined=true;
+      whenCtx(c=>{
+        if(!conn.open)return;
+        const name=clean(d.name)||'Guest',color=freeColor();
+        MP.conns.set(id,conn);MP.roster.set(id,{name,color});
+        let snap;try{snap=JSON.stringify(c.snapshot())}catch(e){conn.send({t:'err',m:'Host could not snapshot the world.'});return}
+        const parts=[];for(let i=0;i<snap.length;i+=CHUNK)parts.push(snap.slice(i,i+CHUNK));
+        const players=[];MP.roster.forEach((r,k)=>{if(k!==id)players.push({id:k,name:r.name,color:r.color})});
+        conn.send({t:'welcome',v:1,id,hid:MP.myId,color,hn:MP.name,players,n:parts.length,size:snap.length,diff:c.diff(),claim:c.claim(),tm:c.t,days:c.days,pos:[r2(c.P.x),r2(c.P.y),r2(c.P.z)]});
+        sendChunks(conn,parts);
+        relay({t:'join',id,name,color},id);
+        sysMsg(name+' is joining…');
+        refreshPop();
+      });
+    }else if(d.t==='pos'&&joined&&Array.isArray(d.s)){MP.states.set(id,d.s);applyState(id,d.s)}
+    else if(d.t==='chat'&&joined){const m=String(d.m||'').slice(0,160).replace(/[\u0000-\u001f]/g,'');if(m){const r=MP.roster.get(id)||{name:'?'};const msg={t:'chat',n:r.name,c:r.color,m};relay(msg,null);showChat(msg)}}
+  });
+  const gone=()=>{if(!MP.conns.has(id)&&!joined)return;const r=MP.roster.get(id);MP.conns.delete(id);MP.roster.delete(id);MP.states.delete(id);dropRemote(id);relay({t:'leave',id},null);if(r)sysMsg(r.name+' left.');refreshPop()};
+  conn.on('close',gone);conn.on('error',gone);
+}
+function sendChunks(conn,parts){
+  let i=0;const step=()=>{if(!conn.open)return;
+    const dc=conn.dc||conn.dataChannel,busy=()=>dc&&dc.bufferedAmount>1000000;
+    let n=0;while(i<parts.length&&n<4&&!busy()){conn.send({t:'snap',i,d:parts[i]});i++;n++}if(i<parts.length)setTimeout(step,busy()?60:15)};step();
+}
+function relay(msg,except){MP.conns.forEach((c,id)=>{if(id!==except&&c.open){try{c.send(msg)}catch(e){}}})}
+
+/* ---------- join ---------- */
+async function joinGame(){
+  if(MP.busy||MP.role)return;
+  if($('mpDirect')&&$('mpDirect').checked){MP.name=myName();openPair('guest');return}
+  const code=parseRoom($('mpCode').value);
+  if(code.length<4){setStat('Enter the room code from your friend.',true);return}
+  if(typeof window.__bpBegin!=='function'){setStat('Game launcher not ready.',true);return}
+  lock(true);setStat('Connecting to room '+code+'…');
+  MP.name=myName();MP.code=code;
+  try{
+    await loadPeer();
+    const p=new window.Peer(undefined,iceCfg());MP.peer=p;
+    await new Promise((res,rej)=>{const to=setTimeout(()=>rej(new Error(BROKER_FAIL)),25000);p.on('open',id=>{clearTimeout(to);MP.myId=id;res()});p.on('error',e=>{clearTimeout(to);rej(new Error('Matchmaking error ('+((e&&e.type)||'unknown')+'). '+BROKER_FAIL))})});
+    p.on('error',e=>{if(e&&e.type==='peer-unavailable')failJoin('No game found with code '+code+'. Ask the host to keep their tab open.');});
+    attachGuest(p.connect(PFX+code,{reliable:true,serialization:'json'}),code,20000);
+  }catch(e){failJoin((e&&e.message)||'Could not join.');brokerFallback()}
+}
+function attachGuest(conn,code,ms){
+  MP.code=code;
+  const to=setTimeout(()=>{if(!conn.open)failJoin('Could not connect to '+code+'. The host may be offline, or a strict network is blocking peer-to-peer.')},ms);
+  MP.pending={n:-1,parts:[],got:0,w:null,to};
+  conn.on('open',()=>{MP.hostConn=conn;conn.send({t:'hello',v:1,name:MP.name});setStat('Connected. Waiting for the host…')});
+  conn.on('data',onClientData);
+  conn.on('close',()=>{if(MP.pending)failJoin('The host closed the room.');else hostGone()});
+  conn.on('error',()=>{if(MP.pending)failJoin('Connection error.')});
+}
+function failJoin(msg){if(MP.pending){clearTimeout(MP.pending.to);MP.pending=null}if(MP.role!=='client'||!ctx()){leaveMP(true);setStat(msg,true);lock(false)}else toast(msg)}
+function onClientData(d){
+  if(!d||typeof d!=='object')return;
+  switch(d.t){
+    case 'full':return failJoin('That room is full.');
+    case 'err':return failJoin(d.m||'Host error.');
+    case 'welcome':{
+      const P=MP.pending;if(!P)return;
+      closePair();P.w=d;P.n=d.n;MP.color=d.color;MP.myId=d.id||MP.myId;MP.role='client';
+      MP.roster.clear();MP.roster.set(MP.myId,{name:MP.name,color:d.color});
+      for(const pl of d.players||[])MP.roster.set(pl.id,{name:pl.name,color:pl.color});
+      if(d.hid)MP.hostConn.peer=String(d.hid);MP.roster.set(MP.hostConn.peer,{name:clean(d.hn)||'Host',color:0});
+      setStat('Downloading the world… 0%');return}
+    case 'snap':{
+      const P=MP.pending;if(!P||P.n<0)return;P.parts[d.i]=d.d;P.got++;
+      setStat('Downloading the world… '+Math.round(P.got/P.n*100)+'%');
+      if(P.got>=P.n)startClient();return}
+    case 'join':MP.roster.set(d.id,{name:clean(d.name)||'Guest',color:d.color|0});sysMsg((clean(d.name)||'Guest')+' joined.');refreshPop();return;
+    case 'leave':{const r=MP.roster.get(d.id);MP.roster.delete(d.id);dropRemote(d.id);if(r)sysMsg(r.name+' left.');refreshPop();return}
+    case 'ps':{for(const k in d.p){if(k!==MP.myId)applyState(k,d.p[k])}return}
+    case 'time':{const c=ctx();if(c)syncTime(c,d.t0,d.d);return}
+    case 'chat':showChat(d);return;
+  }
+}
+function startClient(){
+  const P=MP.pending;clearTimeout(P.to);
+  let s;try{s=JSON.parse(P.parts.join(''))}catch(e){return failJoin('The world data was damaged. Try again.')}
+  const w=P.w;MP.pending=null;
+  /* fresh character, shared base: no copied inventory, hotbar, armour or vitals */
+  s.slots=Array(30).fill(null);s.pack=0;s.packSlots=[];s.eq={head:0,chest:0,legs:0,feet:0};s.cl={head:0,chest:0,legs:0,feet:0};
+  s.S={health:100,hunger:85,thirst:85,energy:90,warmth:70};
+  s.slotId='mp_'+MP.code+'_'+Date.now().toString(36);s.name='Co-op: '+String(w.claim||s.name||'Blackpine').slice(0,20);
+  if(w.pos&&isFinite(w.pos[0]))s.p={x:w.pos[0]+1.5,y:w.pos[1],z:w.pos[2]+1.5};
+  if(isFinite(w.tm))s.t=w.tm;if(isFinite(w.days))s.days=w.days;
+  setStat('Starting…');
+  window.__bpBegin(true,{saveData:s,slotId:s.slotId,claimName:s.name});
+}
+
+/* ---------- state sync ---------- */
+function ownState(c){return[r2(c.P.x),r2(c.P.y),r2(c.P.z),r2(c.yaw),r2(c.pitch),c.held(),Math.round(c.S.health),c.dead?1:0]}
+function applyState(id,s){
+  if(!Array.isArray(s)||s.length<8||!isFinite(s[0]+s[1]+s[2]))return;
+  let r=MP.remotes.get(id);
+  if(!r){const ro=MP.roster.get(id)||{name:'Player',color:1};r={id,name:ro.name,color:ro.color,n:null,tag:null,tx:s[0],ty:s[1]-EYE,tz:s[2],tyaw:s[3]+Math.PI,held:'',hp:100,dead:0,seen:0,fresh:true};MP.remotes.set(id,r)}
+  r.tx=s[0];r.ty=s[1]-EYE;r.tz=s[2];r.tyaw=s[3]+Math.PI;r.held=String(s[5]||'');r.hp=s[6];r.dead=s[7];r.seen=performance.now();
+}
+function syncTime(c,t0,days){
+  if(!isFinite(t0))return;
+  let d=t0-c.t;if(d>.5)d-=1;else if(d<-.5)d+=1;
+  if(Math.abs(d)>.002){let n=c.t+d;if(n>=1)n-=1;if(n<0)n+=1;c.t=n}
+  if(isFinite(days)&&days>=0&&days!==c.days)c.days=days;
+}
+function broadcast(c){
+  const own=ownState(c);
+  if(MP.role==='client'){if(MP.hostConn&&MP.hostConn.open)try{MP.hostConn.send({t:'pos',s:own})}catch(e){}return}
+  MP.states.set(MP.myId,own);
+  MP.conns.forEach((conn,id)=>{
+    if(!conn.open)return;const p={};
+    MP.states.forEach((s,k)=>{if(k!==id)p[k]=s});
+    try{conn.send({t:'ps',p})}catch(e){}
+  });
+}
+
+/* ---------- avatars ---------- */
+function mkAvatar(r,c){
+  const m=c.spawnMan(COLN[r.color%COLN.length],false,{hat:0});
+  r.n={m,x:r.tx,y:r.ty,z:r.tz,_mv:0,hp:100};
+  m.position.set(r.tx,r.ty,r.tz);m.rotation.y=r.tyaw;
+  const tg=document.createElement('div');tg.className='mp-tag';tg.innerHTML='<b></b><i></i><span class="hpb"><u></u></span>';
+  tg.firstChild.style.color=COLORS[r.color%COLORS.length];tg.firstChild.textContent=r.name;
+  $('mpTags').appendChild(tg);r.tag=tg;
+}
+function dropRemote(id){
+  const r=MP.remotes.get(id);if(!r)return;
+  const c=ctx();try{if(r.n&&r.n.m){if(c)c.scene.remove(r.n.m);else if(r.n.m.parent)r.n.m.parent.remove(r.n.m)}}catch(e){}
+  if(r.tag)r.tag.remove();MP.remotes.delete(id);
+}
+const _v={};
+function updateRemotes(c,dt){
+  const now=performance.now(),k=1-Math.exp(-dt*12);
+  if(!_v.v)_v.v=new c.T.Vector3();
+  const rect=c.root.getBoundingClientRect?c.root.getBoundingClientRect():{left:0,top:0,width:innerWidth,height:innerHeight};
+  MP.remotes.forEach(r=>{
+    const ro=MP.roster.get(r.id);if(ro&&(ro.name!==r.name)){r.name=ro.name;if(r.tag)r.tag.firstChild.textContent=r.name}
+    const stale=now-r.seen>STALE_MS;
+    if(!r.n){if(stale||r.dead)return;try{mkAvatar(r,c)}catch(e){console.warn('mp avatar',e);return}}
+    const n=r.n,m=n.m,vis=!stale&&!r.dead;
+    if(m.visible!==vis)m.visible=vis;
+    if(!vis){if(r.tag)r.tag.style.display='none';return}
+    const dx=r.tx-n.x,dz=r.tz-n.z;
+    if(Math.hypot(dx,dz)>30||Math.abs(r.ty-n.y)>20){n.x=r.tx;n.y=r.ty;n.z=r.tz;n._mv=0}
+    else{const ox=n.x,oz=n.z;n.x+=dx*k;n.z+=dz*k;n.y+=(r.ty-n.y)*k;n._mv=Math.hypot(n.x-ox,n.z-oz)}
+    m.position.set(n.x,n.y,n.z);m.rotation.y=lerpAng(m.rotation.y,r.tyaw,k);
+    if(MP.animFail<5)try{c.animMan(n,dt)}catch(e){MP.animFail++;console.warn('mp anim',e)}
+    /* name tag */
+    const d=Math.hypot(n.x-c.P.x,n.z-c.P.z);
+    if(d>140){r.tag.style.display='none';return}
+    _v.v.set(n.x,n.y+2.2,n.z).project(c.cam);
+    if(_v.v.z>1||_v.v.z<-1){r.tag.style.display='none';return}
+    const sx=rect.left+(_v.v.x*.5+.5)*rect.width,sy=rect.top+(-_v.v.y*.5+.5)*rect.height;
+    r.tag.style.display='';r.tag.style.transform='translate('+sx.toFixed(1)+'px,'+sy.toFixed(1)+'px) translate(-50%,-100%)';
+    r.tag.style.opacity=d>90?String(Math.max(.25,1-(d-90)/50)):'1';
+    r.tag.children[1].textContent=r.held;r.tag.children[1].style.display=r.held?'':'none';
+    r.tag.children[2].firstChild.style.width=Math.max(0,Math.min(100,r.hp))+'%';
+  });
+}
+
+/* ---------- per-frame hook ---------- */
+window.__bpMPtick=function(dt){
+  const c=ctx();if(!c||!MP.role)return;
+  if(MP.gen!==c.gen)startSession(c);
+  MP.sendT+=dt*1000;if(MP.sendT>=SEND_MS){MP.sendT=0;broadcast(c)}
+  if(MP.role==='host'){MP.timeT+=dt*1000;if(MP.timeT>=TIME_MS){MP.timeT=0;relay({t:'time',t0:r2(c.t*10000)/10000,d:c.days},null)}}
+  updateRemotes(c,dt);
+};
+window.__bpMPgone=function(gen){if(MP.gen===gen||MP.role)leaveMP(false)};
+function startSession(c){
+  MP.gen=c.gen;MP.animFail=0;
+  ensureOverlay();
+  MP.remotes.forEach(r=>{r.n=null;r.tag=null});$('mpTags').textContent='';
+  $('mpPill').style.display='block';refreshPop();
+  const t=$('title');if(t)t.style.display='none';
+  if(MP.role==='host'){c.say(MP.direct?'No-server room is open. Esc, then the Co-op badge, then Add friend.':'Room '+MP.code+' is open. Tap the Co-op badge (top left) for the invite link.');showInviteBanner()}
+  else c.say('Joined '+((MP.roster.get(MP.hostConn&&MP.hostConn.peer)||{}).name||'host')+'\'s world.');
+}
+function hostGone(){
+  if(MP.role!=='client')return;
+  sysMsg('The host left. This copy of the world is now offline; you can keep playing it.');toast('Host left the room.');
+  endNet();
+}
+
+/* ---------- overlay: pill, popover, tags, chat ---------- */
+function ensureOverlay(){
+  if($('mpPill'))return;
+  const b=document.body;
+  const tags=document.createElement('div');tags.id='mpTags';b.appendChild(tags);
+  const pill=document.createElement('div');pill.id='mpPill';pill.title='Co-op';pill.onclick=()=>{const p=$('mpPop');p.style.display=p.style.display==='block'?'none':'block';refreshPop()};b.appendChild(pill);
+  const pop=document.createElement('div');pop.id='mpPop';b.appendChild(pop);
+  const chat=document.createElement('div');chat.id='mpChat';b.appendChild(chat);
+  const inp=document.createElement('input');inp.id='mpIn';inp.maxLength=160;inp.placeholder='Say something (Enter to send, Esc to cancel)';inp.autocomplete='off';b.appendChild(inp);
+  for(const ev of ['keydown','keyup','keypress'])inp.addEventListener(ev,e=>{e.stopPropagation();if(ev==='keydown'){if(e.key==='Enter'){sendChat(inp.value);closeChat()}else if(e.key==='Escape'){closeChat()}}});
+  document.addEventListener('keydown',e=>{
+    if(e.code!=='Enter'||!MP.role||!ctx())return;
+    const a=document.activeElement;if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'))return;
+    e.preventDefault();openChat();
+  },true);
+}
+function refreshPop(){
+  const pill=$('mpPill'),pop=$('mpPop');if(!pill||!pop)return;
+  const n=MP.roster.size;
+  pill.innerHTML='Co-op · <b>'+(MP.direct?'LOCAL':MP.code)+'</b> · '+n+' player'+(n===1?'':'s');
+  pop.textContent='';
+  const h=document.createElement('h4');h.textContent=MP.direct?(MP.role==='host'?'You are hosting (no-server)':'Playing co-op (no-server)'):(MP.role==='host'?'You are hosting':'Playing in')+' room '+MP.code;pop.appendChild(h);
+  MP.roster.forEach((r,id)=>{const row=document.createElement('div');row.className='pl';const dot=document.createElement('span');dot.className='dot';dot.style.background=COLORS[r.color%COLORS.length];const nm=document.createElement('span');nm.textContent=r.name+(id===MP.myId?' (you)':'');row.append(dot,nm);pop.appendChild(row)});
+  const mk=(txt,fn,cls)=>{const b=document.createElement('button');b.textContent=txt;if(cls)b.className=cls;b.onclick=fn;pop.appendChild(b)};
+  if(MP.role==='host'&&MP.direct)mk('Add friend (code)',()=>{$('mpPop').style.display='none';openPair('host')});
+  if(MP.role==='host'&&!MP.direct)mk('Copy invite link',async()=>{const ok=await copyText(inviteLink());toast(ok?'Invite link copied.':'Copy failed. Link: '+inviteLink())});
+  mk('Chat',()=>{$('mpPop').style.display='none';openChat()});
+  mk(MP.role==='host'?'Close room':'Leave room',()=>{$('mpPop').style.display='none';leaveMP(false);toast(MP.role?'':'Left the room.')},'bad');
+}
+function showInviteBanner(){
+  if(MP.direct){addChatLine({sys:1,m:'No-server room. Press Esc, tap the Co-op badge, then "Add friend (code)".'});return}
+  const link=inviteLink();
+  addChatLine({sys:1,m:'Invite link (also copied): '+link});
+}
+function toast(m){const c=ctx();if(c)c.say(m);addChatLine({sys:1,m})}
+function sysMsg(m){addChatLine({sys:1,m})}
+function addChatLine(msg){
+  const box=$('mpChat');if(!box)return;
+  const d=document.createElement('div');if(msg.sys)d.className='sys';
+  if(!msg.sys){const b=document.createElement('b');b.textContent=msg.n+':';b.style.color=COLORS[(msg.c|0)%COLORS.length];d.appendChild(b)}
+  d.appendChild(document.createTextNode(msg.m));box.appendChild(d);
+  while(box.children.length>7)box.removeChild(box.firstChild);
+  setTimeout(()=>d.classList.add('old'),msg.sys?14000:12000);setTimeout(()=>d.remove(),msg.sys?16000:14000);
+}
+function showChat(msg){addChatLine(msg)}
+function openChat(){const i=$('mpIn');if(!i)return;i.style.display='block';i.value='';i.focus()}
+function closeChat(){const i=$('mpIn');if(!i)return;i.style.display='none';i.blur()}
+function sendChat(txt){
+  const m=String(txt||'').trim().slice(0,160);if(!m||!MP.role)return;
+  if(MP.role==='host'){const r=MP.roster.get(MP.myId)||{name:MP.name,color:0};const msg={t:'chat',n:r.name,c:r.color,m};relay(msg,null);showChat(msg)}
+  else if(MP.hostConn&&MP.hostConn.open)MP.hostConn.send({t:'chat',m});
+}
+
+/* ---------- teardown ---------- */
+function endNet(){
+  try{MP.conns.forEach(c=>{try{c.close()}catch(e){}})}catch(e){}
+  try{if(MP.hostConn)MP.hostConn.close()}catch(e){}
+  try{if(MP.peer)MP.peer.destroy()}catch(e){}
+  MP.peer=null;MP.hostConn=null;MP.direct=false;MP.conns.clear();MP.states.clear();MP.role=null;
+  const p=$('mpPill');if(p)p.style.display='none';const o=$('mpPop');if(o)o.style.display='none';
+}
+function leaveMP(silent){
+  const had=!!MP.role||!!MP.peer;
+  if(MP.pending){clearTimeout(MP.pending.to);MP.pending=null}
+  MP.remotes.forEach((r,id)=>dropRemote(id));MP.remotes.clear();
+  endNet();MP.roster.clear();MP.gen=-1;
+  const t=$('mpTags');if(t)t.textContent='';
+  if(had&&!silent){const c=ctx();if(c)try{c.say('Co-op ended. You are playing offline.')}catch(e){}}
+  lock(false);
+}
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',buildLobby);else buildLobby();
+window.addEventListener('pagehide',()=>{try{endNet()}catch(e){}});
+})();
+</script>

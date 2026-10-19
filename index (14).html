@@ -53315,15 +53315,16 @@ function seatFoundation(x,z,top){
   const map=terrLookup();if(!map||!terrMesh)return;
   const pos=terrMesh.geometry.attributes.position,col=terrMesh.geometry.attributes.color,W=TN+1,target=top-.22,berm=top-.58;
   const cx=Math.round((x/TS+.5)*TN),cz=Math.round((.5-z/TS)*TN);
-  for(let iy=Math.max(0,cz-3);iy<=Math.min(TN,cz+3);iy++)for(let ix=Math.max(0,cx-3);ix<=Math.min(TN,cx+3);ix++){
+  const FLAT=4,EDGE=8;
+  for(let iy=Math.max(0,cz-2);iy<=Math.min(TN,cz+2);iy++)for(let ix=Math.max(0,cx-2);ix<=Math.min(TN,cx+2);ix++){
     const vi=map[iy*W+ix];if(vi<0)continue;
     const vx=(ix/TN-.5)*TS,vz=(.5-iy/TN)*TS,dist=Math.hypot(vx-x,vz-z);
-    if(dist>22)continue;
+    if(dist>EDGE+.2)continue;
     const y0=HG[iy*W+ix];let ny=target;
-    if(dist>15.2){const t=(dist-15.2)/6.8,s=t*t*(3-2*t);ny=target+(y0-target)*s}
+    if(dist>FLAT){const t=(dist-FLAT)/(EDGE-FLAT),s=t*t*(3-2*t);ny=target+(y0-target)*s}
     if(ny<y0-.003){pos.setY(vi,ny);HG[iy*W+ix]=ny;terrDirty=1}
-    else if(y0>.35&&y0<berm&&dist<18.5){
-      const t=Math.max(0,(dist-8.5)/10),s=1-t*t*(3-2*t),ry=y0+Math.min(1.35,berm-y0)*s*.65;
+    else if(y0>.35&&y0<berm&&dist<EDGE){
+      const t=Math.max(0,(dist-FLAT*.8)/(EDGE-FLAT*.8)),s=1-t*t*(3-2*t),ry=y0+Math.min(1.35,berm-y0)*s*.65;
       if(ry>y0+.005&&ry<target-.15){pos.setY(vi,ry);HG[iy*W+ix]=ry;terrDirty=1;if(col){col.setXYZ(vi,col.getX(vi)*.86+.52*.14,col.getY(vi)*.86+.45*.14,col.getZ(vi)*.86+.34*.14)}}
     }
   }
@@ -53396,10 +53397,37 @@ function ghostTick(){const s=SL[sel],it=s&&ITEMS[s.id];if(!it||!(it.bd||it.dv)||
  if(ghId!==s.id){if(gh)scene.remove(gh);gh=mk(it,GM);scene.add(gh);ghId=s.id}
  const a=aim(it);let ok=a.ok&&!privWhy(a.x,a.z,null);if(ok&&it.dv==='tc'&&tcCovering(a.x,a.z))ok=false;gh.visible=true;gh.position.set(a.x,a.y,a.z);gh.rotation.y=a.rot||0;GM.color.set(ok?0x66ff66:0xff5555)}
 const RAD=.42,SCELL=12,STATIC_GRID=new Map();
-function addStaticCol(x,z,y,r,h,kind){
+function addStaticCol(x,z,y,r,h,kind,canopy,canopyS){
  const k=Math.floor(x/SCELL)+','+Math.floor(z/SCELL);
  let b=STATIC_GRID.get(k);if(!b){b=[];STATIC_GRID.set(k,b)}
- b.push({x,z,y,r:r||.32,h:h||3.5,kind:kind||'tree'});
+ const c={x,z,y,r:r||.32,h:h||3.5,kind:kind||'tree'};
+ if(canopy>0){c.canopy=canopy;c.canopyS=canopyS||1}
+ b.push(c);
+}
+function pushCamFoliage(){
+ const ex=cam.position.x,ey=cam.position.y,ez=cam.position.z;let ox=0,oz=0;
+ const consider=(x,z,y,rad,s)=>{
+  if(!(rad>0))return;
+  const rel=ey-y,sc=s||1,y0=1.05*sc,y1=3.35*sc;
+  if(rel<y0||rel>y1)return;
+  const u=(rel-y0)/Math.max(.2,y1-y0),belly=Math.sin(Math.min(1,u)*Math.PI),R=rad*(.45+.55*belly);
+  const dx=ex-x,dz=ez-z,d=Math.hypot(dx,dz);
+  if(d>=R||d<1e-4)return;
+  const k=Math.min(R-d,.62);ox+=dx/d*k;oz+=dz/d*k;
+ };
+ for(let i=0;i<NEAR.length;i++){
+  const o=NEAR[i];if(!o.userData||o.userData.k!=='tree')continue;
+  const s=o.scale.x||1,tk=o.userData.tk||'pine';
+  const rad=(tk==='oak'||tk==='willow'||tk==='leaf'||tk==='aut'||tk==='maple'||tk==='birch'||tk==='aspen')?1.45:(tk==='scrub'||tk==='juniper'||tk==='snag')?.62:1.25;
+  consider(o.position.x,o.position.z,o.position.y,Math.min(1.65,rad*s),s);
+ }
+ const gx=Math.floor(ex/SCELL),gz=Math.floor(ez/SCELL);
+ for(let di=-1;di<=1;di++)for(let dj=-1;dj<=1;dj++){
+  const b=STATIC_GRID.get((gx+di)+','+(gz+dj));if(!b)continue;
+  for(let i=0;i<b.length;i++){const c=b[i];if(!(c.canopy>0))continue;consider(c.x,c.z,c.y,c.canopy,c.canopyS||1)}
+ }
+ const mag=Math.hypot(ox,oz);
+ if(mag>1e-5){const k=mag>.7?.7/mag:1;cam.position.x+=ox*k;cam.position.z+=oz*k}
 }
 function touchStaticGrid(ent,rad,feet){
  const gx=Math.floor(ent.x/SCELL),gz=Math.floor(ent.z/SCELL);
@@ -53415,7 +53443,7 @@ function touchStaticGrid(ent,rad,feet){
 }
 function propColRad(o,k){
  if(k==='tree')return Math.min(.52,Math.max(.26,(o.userData.rad||.36)*.72));
- if(k==='rock')return Math.min(1.65,Math.max(.42,(o.userData.rad||.68)*.78));
+ if(k==='rock'){const u=o.userData,base=Math.min(1.65,Math.max(.42,(u.rad||.68)*.78));if(u._crS!==o.scale.x){u._crS=o.scale.x;let geo=null;o.traverse(c=>{if(geo||!c.geometry||!c.geometry.attributes||!c.geometry.attributes.position)return;if(c.parent&&c.parent.isLOD&&c.parent.levels&&c.parent.levels[0]&&c.parent.levels[0].object!==c)return;geo=c.geometry});if(geo){if(!geo.boundingBox)geo.computeBoundingBox();const bb=geo.boundingBox,sx=(bb.max.x-bb.min.x)*o.scale.x,sz=(bb.max.z-bb.min.z)*(o.scale.z||o.scale.x);u._cr=Math.min(sx,sz)*.5}}return Math.min(3.2,Math.max(base,u._cr||0))}
  if(k==='ore')return .68;
  if(k==='sulfur')return .72;
  if(k==='barrel')return Math.min(.56,Math.max(.34,(o.userData.rad||.52)*.82));
@@ -55007,8 +55035,8 @@ function mkRefinery(){const g=new T.Group(),p=P(g);
 
 // Oil deposit marker: glossy puddle with seep bubbles and a survey stake. AI can search for userData.k==='oilDeposit'.
 function mkOilDeposit(amount){const g=new T.Group(),p=P(g);
- const st=new T.Mesh(new T.CircleGeometry(1,20),M(0x3e3022));st.rotation.x=-Math.PI/2;st.position.y=.008;st.scale.set(2.05,1.5,1);g.add(st);
- const pd=new T.Mesh(new T.CircleGeometry(1,16),new T.MeshPhongMaterial({color:0x2a2622,shininess:110,specular:0x8899aa}));pd.rotation.x=-Math.PI/2;pd.position.y=.016;pd.scale.set(1.4,1,1);g.add(pd);
+ const st=new T.Mesh(new T.CircleGeometry(1,20),M(0x3e3022,{polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));st.rotation.x=-Math.PI/2;st.position.y=.04;st.scale.set(2.05,1.5,1);g.add(st);
+ const pd=new T.Mesh(new T.CircleGeometry(1,16),new T.MeshPhongMaterial({color:0x2a2622,shininess:110,specular:0x8899aa,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));pd.rotation.x=-Math.PI/2;pd.position.y=.05;pd.scale.set(1.4,1,1);g.add(pd);
  for(let i=0;i<4;i++){const s=new T.Mesh(new T.SphereGeometry(.06+Math.random()*.05,6,4),M(0x1a1a1e));s.position.set((Math.random()-.5)*1.4,.03,(Math.random()-.5)*1);g.add(s)}
  p.cyl(.04,.04,1.2,.9,.6,.5,C.wood);p.box(.3,.2,.02,.9,1.1,.5,C.yellow,0,0,.04);
  g.userData={k:'oilDeposit',rad:1.3,amount:amount||500};return g}
@@ -57701,8 +57729,8 @@ function site(w,d){for(let t=0;t<900;t++){const x=(MR()*2-1)*(B-55),z=(MR()*2-1)
 const MC={conc:0x8c8b85,concD:0x66665f,asph:0x2f3135,rust:0x9a4d28,steel:0x56606a,corr:0x6c767c,corrD:0x4d565c,yel:0xd1a02a,red:0xa63a24,blue:0x2f5b78,wood:0x7a5a38,woodD:0x55402a,olive:0x56603f,blk:0x1d1f22,lamp:0xfff0b8,sand:0xa89a6a,wht:0xe4dfcf};
 function monDeck(b,W,D,X,Z){const R=rng(((X*7+Z*13)|0)+5);b.box(W-.4,.04,D-.4,0,.02,0,MC.asph);
  for(const s of[-1,1]){b.box(W,.2,.3,0,.1,s*(D/2-.15),MC.conc);b.box(.3,.2,D-.6,s*(W/2-.15),.1,0,MC.conc);b.box(W-1.4,.02,.1,0,.05,s*(D/2-.6),MC.yel);b.box(.1,.02,D-1.4,s*(W/2-.6),.05,0,MC.yel)}
- for(let i=0;i<5;i++)b.cyl(.5+R()*.8,.5+R()*.8,.01,10,(R()*2-1)*(W/2-1.5),.045,(R()*2-1)*(D/2-1.5),0x232528);
- for(let i=0;i<4;i++)b.box(.05,.015,1+R()*1.6,(R()*2-1)*(W/2-1.5),.045,(R()*2-1)*(D/2-1.5),0x222427,[0,R()*3,0])}
+ for(let i=0;i<5;i++)b.cyl(.5+R()*.8,.5+R()*.8,.01,10,(R()*2-1)*(W/2-1.5),.08,(R()*2-1)*(D/2-1.5),0x232528);
+ for(let i=0;i<4;i++)b.box(.05,.015,1+R()*1.6,(R()*2-1)*(W/2-1.5),.08,(R()*2-1)*(D/2-1.5),0x222427,[0,R()*3,0])}
 function monPad(b,x,z){b.box(2.6,.03,2.6,x,.055,z,0x3d3f43);for(const s of[-1,1]){b.box(2.6,.035,.12,x,.06,z+s*1.24,MC.yel);b.box(.12,.035,2.6,x+s*1.24,.06,z,MC.yel)}for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1]])b.box(.4,.04,.4,x+sx*1.05,.065,z+sz*1.05,MC.blk)}
 function monKit(k){const b=k.b,K={
  wall(x0,z0,x1,z1,h,c){k.wall(x0,z0,x1,z1,h,c||MC.corr);const cx=(x0+x1)/2,cz=(z0+z1)/2;b.box(x1-x0+.1,.55,z1-z0+.1,cx,.28,cz,MC.concD);b.box(x1-x0+.14,.12,z1-z0+.14,cx,h+.06,cz,MC.blk)},
@@ -58951,7 +58979,7 @@ function mkBarrelV2(kind,variant){kind=kind||'blue';variant=variant||'upright';
  if(variant==='dented'){b.scale.set(1.05,.9,.95);b.rotation.z=.06}
  if(variant==='tipped'){b.rotation.z=Math.PI/2;b.position.set(h/2,r,0)}
  g.add(b);
- if(variant==='leaking'||(variant==='tipped'&&(kind==='oil'||kind==='red'))){const pd=new T.Mesh(new T.CircleGeometry(.55,14),M(0x0c0c0e,{transparent:true,opacity:.85}));pd.rotation.x=-Math.PI/2;pd.position.set(variant==='tipped'?h+.3:.5,.012,.1);pd.scale.set(1.3,.8,1);g.add(pd)}
+ if(variant==='leaking'||(variant==='tipped'&&(kind==='oil'||kind==='red'))){const pd=new T.Mesh(new T.CircleGeometry(.55,14),M(0x0c0c0e,{transparent:true,opacity:.85,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));pd.rotation.x=-Math.PI/2;pd.position.set(variant==='tipped'?h+.3:.5,.04,.1);pd.scale.set(1.3,.8,1);g.add(pd)}
  g.userData={k:'barrel',kind:kind==='rust'?'brown':kind,variant,uses:1,rad:variant==='tipped'?.7:.56};return g}
 
 // Cluster of 2-5 barrels around one centre. Children keep their own userData so each can be broken.
@@ -59283,7 +59311,7 @@ function cardsTakenLoad(a){CARDS_TAKEN.clear();if(Array.isArray(a))for(const k o
 const CARDS=[],CARD_N={};
 function placeCard(cardId,item,x,y,z,rotY){item=item||'card_g';if(!cardId||cardTaken(cardId))return null;for(const c of CARDS)if(c.cardId===cardId&&c.g.parent)return c.g;
  const g=new T.Group(),card=BPAnimals&&BPAnimals.mkKeycard?BPAnimals.mkKeycard(item==='card_r'?3:item==='card_b'?2:1):new T.Mesh(new T.BoxGeometry(.17,.006,.105),new T.MeshLambertMaterial({color:0x2e9a3a}));card.userData={};card.scale.setScalar(1.25);g.add(card);
- const gl=new T.Mesh(new T.CircleGeometry(.17,20),new T.MeshBasicMaterial({color:0x40ff70,transparent:true,opacity:.16,depthWrite:false,blending:T.AdditiveBlending}));gl.rotation.x=-Math.PI/2;gl.position.y=.002;g.add(gl);
+ const gl=new T.Mesh(new T.CircleGeometry(.17,20),new T.MeshBasicMaterial({color:0x40ff70,transparent:true,opacity:.16,depthWrite:false,blending:T.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));gl.rotation.x=-Math.PI/2;gl.position.y=.03;g.add(gl);
  const hb=new T.Mesh(new T.BoxGeometry(.36,.16,.3),new T.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}));hb.position.y=.07;g.add(hb);
  g.position.set(x,y,z);g.rotation.y=rotY||0;Object.assign(g.userData,{k:'drop',item,n:1,uses:1,cardId:String(cardId)});scene.add(g);things.push(g);CARDS.push({cardId:String(cardId),g,item,x,y,z});return g}
 function cardsSync(){for(const c of CARDS){if(!cardTaken(c.cardId)||!c.g.parent)continue;const ti=things.indexOf(c.g);if(ti>=0)things.splice(ti,1);scene.remove(c.g)}}
@@ -59721,7 +59749,7 @@ function seatRoads(){Hg=H;const runs=[];ROADS.forEach((rd,ri)=>{const spec=roadS
   br.deckY=Math.max(1.32,Math.max(br.yA,br.yB)+.28);
   if(br.mesh){scene.remove(br.mesh);br.mesh=mkBridgeMesh(br)}
  }
- liftRuns(runs);pinNearPads(runs);willRamp(runs);rebuildRoads(runs);gradeTerrain();redrapeBanks();willSettle(runs);rebuildRoads(runs);buildRoadMesh(runs);H=(x,z)=>{const b=bridgeAt(x,z),r=roadAt(x,z),g=Hg(x,z);let y=r==null?g:r;return b!=null&&b>y?b:y};const placed=[],pDummy=new T.Object3D();for(const p of POSTS){if(onPad(p.x,p.z)||inRiver(p.x,p.z,2.5)||inPond(p.x,p.z)||onBridge(p.x,p.z,2.5)||nearMon(p.x,p.z,11.5)){p.skip=1;continue}let onRd=false;visitRoads(p.x,p.z,h=>{if(h.dist<h.half+.15)onRd=true});if(onRd){p.skip=1;continue}const y=H(p.x,p.z);if(y<.55||y>9.2){p.skip=1;continue}let close=false;for(const q of placed)if((q.x-p.x)*(q.x-p.x)+(q.z-p.z)*(q.z-p.z)<2.2){close=true;break}if(close){p.skip=1;continue}p.y=y;placed.push(p)}if(placed.length){const pm=new T.InstancedMesh(gRoadPost,mRoadPost,placed.length);for(let i=0;i<placed.length;i++){const p=placed[i];pDummy.position.set(p.x,p.y+.72,p.z);pDummy.updateMatrix();pm.setMatrixAt(i,pDummy.matrix)}pm.instanceMatrix.needsUpdate=true;pm.frustumCulled=false;scene.add(pm)}snapWorld();cullFarBarrels();reseatFoundations()}
+ liftRuns(runs);pinNearPads(runs);willRamp(runs);rebuildRoads(runs);gradeTerrain();redrapeBanks();willSettle(runs);rebuildRoads(runs);buildRoadMesh(runs);H=(x,z)=>{const b=bridgeAt(x,z),r=roadAt(x,z),g=Hg(x,z);let y=r==null?g:Math.max(r,g);return b!=null&&b>y?b:y};const placed=[],pDummy=new T.Object3D();for(const p of POSTS){if(onPad(p.x,p.z)||inRiver(p.x,p.z,2.5)||inPond(p.x,p.z)||onBridge(p.x,p.z,2.5)||nearMon(p.x,p.z,11.5)){p.skip=1;continue}let onRd=false;visitRoads(p.x,p.z,h=>{if(h.dist<h.half+.15)onRd=true});if(onRd){p.skip=1;continue}const y=H(p.x,p.z);if(y<.55||y>9.2){p.skip=1;continue}let close=false;for(const q of placed)if((q.x-p.x)*(q.x-p.x)+(q.z-p.z)*(q.z-p.z)<2.2){close=true;break}if(close){p.skip=1;continue}p.y=y;placed.push(p)}if(placed.length){const pm=new T.InstancedMesh(gRoadPost,mRoadPost,placed.length);for(let i=0;i<placed.length;i++){const p=placed[i];pDummy.position.set(p.x,p.y+.72,p.z);pDummy.updateMatrix();pm.setMatrixAt(i,pDummy.matrix)}pm.instanceMatrix.needsUpdate=true;pm.frustumCulled=false;scene.add(pm)}snapWorld();cullFarBarrels();reseatFoundations()}
 function densePath(path,step){if(!path||path.length<2)return path;const out=[path[0]];for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];if(a._onBridge||b._onBridge||a._bridgeEnd||b._bridgeEnd){out.push(b);continue}const d=Math.hypot(b.x-a.x,b.z-a.z),n=Math.ceil(d/step);for(let k=1;k<n;k++){const t=k/n;out.push({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t})}out.push(b)}path.length=0;for(const p of out)path.push(p);return path}
 function baseBlobs(){const o=[];for(const n of NP){const l=n.lot||(n.tc?{x:n.tc.x,z:n.tc.z}:null);if(!l)continue;const p=n.plan||{w:2,d:2},rA=Math.max(14,Math.hypot(p.w,p.d)*C/2+4);let b={x:l.x,z:l.z,r:n.cmp?Math.max(rA,26):rA};if(n.farm){const rB=9,dx=n.farm.x-l.x,dz=n.farm.z-l.z,d=Math.hypot(dx,dz);if(d+rB>rA){const R=(d+rA+rB)/2,k=d>1e-3?(R-rA)/d:0;b={x:l.x+dx*k,z:l.z+dz*k,r:R}}}o.push(b)}return o}
 function shovePathOffBases(path,kind){if(!path||path.length<2)return path;const ro=kind==='trail'?2.4:5.1,obs=baseBlobs().map(o=>({x:o.x,z:o.z,need:o.r+ro+1.5}));if(!obs.length)return path;for(const m of MONS)obs.push({x:m.x,z:m.z,need:(m.r||12)+7});const W=5;for(let pass=0;pass<10;pass++){let moved=false;for(const o of obs){const S=path.map(p=>({x:p.x,z:p.z})),n=S.length,near=(q,idx)=>idx>0&&idx<n-1&&!path[idx]._ring&&!path[idx]._bridgeLock&&Math.hypot(q.x-o.x,q.z-o.z)<o.need-.05;let i=1;while(i<n-1){if(!near(S[i],i)){i++;continue}let j=i;while(j+1<n-1&&near(S[j+1],j+1))j++;const a=S[Math.max(0,i-1)],b=S[Math.min(n-1,j+1)];let dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<1e-3){dx=1;dz=0;len=1}dx/=len;dz/=len;let bk=i,bd=1e9;for(let k=i;k<=j;k++){const d=Math.hypot(S[k].x-o.x,S[k].z-o.z);if(d<bd){bd=d;bk=k}}const sg=(S[bk].x-o.x)*(-dz)+(S[bk].z-o.z)*dx,side=Math.abs(sg)>.5?(sg>0?1:-1):(hash(Math.round(o.x),Math.round(o.z))>.5?1:-1),D=[];for(let k=i;k<=j;k++){const al=(S[k].x-o.x)*dx+(S[k].z-o.z)*dz,nx=o.x+dx*al+(-dz)*side*o.need,nz=o.z+dz*al+dx*side*o.need;D.push([nx-S[k].x,nz-S[k].z]);path[k].x=nx;path[k].z=nz}for(let m=1;m<=W;m++){const w=.5*(1+Math.cos(Math.PI*m/(W+1))),l=i-m,r=j+m;if(l>=1&&!near(S[l],l)&&!path[l]._bridgeLock){path[l].x=S[l].x+D[0][0]*w;path[l].z=S[l].z+D[0][1]*w}if(r<n-1&&!near(S[r],r)&&!path[r]._bridgeLock){const e=D[D.length-1];path[r].x=S[r].x+e[0]*w;path[r].z=S[r].z+e[1]*w}}moved=true;i=j+1}}if(!moved)break}return path}
@@ -59840,7 +59868,7 @@ function fillInst(geo,count,seed,test,opt){
    if(trunkR>0&&nearPropOcc(x,z,.65))continue;
    const s=lo+Rng()*(hi-lo),sink=trunkR>0?slopeSink(x,z,.35*s):slopeSink(x,z,.18*s);
    dummy.position.set(x,y-sink,z);dummy.rotation.set((Rng()-.5)*tilt,Rng()*6.28,(Rng()-.5)*tilt);dummy.scale.set(s,s*(.88+Rng()*.24),s);dummy.updateMatrix();
-   if(trunkR>0)addStaticCol(x,z,y-sink,trunkR*s,3.8*s,'inst_tree');
+   if(trunkR>0)addStaticCol(x,z,y-sink,trunkR*s,3.8*s,'inst_tree',trunkR<=.36?Math.min(1.65,1.25*s):0,s);
    const gx=Math.min(GZ-1,Math.max(0,((x+B)/cell)|0)),gz=Math.min(GZ-1,Math.max(0,((z+B)/cell)|0));
    buckets[gz*GZ+gx].push(dummy.matrix.clone());n++;
   }
@@ -64114,6 +64142,7 @@ function lightFire(x,z,life){const y=H(x,z),g=new T.Group();
 // loop
 const dl=()=>(Math.sin(2*Math.PI*(t-.25))+1)/2;
 const day=new T.Color(0x8eb4c9),night=new T.Color(0x05080f),tmp=new T.Color();
+let TFLUSH=0;
 function update(dt){
  if(window.__bpMPtick)try{window.__bpMPtick(dt)}catch(e){}
  if(dead)return;age+=dt;hurtFx=Math.max(0,hurtFx-dt*1.6);
@@ -64123,7 +64152,7 @@ function update(dt){
  const dx=(-Math.sin(yaw)*f*cp+Math.cos(yaw)*s)/len*mv*sp*dt,dz=(-Math.cos(yaw)*f*cp-Math.sin(yaw)*s)/len*mv*sp*dt;
  if(fly){PAIR=0;PJV=0;P.x=Math.max(-B,Math.min(B,P.x+dx));P.z=Math.max(-B,Math.min(B,P.z+dz));P.y=Math.min(150,Math.max(P.y+Math.sin(pitch)*f/len*mv*sp*dt+((keys[' ']?1:0)-(keys.c?1:0))*sp*dt/* Space up / C down at fly speed (Super speed included in sp) */,Math.max(G(P.x,P.z),-2.9)+1.2));if(H(P.x,P.z)>=-1.2){LP.x=P.x;LP.z=P.z}}
  else if(!(window.BPVehicles&&BPVehicles.drive(dt,f,s)))groundMove(dx,dz,dt,mv)
- lastMv=mv*sp;cam.position.set(P.x,P.y,P.z);if(shake>0){cam.position.x+=(Math.random()-.5)*shake;cam.position.y+=(Math.random()-.5)*shake*.6;shake=Math.max(0,shake-dt*1.7)}cam.rotation.set(pitch+camK,yaw+camY,camR);cam.updateMatrixWorld();combatTick(dt,mv*(spr?1.6:1));
+ lastMv=mv*sp;cam.position.set(P.x,P.y,P.z);if(shake>0){cam.position.x+=(Math.random()-.5)*shake;cam.position.y+=(Math.random()-.5)*shake*.6;shake=Math.max(0,shake-dt*1.7)}{const gr=ground(cam.position.x,cam.position.z)+.3;if(cam.position.y<gr)cam.position.y=gr;pushCamFoliage()}cam.rotation.set(pitch+camK,yaw+camY,camR);cam.updateMatrixWorld();combatTick(dt,mv*(spr?1.6:1));
  // survival
  const d=dl();let temp=-10+28*d;const wet=precipAt(P.x,P.z);if(wx==='snow')temp-=wet?16:5;else if(wx==='storm')temp-=wet?11:3;else if(wx==='rain')temp-=wet?7:2;else if(wx==='fog')temp-=2;
  for(const q of fires){if(!q.keep)q.life-=dt*fwd*(pace/REF_PACE);if(!q.keep&&(wx==='rain'||wx==='storm')&&precipAt(q.x,q.z))q.life-=dt*fwd*(pace/REF_PACE)*(wx==='storm'?2.2:1.05);q.l.intensity=1.8+Math.random()*.8;q.fl.scale.y=.8+Math.random()*.5;if(Math.hypot(P.x-q.x,P.z-q.z)<7)temp+=30}
@@ -64147,6 +64176,7 @@ function update(dt){
  tmp.copy(night).lerp(day,Math.pow(d,.7));scene.background.copy(tmp);scene.fog.color.copy(tmp);
  hemi.intensity=.28+.55*d+(boltT>0?1.7:0);sky2(d);tintWeather(dt);weatherTick(dt,fwd);if(boltT>0){scene.background.lerp(boltWhite,.6);boltT-=dt}
  if(msgT>0&&(msgT-=dt)<=0)$('msg').textContent='';
+ if(terrDirty){if((TFLUSH-=dt)<=0){TFLUSH=.25;flushTerrain()}}else if(TFLUSH>0)TFLUSH=Math.max(0,TFLUSH-dt);
 }
 function tempWord(v){return v<20?'Freezing':v<40?'Cold':v<62?'Cool':v<85?'Warm':'Hot'}
 function hud(){
@@ -64217,6 +64247,48 @@ window.__bp.raiderShowcase=(pose)=>{
  pitch=-.06;cam.position.set(P.x,P.y,P.z);cam.rotation.set(pitch,yaw,0);cam.updateMatrixWorld();
  ren.render(scene,cam);
  return EN.length;
+};
+window.__bp.groundAudit=()=>{
+ if(!terrMesh)return{err:'no terrain'};
+ const pos=terrMesh.geometry.attributes.position,W=TN+1,map=terrLookup();
+ let site=null,best=0;
+ for(let iy=6;iy<TN-6;iy+=5)for(let ix=6;ix<TN-6;ix+=5){
+  const x=(ix/TN-.5)*TS,z=(.5-iy/TN)*TS,cx=Math.round(x/C),cz=Math.round(z/C),fx=cx*C,fz=cz*C,y=H(fx,fz);
+  if(y<1.3||y>7.8||FD.has(key(cx,cz))||nearMon(fx,fz,20)||onPlan(fx,fz,4))continue;
+  const target=y-.22;let drop=0;
+  for(let jy=iy-1;jy<=iy+1;jy++)for(let jx=ix-1;jx<=ix+1;jx++){
+   const vx=(jx/TN-.5)*TS,vz=(.5-jy/TN)*TS,d=Math.hypot(vx-fx,vz-fz),h=HG[jy*W+jx];
+   if(d<8&&h>target+.3)drop=Math.max(drop,h-target);
+  }
+  if(drop>best){best=drop;site={x:fx,z:fz,y,ix,iy}}
+ }
+ if(!site)return{err:'no slope'};
+ const saved=[];
+ for(let jy=site.iy-4;jy<=site.iy+4;jy++)for(let jx=site.ix-4;jx<=site.ix+4;jx++){
+  if(jx<0||jy<0||jx>TN||jy>TN)continue;
+  const vi=map[jy*W+jx];if(vi<0)continue;
+  const vx=(jx/TN-.5)*TS,vz=(.5-jy/TN)*TS;
+  saved.push({jx,jy,vi,d:Math.hypot(vx-site.x,vz-site.z),hg:HG[jy*W+jx]});
+ }
+ const fk=key(Math.round(site.x/C),Math.round(site.z/C));
+ construct(ITEMS.wood_foundation,{x:site.x,y:site.y,z:site.z,k:fk,p:'foundation',rot:0},1);
+ let nearDrop=0,farDrop=0,gap=0;
+ for(const v of saved){const nh=HG[v.jy*W+v.jx],drop=v.hg-nh;gap=Math.max(gap,Math.abs(pos.getY(v.vi)-nh));if(v.d<=8)nearDrop=Math.max(nearDrop,drop);else if(v.d>8.2)farDrop=Math.max(farDrop,drop)}
+ const dirtyBefore=terrDirty;
+ const sx=P.x,sy=P.y,sz=P.z;P.x=LP.x=site.x;P.z=LP.z=site.z;P.y=site.y+1.7;shake=40;
+ let camGap=1e9;
+ for(let i=0;i<6;i++){update(.05);const gy=ground(cam.position.x,cam.position.z);camGap=Math.min(camGap,cam.position.y-gy)}
+ const dirtyAfter=terrDirty;
+ let rocks=0,grown=0,maxR=0,rockErr=null;
+ for(const o of things){if(!o.userData||o.userData.k!=='rock')continue;const base=Math.min(1.65,Math.max(.42,(o.userData.rad||.68)*.78));let r=0;try{r=propColRad(o,'rock')}catch(e){rockErr=String(e);break}rocks++;if(r>base+.02)grown++;if(r>maxR)maxR=r;if(rocks>=20)break}
+ let canopy=0,fatCanopy=0;
+ for(const b of STATIC_GRID.values())for(const c of b)if(c.canopy>0){canopy++;if(c.r>.5)fatCanopy++}
+ const crates=[];
+ for(let i=0;i<CR.length&&crates.length<8;i++){const o=CR[i],gy=G(o.position.x,o.position.z,o.position.y+1.2);crates.push({y:+o.position.y.toFixed(3),G:+gy.toFixed(3),g:+ground(o.position.x,o.position.z).toFixed(3),dG:+(gy-o.position.y).toFixed(3)})}
+ const mons=[];
+ for(let i=0;i<MONS.length&&mons.length<6;i++){const m=MONS[i],gy=G(m.x,m.z,m.y+1);mons.push({n:m.n,y:+m.y.toFixed(3),G:+gy.toFixed(3),g:+ground(m.x,m.z).toFixed(3),dG:+(gy-m.y).toFixed(3)})}
+ P.x=LP.x=sx;P.y=sy;P.z=LP.z=sz;shake=0;
+ return{site:{x:+site.x.toFixed(1),z:+site.z.toFixed(1),y:+site.y.toFixed(2),pred:+best.toFixed(2)},dirtyBefore,dirtyAfter,nearDrop:+nearDrop.toFixed(3),farDrop:+farDrop.toFixed(3),meshGap:+gap.toFixed(4),camGap:+camGap.toFixed(3),rocks,grown,maxR:+maxR.toFixed(3),rockErr,canopy,fatCanopy,crates,mons};
 };
 window.__bp.colCheck=()=>{
  let staticCount=0;for(const b of STATIC_GRID.values())staticCount+=b.length;

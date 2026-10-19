@@ -10,7 +10,14 @@ catch { ({ chromium } = require(path.join(process.env.NPM_GLOBAL || '/usr/local/
 
 const file = path.resolve(process.argv[2] || new URL('../play.html', import.meta.url).pathname);
 const errors = [];
-const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const launchOpts = { args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] };
+let browser;
+try { browser = await chromium.launch(launchOpts); }
+catch {
+  const opts = { ...launchOpts, channel: 'chrome' };
+  if (process.env.CHROME_PATH) opts.executablePath = process.env.CHROME_PATH;
+  browser = await chromium.launch(opts);
+}
 const page = await browser.newPage({ viewport: { width: 1000, height: 600 } });
 page.on('pageerror', e => errors.push('pageerror: ' + e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });

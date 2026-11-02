@@ -7,7 +7,7 @@ let chromium;
 try { ({ chromium } = require('playwright')); }
 catch { ({ chromium } = require(path.join(process.env.NPM_GLOBAL || '/usr/local/lib/node_modules', 'playwright'))); }
 
-const file = path.resolve(process.argv[2] || new URL('../play.html', import.meta.url).pathname);
+const file = path.resolve(process.argv[2] || new URL('../archive/play.html', import.meta.url).pathname);
 const errors = [];
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1000, height: 600 } });

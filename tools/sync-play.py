@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Copy blackpine.js and blackpine.css into the inlined copy inside play.html.
+"""Refresh archive/play.html from blackpine.js and blackpine.css.
+
+The playable game is index.html (single file). This script does not read or write it.
 Run from anywhere:  python3 tools/sync-play.py"""
 import os
 d = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 rd = lambda n: open(os.path.join(d, n), encoding='utf-8').read()
-html, js, css = rd('play.html'), rd('blackpine.js').split('\n'), rd('blackpine.css')
+html, js, css = rd('archive/play.html'), rd('blackpine.js').split('\n'), rd('blackpine.css')
 # CSS: everything between the first <style> and </style>
 a = html.index('<style>\n') + len('<style>\n'); b = html.index('\n</style>', a)
 html = html[:a] + css.rstrip('\n') + html[b:]
@@ -15,5 +17,6 @@ e = next(i for i in range(s, len(h)) if h[i].startswith('(function(){'))
 body = [js[2].replace('export ', '', 1)] + js[3:]
 while body and body[-1] == '': body.pop()
 h = h[:s] + body + h[e:]
-open(os.path.join(d, 'play.html'), 'w', encoding='utf-8').write('\n'.join(h))
-print('play.html synced:', len(body), 'JS lines,', len(css.splitlines()), 'CSS lines')
+open(os.path.join(d, 'archive/play.html'), 'w', encoding='utf-8').write('\n'.join(h))
+print('archive/play.html synced:', len(body), 'JS lines,', len(css.splitlines()), 'CSS lines')
+print('index.html was not modified (it is the play source of truth).')

@@ -1,7 +1,14 @@
 # Handoff for a new chat
-Game: Blackpine (Three.js survival, single JS file `blackpine.js`, also inlined in `play.html`).
-Last change: compact HUD (top-center vitals, alert pills, messages below); settlers fetch fuel from red barrels. Rust-style components in COMPONENTS.md.
-Edit both `blackpine.js` AND `play.html` (inlined copy) to keep them in sync.
+
+**Play source of truth: `index.html`.** It is the single-file tip build, shipped unchanged (md5 `2ff28beaed95a11a6ea33cf9c20ca9f1`). It is a strict superset of the old `index (19).html`, including the FX layer and the J key (`FX.toggle`). Do not merge an older HTML back into it. Do not add nemesis work on top of what is already in that file.
+
+GitHub Pages plays that file directly. Root `index.html` is the game, not a redirect. Older HTML copies live in `archive/` (`index (18).html`, `index (19).html`, `play.html`, `test.html`, `blackpine-ai-base-save-fix.html`). Dead Harvest stays separate under `dead-harvest/`.
+
+`blackpine.js` and `blackpine.css` are the older modular tree. `python3 tools/sync-play.py` only refreshes `archive/play.html`. It does not touch `index.html`.
+
+Historical notes below describe that older tree (compact HUD, settlers, components in COMPONENTS.md).
+
+Game: Blackpine (Three.js survival). The notes that follow still refer to `blackpine.js` and the inlined copy that is now `archive/play.html`.
 Where things live in blackpine.js: `REC` (recipes), `ITEMS`, `GUNS`, `ITM` (3D models, built with MB: box/cyl/sph), `VMS` (viewmodel scale), `HOLD`, `RY` (recycler), `lootTable()`, `ARM_N` (armor), `COMP`/`catOf`/`needWB` (crafting categories).
 Not yet done / ideas: melee weapons (spear, machete) need player attack logic; attachments; component drops from junk piles; raider guns (`RGUN`) for new weapons; untested in a real browser.
 Latest: ammo types (AMMO, ammoSel, cycleAmmo, reloadDone), per-gun animation (ANIM table, gunPose, gunM sub-groups act/mag/cyl), FX particles (fxAdd), muzzle flash (makeFlash), burn (BURN). Untested in a real browser.

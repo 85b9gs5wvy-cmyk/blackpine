@@ -9,7 +9,7 @@ let chromium;
 try { ({ chromium } = require('playwright')); }
 catch { ({ chromium } = require(path.join(process.env.NPM_GLOBAL || '/usr/local/lib/node_modules', 'playwright'))); }
 
-const file = path.resolve(process.argv[2] || new URL('../play.html', import.meta.url).pathname);
+const file = path.resolve(process.argv[2] || new URL('../archive/play.html', import.meta.url).pathname);
 const SHOTS = process.env.SHOTS || '';
 const errors = [], fails = [];
 const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails.push(m); };
